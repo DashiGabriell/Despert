@@ -1,4 +1,10 @@
+---
+status: superseded in part by ADR-0007
+---
+
 # Multitenancy por RLS, robô fora do RLS
+
+> O ADR-0007 troca o dono dos dados: de `user_id` para a organização. O RLS como garantia e o robô fora do RLS continuam valendo.
 
 O sistema é multitenant: cada advogado vê apenas seus próprios dados, garantido por `user_id` e Row Level Security no Supabase. O n8n, porém, usa a chave `service_role`, que ignora o RLS — é quem escreve `prazos` e `execucoes` em nome do advogado correto (o `user_id` vem da configuração lida na própria execução).
 

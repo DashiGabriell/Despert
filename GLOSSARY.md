@@ -1,6 +1,6 @@
 # Despert — Monitor de Prazos
 
-Controle de prazos processuais para advogados: o robô lê o Diário de Justiça Eletrônico Nacional, identifica as publicações que atingem os processos monitorados e calcula a data de vencimento; a aplicação mostra o que está em risco e avisa por e-mail.
+Controle de prazos processuais para advogados solo, escritórios e departamentos jurídicos de empresa: o robô lê o Diário de Justiça Eletrônico Nacional, identifica as publicações que atingem os processos monitorados e calcula a data de vencimento; a aplicação mostra o que está em risco e avisa por e-mail.
 
 ## Language
 
@@ -15,14 +15,22 @@ Um item do DJEN dirigido a uma OAB ou a um número de processo. É a matéria-pr
 _Avoid_: notícia, movimentação, andamento
 
 **Monitoramento**:
-Um filtro cadastrado pelo advogado — OAB com UF, ou número de processo — que define quais publicações interessam a ele.
+Um filtro da organização — a OAB com UF de um advogado membro, ou um número de processo — que define quais publicações interessam a ela.
 _Avoid_: assinatura, rastreio, acompanhamento
+
+**Processo avulso**:
+Monitoramento por número de processo, cadastrado quando a OAB dos membros não basta (processo conduzido por escritório externo, por exemplo).
+_Avoid_: processo extra, processo manual
 
 ### Prazo
 
 **Prazo**:
 O intervalo concedido para uma manifestação processual, expresso em dias, com uma data de vencimento. Unidade central do sistema.
 _Avoid_: tarefa, compromisso, deadline
+
+**Responsável**:
+O membro que responde por um prazo: o dono da OAB intimada ou quem cadastrou o processo avulso. Pode ser trocado; quando a publicação intima mais de um membro, os demais são "também intimados".
+_Avoid_: dono do prazo, atribuído
 
 **Origem do prazo**:
 De onde vieram os dias do prazo: identificados no texto da publicação, ajustados à mão pelo advogado, ou assumidos pelo valor padrão quando o texto não informa.
@@ -45,7 +53,7 @@ Dia em que o expediente forense corre: dia de semana que não seja feriado nacio
 _Avoid_: dia de semana, dia útil bancário
 
 **Recesso forense**:
-Período de 20/12 a 20/01 em que o prazo não corre (CPC art. 220). Considerado quando a configuração do advogado assim determina.
+Período de 20/12 a 20/01 em que o prazo não corre (CPC art. 220). Considerado quando a configuração da organização assim determina.
 _Avoid_: férias, recesso de fim de ano
 
 **Urgência**:
@@ -59,11 +67,11 @@ Uma rodada do robô — programada ou disparada à mão — e seu resultado regi
 _Avoid_: job, run, ciclo
 
 **Busca agora**:
-Disparo manual de uma execução pelo botão da aplicação, com limite de frequência por advogado.
+Disparo manual de uma execução pelo botão da aplicação, com intervalo mínimo e quantidade por dia definidos pelo plano e contados para a organização inteira.
 _Avoid_: refresh, sincronizar
 
 **Resumo diário**:
-E-mail enviado a cada advogado depois de toda execução, listando os vencimentos dentro da janela de alerta. Sai sempre, mesmo quando não há nada na janela.
+E-mail enviado a cada membro depois de toda execução, listando os vencimentos dentro da janela de alerta dele — só os prazos em que é responsável ou todos da organização, conforme a preferência. Sai sempre, mesmo quando não há nada na janela.
 _Avoid_: newsletter, alerta diário
 
 **Janela de alerta**:
@@ -71,33 +79,77 @@ Quantos dias à frente do vencimento o prazo passa a aparecer no resumo diário.
 _Avoid_: lookahead, horizonte
 
 **Token de webhook**:
-Código secreto por advogado que autoriza o botão Busca agora a disparar uma execução no robô.
+Código secreto da organização que autoriza o botão Busca agora a disparar uma execução no robô.
 _Avoid_: senha, API key
 
 **Agenda**:
 A grade mensal da aplicação onde cada vencimento ocupa o seu dia. É a agenda da aplicação — não existe agenda externa.
 _Avoid_: Google Agenda, calendário do advogado, evento
 
-### Conta
+### Organização
+
+**Organização**:
+Quem contrata a aplicação e é dona dos monitoramentos, prazos, feriados, configurações e execuções. Pode ser um advogado solo (organização de um membro), um escritório ou o departamento jurídico de uma empresa; na tela aparece como "Escritório" ou "Departamento jurídico".
+_Avoid_: tenant, conta, workspace, empresa
+
+**Membro**:
+Uma pessoa com login que pertence a uma organização, com um papel. A mesma pessoa pode ser membro de mais de uma organização.
+_Avoid_: usuário, funcionário, colaborador
+
+**Papel**:
+O que um membro pode fazer na organização: Administrador, Advogado, Assistente ou Leitura.
+_Avoid_: perfil, permissão, cargo
+
+**Administrador**:
+Papel que gerencia a equipe, os feriados e as configurações da organização, além de tudo o que o Advogado faz. Não gerencia plano nem cobrança.
+_Avoid_: dono, titular, admin do sistema
 
 **Advogado**:
-Quem usa a aplicação: uma conta com e-mail e senha, dona exclusiva dos seus monitoramentos, prazos, feriados e configurações.
+Papel de quem tem OAB monitorada e responde por prazos: cria, edita, exclui e cumpre prazos e cadastra monitoramentos.
 _Avoid_: usuário, cliente, tenant
 
+**Assistente**:
+Papel de quem organiza a agenda sem responder pelo prazo (estagiário, secretária, paralegal): vê, edita e cumpre prazos, mas não exclui nem configura.
+_Avoid_: estagiário, secretária, auxiliar
+
+**Leitura**:
+Papel de quem só acompanha (sócio, diretoria): vê prazos e exporta relatórios, sem alterar nada.
+_Avoid_: visualizador, observador, convidado
+
+### Plano
+
+**Plano**:
+O pacote contratado pela organização — Solo, Escritório ou Corporativo — que define seus limites de uso. Só o dev atribui e ajusta.
+_Avoid_: assinatura, licença, pacote
+
+**Limite**:
+Quantidade máxima de algo que o plano permite à organização (membros, OABs, processos avulsos, buscas). O dev pode sobrescrever o limite de uma organização específica.
+_Avoid_: cota, franquia
+
+**Período de teste**:
+Os primeiros 7 dias de uma organização criada por autoatendimento, com os limites do Solo.
+_Avoid_: trial, degustação, freemium
+
+**Período de carência**:
+Os 15 dias após o fim do teste ou a falta de pagamento: primeiro tudo funciona com aviso, depois só leitura com o robô ainda avisando; ao final, o robô para. Nada é apagado.
+_Avoid_: bloqueio, suspensão, inadimplência
+
+### Sistema
+
 **Dev**:
-A conta que administra a aplicação inteira pelo painel `/dashitecnology`: contas, dados de todos os advogados, execuções, integração com o n8n e auditoria. Não é advogado e não tem prazos próprios.
+A conta que administra a aplicação inteira pelo painel `/dashitecnology`: organizações, planos, contas, dados, execuções, integração com o n8n e auditoria. Não é membro de nenhuma organização e não tem prazos próprios.
 _Avoid_: root, admin, superusuário
 
 **Entrar como advogado**:
-O dev usando as telas de um advogado, com os dados dele, para conferir ou corrigir algo. Vale só na aba aberta e cada alteração vai para a auditoria.
+O dev usando as telas de um membro, com os dados da organização dele, para conferir ou corrigir algo. Vale só na aba aberta e cada alteração vai para a auditoria.
 _Avoid_: impersonar, logar como, personificar
 
 **Configuração do sistema**:
-O que vale para todos os advogados ao mesmo tempo — hoje, a URL do webhook do n8n. Só o dev vê e altera.
+O que vale para todas as organizações ao mesmo tempo — hoje, a URL do webhook do n8n. Só o dev vê e altera.
 _Avoid_: configuração global, settings
 
 **Auditoria**:
-O registro de tudo o que um dev fez em contas, dados de advogados e na configuração do sistema: quem, quando, o quê e em qual conta.
+O registro de quem fez o quê, quando e em qual organização: todas as ações do dev e, nos planos que incluem auditoria, as alterações feitas pelos membros.
 _Avoid_: log, histórico (histórico é das execuções)
 
 **Janela de alerta do resumo**:
