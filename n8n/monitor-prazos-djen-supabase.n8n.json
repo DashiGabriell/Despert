@@ -1,0 +1,690 @@
+{
+  "name": "Monitor de Prazos - DJEN + Supabase",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Monitor de Prazos - DJEN (CNJ) + Supabase\n\n**Como configurar:**\n1. Rode `supabase/schema.sql` no SQL Editor do Supabase.\n2. Crie a credencial **Supabase** (Host = URL do projeto, Service Role Secret = chave `service_role`) e selecione-a em todos os nós verdes do Supabase.\n3. Crie as credenciais **Gmail** e **Google Calendar** (OAuth2). Se não quiser a agenda, desative o nó \"Criar Evento na Agenda\".\n4. Ative o fluxo e copie a **Production URL** do nó \"Disparo pelo Site\" para a aba Configurações do site.\n5. OABs, processos, feriados e e-mail são cadastrados pelo site.\n\nRoda de seg. a sex. às 07:00 (Brasília), pelo botão manual ou pelo botão \"Buscar agora\" do site.\n\n**Atenção:** os vencimentos são ESTIMADOS (dias úteis do CPC). Sempre confira no processo.",
+        "height": 480,
+        "width": 640,
+        "color": 4
+      },
+      "id": "53ea81cf-ec79-42f5-b90d-2e4e5923dbb3",
+      "name": "Notas",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -300,
+        -460
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "3def431d-023c-4405-961e-c2c654f1d5a6",
+      "name": "Executar manualmente",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 7 * * 1-5"
+            }
+          ]
+        }
+      },
+      "id": "d5f5d7ae-d8df-4713-b970-6ad761a5da95",
+      "name": "Todo dia útil 07:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "path": "monitor-prazos",
+        "responseMode": "onReceived",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "id": "a15b51c1-9898-4558-9c59-9fd6e3b93c69",
+      "name": "Disparo pelo Site",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        400
+      ],
+      "webhookId": "23b1be1a-34a7-4355-b813-b284ce779700"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "configuracoes",
+        "returnAll": true,
+        "filterType": "string",
+        "filterString": "id=eq.1"
+      },
+      "id": "ade0de65-92b2-4267-b7ac-d00cf902b46f",
+      "name": "Ler Configuração",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        240,
+        200
+      ],
+      "executeOnce": true,
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "monitoramentos",
+        "returnAll": true,
+        "filterType": "string",
+        "filterString": "ativo=is.true"
+      },
+      "id": "431d7bb2-adf9-4d69-a2a2-ec3f1ba07cad",
+      "name": "Ler Monitoramentos",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        460,
+        200
+      ],
+      "executeOnce": true,
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "feriados",
+        "returnAll": true
+      },
+      "id": "bd8fca50-7486-4647-a2b9-0e59ce1721be",
+      "name": "Ler Feriados",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        680,
+        200
+      ],
+      "executeOnce": true,
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const cfg = $('Ler Configuração').first().json || {};\nconst monitoramentos = $('Ler Monitoramentos').all().map(i => i.json).filter(m => m && m.tipo);\n\nfunction executou(nome) {\n  try { return $(nome).isExecuted; } catch (e) { return false; }\n}\nlet origemExecucao = 'manual';\nif (executou('Disparo pelo Site')) {\n  origemExecucao = 'site';\n  const token = ($('Disparo pelo Site').first().json.query || {}).token;\n  if (!cfg.webhook_token || token !== cfg.webhook_token) {\n    throw new Error('Disparo pelo site recusado: token inválido.');\n  }\n} else if (executou('Todo dia útil 07:00')) {\n  origemExecucao = 'agendado';\n}\n\nconst hoje = DateTime.now().setZone('America/Sao_Paulo');\nconst base = {\n  dataDisponibilizacaoInicio: hoje.minus({ days: Number(cfg.dias_retroativos || 5) }).toISODate(),\n  dataDisponibilizacaoFim: hoje.toISODate(),\n  itensPorPagina: 100,\n};\n\nconst consultas = [];\nfor (const m of monitoramentos) {\n  if (m.tipo === 'oab') {\n    const numero = String(m.oab_numero || '').replace(/\\D/g, '');\n    if (!numero || !m.oab_uf) continue;\n    consultas.push({ json: { origemExecucao, query: { ...base, numeroOab: numero, ufOab: String(m.oab_uf).toUpperCase() } } });\n  } else if (m.tipo === 'processo') {\n    const numero = String(m.numero_processo || '').replace(/\\D/g, '');\n    if (numero.length !== 20) continue;\n    consultas.push({ json: { origemExecucao, query: { ...base, numeroProcesso: numero } } });\n  }\n}\n\nif (!consultas.length) {\n  throw new Error('Nenhuma OAB ou processo ativo cadastrado. Cadastre na aba \"Monitoramento\" do site.');\n}\nreturn consultas;"
+      },
+      "id": "bea6bcdd-dbd0-4704-9fb5-8fe64c5f365d",
+      "name": "Montar Consultas",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        900,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://comunicaapi.pje.jus.br/api/v1/comunicacao",
+        "sendQuery": true,
+        "specifyQuery": "json",
+        "jsonQuery": "={{ JSON.stringify($json.query) }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 1500
+            }
+          },
+          "pagination": {
+            "pagination": {
+              "parameters": {
+                "parameters": [
+                  {
+                    "type": "qs",
+                    "name": "pagina",
+                    "value": "={{ $pageCount + 1 }}"
+                  }
+                ]
+              },
+              "paginationCompleteWhen": "other",
+              "completeExpression": "={{ ((($response.body || {}).items) || []).length < 100 }}",
+              "limitPagesFetched": true,
+              "maxRequests": 50
+            }
+          },
+          "timeout": 60000
+        }
+      },
+      "id": "b1ed7e38-29c9-40ab-a255-55d0f1f53b74",
+      "name": "Consultar DJEN",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1120,
+        200
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Ler Configuração').first().json.email_destino }}",
+        "subject": "[Prazos] FALHA ao consultar o Diário (DJEN) - verifique manualmente hoje",
+        "emailType": "html",
+        "message": "=<p>O monitor de prazos não conseguiu consultar a API do DJEN/CNJ em {{ $now.setZone('America/Sao_Paulo').toFormat('dd/MM/yyyy HH:mm') }}.</p><p><b>Verifique as publicações manualmente hoje</b> em <a href=\"https://comunica.pje.jus.br/\">comunica.pje.jus.br</a>.</p><pre>{{ JSON.stringify($json.error || $json, null, 2) }}</pre>",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "id": "167d369a-aee1-4d8d-b480-84f29a3932d0",
+      "name": "E-mail de Falha",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1360,
+        460
+      ],
+      "executeOnce": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "tableId": "execucoes",
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "origem",
+              "fieldValue": "={{ $('Montar Consultas').first().json.origemExecucao }}"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "falha"
+            },
+            {
+              "fieldId": "detalhe",
+              "fieldValue": "={{ JSON.stringify($('Consultar DJEN').first().json.error || $('Consultar DJEN').first().json).slice(0, 2000) }}"
+            }
+          ]
+        }
+      },
+      "id": "d81c50c1-582a-4d88-ba03-cd8f771af8d1",
+      "name": "Registrar Falha",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1580,
+        460
+      ],
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const cfg = $('Ler Configuração').first().json || {};\nconst TZ = 'America/Sao_Paulo';\nconst PRAZO_PADRAO = Number(cfg.prazo_padrao_dias || 15);\nconst extras = new Set($('Ler Feriados').all().map(i => String(i.json.data || '').slice(0, 10)).filter(Boolean));\n\nfunction pascoa(y) {\n  const a = y % 19, b = Math.floor(y / 100), c = y % 100, d = Math.floor(b / 4), e = b % 4;\n  const f = Math.floor((b + 8) / 25), g = Math.floor((b - f + 1) / 3);\n  const h = (19 * a + b - d - g + 15) % 30, i = Math.floor(c / 4), k = c % 4;\n  const l = (32 + 2 * e + 2 * i - h - k) % 7, m = Math.floor((a + 11 * h + 22 * l) / 451);\n  const mes = Math.floor((h + l - 7 * m + 114) / 31), dia = ((h + l - 7 * m + 114) % 31) + 1;\n  return DateTime.fromObject({ year: y, month: mes, day: dia }, { zone: TZ });\n}\n\nconst cacheFeriados = {};\nfunction feriadosNacionais(y) {\n  if (cacheFeriados[y]) return cacheFeriados[y];\n  const s = new Set(['01-01', '04-21', '05-01', '09-07', '10-12', '11-02', '11-15', '11-20', '12-25'].map(md => y + '-' + md));\n  s.add(pascoa(y).minus({ days: 2 }).toISODate());\n  cacheFeriados[y] = s;\n  return s;\n}\n\nfunction ehDiaUtil(d) {\n  if (d.weekday > 5) return false;\n  const iso = d.toISODate();\n  if (feriadosNacionais(d.year).has(iso) || extras.has(iso)) return false;\n  if (cfg.considerar_recesso !== false) {\n    const md = d.toFormat('MM-dd');\n    if (md >= '12-20' || md <= '01-20') return false;\n  }\n  return true;\n}\nfunction proximoDiaUtil(d) {\n  let x = d.plus({ days: 1 });\n  while (!ehDiaUtil(x)) x = x.plus({ days: 1 });\n  return x;\n}\nfunction calcularVencimento(inicio, dias) {\n  let x = inicio;\n  for (let c = 1; c < dias; c++) x = proximoDiaUtil(x);\n  return x;\n}\n\nconst POR_EXTENSO = { um: 1, uma: 1, dois: 2, duas: 2, 'três': 3, tres: 3, quatro: 4, cinco: 5, seis: 6, sete: 7, oito: 8, nove: 9, dez: 10, onze: 11, doze: 12, quinze: 15, vinte: 20, trinta: 30, quarenta: 40, sessenta: 60, noventa: 90 };\n\nfunction detectarPrazo(texto) {\n  const t = texto.toLowerCase();\n  const achados = [];\n  for (const m of t.matchAll(/(?:prazo|em|dentro de)\\s+(?:\\S+\\s+){0,2}?(?:de\\s+)?(\\d{1,3})\\s*(?:\\([^)]{0,40}\\))?\\s*dias?\\b/g)) {\n    if (+m[1] >= 1 && +m[1] <= 365) achados.push(+m[1]);\n  }\n  for (const m of t.matchAll(/(?:prazo|em|dentro de)\\s+(?:\\S+\\s+){0,2}?(?:de\\s+)?(\\S+)\\s+dias?\\b/g)) {\n    if (POR_EXTENSO[m[1]]) achados.push(POR_EXTENSO[m[1]]);\n  }\n  const distintos = [...new Set(achados)].sort((a, b) => a - b);\n  if (distintos.length === 1) return { dias: distintos[0], origem: 'Identificado no texto' };\n  if (distintos.length > 1) {\n    return { dias: distintos[0], origem: 'Mais de um prazo no texto (' + distintos.join(', ') + ' dias) - usado o menor, CONFERIR' };\n  }\n  const m = t.match(/(\\d{1,3})\\s*(?:\\([^)]{0,40}\\))?\\s*horas/);\n  if (m) return { dias: Math.max(1, Math.ceil(+m[1] / 24)), origem: 'Prazo em horas (' + m[1] + 'h) - CONFERIR' };\n  return { dias: PRAZO_PADRAO, origem: 'Padrão (' + PRAZO_PADRAO + ' dias) - não identificado no texto' };\n}\n\nfunction parseData(v) {\n  if (!v) return null;\n  const s = String(v).slice(0, 10);\n  const d = /^\\d{4}-\\d{2}-\\d{2}$/.test(s) ? DateTime.fromISO(s, { zone: TZ }) : DateTime.fromFormat(s, 'dd/MM/yyyy', { zone: TZ });\n  return d.isValid ? d : null;\n}\nconst DIACRITICOS = { acute: '\\u0301', grave: '\\u0300', tilde: '\\u0303', circ: '\\u0302', cedil: '\\u0327', uml: '\\u0308' };\nconst ENTIDADES = { nbsp: ' ', amp: '&', lt: '<', gt: '>', quot: '\"', apos: \"'\", ordm: 'º', ordf: 'ª', sect: '§', deg: '°', ndash: '-', mdash: '-', laquo: '«', raquo: '»', ldquo: '\"', rdquo: '\"', lsquo: \"'\", rsquo: \"'\", hellip: '...' };\nfunction limparHtml(s) {\n  return String(s || '')\n    .replace(/<(style|script|head)[\\s\\S]*?<\\/\\1>/gi, ' ')\n    .replace(/<br\\s*\\/?>/gi, ' ')\n    .replace(/<[^>]+>/g, ' ')\n    .replace(/&([A-Za-z])(acute|grave|tilde|circ|cedil|uml);/g, (_, l, d) => (l + DIACRITICOS[d]).normalize('NFC'))\n    .replace(/&#x([0-9a-f]+);/gi, (_, h) => String.fromCodePoint(parseInt(h, 16)))\n    .replace(/&#(\\d+);/g, (_, n) => String.fromCodePoint(+n))\n    .replace(/&([a-z]+);/gi, (m, e) => ENTIDADES[e.toLowerCase()] ?? m)\n    .replace(/\\s+/g, ' ')\n    .trim();\n}\n\nconst porId = new Map();\nfor (const item of $input.all()) {\n  const lista = Array.isArray(item.json.items) ? item.json.items : [];\n  for (const c of lista) {\n    const id = String(c.id ?? c.hash ?? '');\n    if (id && !porId.has(id)) porId.set(id, c);\n  }\n}\n\nconst saida = [];\nfor (const [id, c] of porId) {\n  const teor = limparHtml(c.texto);\n  const prazo = detectarPrazo(teor);\n  const disponibilizacao = parseData(c.data_disponibilizacao || c.datadisponibilizacao || c.dataDisponibilizacao);\n  const publicacao = disponibilizacao ? proximoDiaUtil(disponibilizacao) : null;\n  const inicio = publicacao ? proximoDiaUtil(publicacao) : null;\n  const vencimento = inicio ? calcularVencimento(inicio, prazo.dias) : null;\n  const partes = (c.destinatarios || []).map(x => x.nome + (x.polo ? ' (' + x.polo + ')' : '')).join('; ');\n  const precisaConferir = !vencimento || /CONFERIR|Padrão/.test(prazo.origem);\n\n  saida.push({\n    json: {\n      djen_id: id,\n      processo: c.numeroprocessocommascara || c.numero_processo || '',\n      tribunal: c.siglaTribunal || '',\n      orgao: c.nomeOrgao || '',\n      tipo: [c.tipoComunicacao, c.tipoDocumento].filter(Boolean).join(' / '),\n      classe: String(c.nomeClasse || '').toUpperCase(),\n      partes,\n      prazo_dias: prazo.dias,\n      origem_prazo: prazo.origem,\n      data_disponibilizacao: disponibilizacao ? disponibilizacao.toISODate() : null,\n      data_publicacao: publicacao ? publicacao.toISODate() : null,\n      inicio_prazo: inicio ? inicio.toISODate() : null,\n      vencimento: vencimento ? vencimento.toISODate() : null,\n      status: precisaConferir ? 'conferir' : 'pendente',\n      link: c.link || 'https://comunica.pje.jus.br/',\n      teor: teor.slice(0, 20000),\n      _vencFim: vencimento ? vencimento.plus({ days: 1 }).toISODate() : null,\n    },\n  });\n}\n\nsaida.sort((a, b) => String(a.json.vencimento || '9999').localeCompare(String(b.json.vencimento || '9999')));\nreturn saida.length ? saida : [{ json: { _vazio: true } }];"
+      },
+      "id": "12bbab75-823f-45d8-85da-8ab5f25908f4",
+      "name": "Processar Publicações",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1360,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "prazos",
+        "returnAll": true,
+        "filterType": "string",
+        "filterString": "={{ (() => { const ids = $('Processar Publicações').all().map(i => i.json.djen_id).filter(Boolean); return ids.length ? 'djen_id=in.(' + ids.join(',') + ')' : 'djen_id=eq.nenhum'; })() }}"
+      },
+      "id": "6f5fcf2f-9f7c-4a74-b99b-3285211b573c",
+      "name": "Ler Já Salvos",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1580,
+        180
+      ],
+      "executeOnce": true,
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const jaSalvos = new Set(\n  $input.all().map(i => String(i.json.djen_id ?? '')).filter(Boolean)\n);\nconst publicacoes = $('Processar Publicações').all().filter(i => !i.json._vazio);\nconst novas = publicacoes.filter(i => !jaSalvos.has(String(i.json.djen_id)));\n\nreturn novas.length ? novas : [{ json: { _vazio: true } }];"
+      },
+      "id": "108f2767-74a8-4f9e-aad6-45a8965809c5",
+      "name": "Filtrar Novas",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1800,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "01c1455d-60e7-4ddd-8c4e-e7d3f132bfcf",
+              "leftValue": "={{ $json._vazio !== true }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "9068fcfe-8354-4900-97f9-79bfc9ddf19c",
+      "name": "Tem novas?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2020,
+        20
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all().map(i => {\n  const linha = {};\n  for (const [k, v] of Object.entries(i.json)) {\n    if (!k.startsWith('_')) linha[k] = v;\n  }\n  return { json: linha };\n});"
+      },
+      "id": "51df6ad7-cdb0-480c-ae3a-5b1088efc873",
+      "name": "Preparar Registros",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2240,
+        -80
+      ]
+    },
+    {
+      "parameters": {
+        "tableId": "prazos",
+        "dataToSend": "autoMapInputData",
+        "inputsToIgnore": ""
+      },
+      "id": "406f3ed7-7d82-44b0-bde2-8c864952e258",
+      "name": "Salvar Prazos",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        2460,
+        -80
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "calendar": {
+          "__rl": true,
+          "value": "={{ $('Ler Configuração').first().json.calendario_id || 'primary' }}",
+          "mode": "id"
+        },
+        "start": "={{ $json.vencimento || $now.setZone('America/Sao_Paulo').toISODate() }}T08:00:00",
+        "end": "={{ $json._vencFim || $now.setZone('America/Sao_Paulo').plus({ days: 1 }).toISODate() }}T08:00:00",
+        "useDefaultReminders": false,
+        "additionalFields": {
+          "allday": "yes",
+          "summary": "=PRAZO: {{ $json.tipo }} - {{ $json.processo }} ({{ $json.tribunal }})",
+          "description": "=Processo: {{ $json.processo }}\nTribunal/Órgão: {{ $json.tribunal }} - {{ $json.orgao }}\nClasse: {{ $json.classe }}\nPartes: {{ $json.partes }}\n\nDisponibilização: {{ $json.data_disponibilizacao }}\nPublicação: {{ $json.data_publicacao }}\nInício do prazo: {{ $json.inicio_prazo }}\nPrazo: {{ $json.prazo_dias }} dias ({{ $json.origem_prazo }})\nVENCIMENTO ESTIMADO: {{ $json.vencimento }}\n\nLink: {{ $json.link }}\n\nTeor:\n{{ String($json.teor || '').slice(0, 1500) }}\n\n(Prazo calculado automaticamente - confira no processo.)"
+        },
+        "remindersUi": {
+          "remindersValues": [
+            {
+              "method": "popup",
+              "minutes": 4320
+            },
+            {
+              "method": "popup",
+              "minutes": 1440
+            },
+            {
+              "method": "email",
+              "minutes": 2880
+            }
+          ]
+        }
+      },
+      "id": "4fc85ab7-298d-441f-8859-1caee096f825",
+      "name": "Criar Evento na Agenda",
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.3,
+      "position": [
+        2240,
+        100
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "prazos",
+        "returnAll": true,
+        "filterType": "string",
+        "filterString": "={{ 'status=in.(pendente,conferir)&vencimento=gte.' + $now.setZone('America/Sao_Paulo').minus({ days: 30 }).toISODate() + '&vencimento=lte.' + $now.setZone('America/Sao_Paulo').plus({ days: Number($('Ler Configuração').first().json.dias_alerta || 7) }).toISODate() }}"
+      },
+      "id": "e19e3268-f8cd-4267-a4d5-9f1e29e33a4e",
+      "name": "Prazos em Alerta",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        2020,
+        300
+      ],
+      "executeOnce": true,
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const cfg = $('Ler Configuração').first().json || {};\nconst TZ = 'America/Sao_Paulo';\nconst hoje = DateTime.now().setZone(TZ).startOf('day');\nconst JANELA = Number(cfg.dias_alerta || 7);\nconst esc = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\"/g, '&quot;');\nconst br = iso => (iso ? DateTime.fromISO(String(iso).slice(0, 10)).toFormat('dd/MM/yyyy') : '-');\n\nconst encontradas = $('Processar Publicações').all().filter(i => !i.json._vazio).length;\nconst novas = $('Filtrar Novas').all().map(i => i.json).filter(j => !j._vazio);\nconst doBanco = $input.all().map(i => i.json).filter(r => r && r.djen_id);\n\nconst vistos = new Set();\nconst alertas = [];\nfor (const r of [...novas, ...doBanco]) {\n  const id = String(r.djen_id);\n  if (vistos.has(id)) continue;\n  vistos.add(id);\n  if (!['pendente', 'conferir'].includes(r.status) || !r.vencimento) continue;\n  const dias = Math.round(DateTime.fromISO(String(r.vencimento).slice(0, 10), { zone: TZ }).diff(hoje, 'days').days);\n  if (dias < -30 || dias > JANELA) continue;\n  alertas.push({ ...r, _dias: dias });\n}\nalertas.sort((a, b) => a._dias - b._dias);\n\nfunction situacao(d) {\n  if (d < 0) return '<b style=\"color:#b00020\">VENCIDO há ' + -d + ' dia(s)</b>';\n  if (d === 0) return '<b style=\"color:#b00020\">VENCE HOJE</b>';\n  if (d === 1) return '<b style=\"color:#d35400\">Vence amanhã</b>';\n  return 'Em ' + d + ' dias';\n}\nconst TH = 'style=\"text-align:left;padding:6px;border-bottom:2px solid #333;background:#f2f2f2\"';\nconst TD = 'style=\"padding:6px;border-bottom:1px solid #ddd;vertical-align:top\"';\nconst link = r => (r.link ? '<a href=\"' + esc(r.link) + '\">abrir</a>' : '');\nconst tabela = (cabecalho, linhas) =>\n  '<table style=\"border-collapse:collapse;width:100%\"><tr>' + cabecalho.map(h => '<th ' + TH + '>' + h + '</th>').join('') + '</tr>' +\n  linhas.map(cols => '<tr>' + cols.map(c => '<td ' + TD + '>' + c + '</td>').join('') + '</tr>').join('') + '</table>';\n\nlet html = '<div style=\"font-family:Arial,sans-serif;font-size:14px;color:#222\">';\nhtml += '<h2>Monitor de Prazos - ' + hoje.toFormat('dd/MM/yyyy') + '</h2>';\n\nhtml += '<h3>Prazos em alerta (próximos ' + JANELA + ' dias e vencidos não cumpridos)</h3>';\nhtml += alertas.length\n  ? tabela(['Situação', 'Vencimento', 'Processo', 'Tribunal', 'Tipo', 'Link'],\n      alertas.map(r => [situacao(r._dias), esc(br(r.vencimento)), esc(r.processo), esc(r.tribunal), esc(r.tipo), link(r)]))\n  : '<p>Nenhum prazo pendente nessa janela.</p>';\n\nhtml += '<h3>Novas publicações no DJEN (' + novas.length + ')</h3>';\nhtml += novas.length\n  ? tabela(['Vencimento', 'Prazo', 'Processo', 'Tribunal / Órgão', 'Tipo', 'Trecho', 'Link'],\n      novas.map(r => [\n        '<b>' + esc(br(r.vencimento)) + '</b>',\n        esc(r.prazo_dias) + ' dias<br><small>' + esc(r.origem_prazo) + '</small>',\n        esc(r.processo),\n        esc(r.tribunal) + '<br><small>' + esc(r.orgao) + '</small>',\n        esc(r.tipo),\n        '<small>' + esc(String(r.teor || '').slice(0, 300)) + '...</small>',\n        link(r),\n      ]))\n  : '<p>Nenhuma publicação nova desde a última verificação.</p>';\n\nhtml += '<p style=\"color:#777;font-size:12px;margin-top:24px\">Vencimentos estimados automaticamente em dias úteis (CPC arts. 219, 220 e 224; Lei 11.419/2006, art. 4º). '\n  + 'Sempre confira no processo. Marque o prazo como cumprido no painel para tirá-lo dos alertas.</p></div>';\n\nconst assunto = '[Prazos] '\n  + (novas.length ? novas.length + ' nova(s) publicação(ões)' : 'Sem novas publicações')\n  + (alertas.length ? ' | ' + alertas.length + ' prazo(s) em alerta' : '');\n\nreturn [{ json: {\n  assunto,\n  html,\n  encontradas,\n  novas: novas.length,\n  origem: $('Montar Consultas').first().json.origemExecucao,\n} }];"
+      },
+      "id": "9b7d0252-feb8-467a-b55f-d6ad3d621e87",
+      "name": "Montar E-mail",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2240,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Ler Configuração').first().json.email_destino }}",
+        "subject": "={{ $json.assunto }}",
+        "emailType": "html",
+        "message": "={{ $json.html }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "id": "494efff5-9a8c-4b8c-bf05-b80f6af57e3c",
+      "name": "Enviar Resumo",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        2460,
+        220
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "tableId": "execucoes",
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "origem",
+              "fieldValue": "={{ $json.origem }}"
+            },
+            {
+              "fieldId": "encontradas",
+              "fieldValue": "={{ $json.encontradas }}"
+            },
+            {
+              "fieldId": "novas",
+              "fieldValue": "={{ $json.novas }}"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "ok"
+            }
+          ]
+        }
+      },
+      "id": "c5d2c741-9aac-4024-aaef-d578ce3b7f73",
+      "name": "Registrar Execução",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        2460,
+        400
+      ]
+    }
+  ],
+  "connections": {
+    "Executar manualmente": {
+      "main": [
+        [
+          {
+            "node": "Ler Configuração",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Todo dia útil 07:00": {
+      "main": [
+        [
+          {
+            "node": "Ler Configuração",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Disparo pelo Site": {
+      "main": [
+        [
+          {
+            "node": "Ler Configuração",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ler Configuração": {
+      "main": [
+        [
+          {
+            "node": "Ler Monitoramentos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ler Monitoramentos": {
+      "main": [
+        [
+          {
+            "node": "Ler Feriados",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ler Feriados": {
+      "main": [
+        [
+          {
+            "node": "Montar Consultas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Montar Consultas": {
+      "main": [
+        [
+          {
+            "node": "Consultar DJEN",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Consultar DJEN": {
+      "main": [
+        [
+          {
+            "node": "Processar Publicações",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "E-mail de Falha",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "E-mail de Falha": {
+      "main": [
+        [
+          {
+            "node": "Registrar Falha",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Processar Publicações": {
+      "main": [
+        [
+          {
+            "node": "Ler Já Salvos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ler Já Salvos": {
+      "main": [
+        [
+          {
+            "node": "Filtrar Novas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filtrar Novas": {
+      "main": [
+        [
+          {
+            "node": "Tem novas?",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Prazos em Alerta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tem novas?": {
+      "main": [
+        [
+          {
+            "node": "Preparar Registros",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Criar Evento na Agenda",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Preparar Registros": {
+      "main": [
+        [
+          {
+            "node": "Salvar Prazos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prazos em Alerta": {
+      "main": [
+        [
+          {
+            "node": "Montar E-mail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Montar E-mail": {
+      "main": [
+        [
+          {
+            "node": "Enviar Resumo",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Registrar Execução",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/Sao_Paulo",
+    "saveManualExecutions": true
+  }
+}
