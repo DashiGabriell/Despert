@@ -6,7 +6,9 @@ export function fabricarPrazo(parcial: Partial<Prazo> = {}): Prazo {
   sequencia++
   return {
     id: `prazo-${sequencia}`,
+    organizacao_id: 'org-1',
     user_id: 'advogada-1',
+    responsavel_id: 'advogada-1',
     djen_id: `djen-${sequencia}`,
     processo: '0801234-56.2026.8.26.0100',
     tribunal: 'TJSP',

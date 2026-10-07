@@ -6,9 +6,9 @@ import { alertaErro, botaoPequeno, campo } from '../components/ui'
 import { useAtualizarPrazo, useConfiguracaoSistema, useMonitoramentos, usePrazos } from '../data/queries'
 import { filtrarPrazos, type FiltroRapido, type FiltroStatus } from '../domain/filtros'
 import { contarIndicadores } from '../domain/indicadores'
-import { useUserId } from '../lib/auth-context'
 import type { Prazo } from '../lib/database.types'
 import { useLayout } from '../lib/layout-context'
+import { useOrganizacaoId } from '../lib/organizacao-context'
 import { mensagemDeErro, useToast } from '../lib/toast-context'
 
 const OPCOES_STATUS: { valor: FiltroStatus; rotulo: string }[] = [
@@ -21,13 +21,13 @@ const OPCOES_STATUS: { valor: FiltroStatus; rotulo: string }[] = [
 ]
 
 export default function Prazos() {
-  const userId = useUserId()
+  const orgId = useOrganizacaoId()
   const { hoje, abrirPrazo, novoPrazo } = useLayout()
   const avisar = useToast()
-  const prazos = usePrazos(userId)
-  const monitoramentos = useMonitoramentos(userId)
+  const prazos = usePrazos(orgId)
+  const monitoramentos = useMonitoramentos(orgId)
   const sistema = useConfiguracaoSistema()
-  const atualizar = useAtualizarPrazo(userId)
+  const atualizar = useAtualizarPrazo(orgId)
 
   const [busca, setBusca] = useState('')
   const [status, setStatus] = useState<FiltroStatus>('abertos')

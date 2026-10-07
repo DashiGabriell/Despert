@@ -9,6 +9,7 @@ import {
   useExecucoes,
   useFeriados,
   useMonitoramentos,
+  usePertencas,
   usePrazos,
   useTempoReal,
 } from '../data/queries'
@@ -17,15 +18,17 @@ import { rotaDev, type Atuacao } from '../domain/acesso'
 import { formatarDataHora } from '../domain/datas'
 import type { DataISO, OpcoesDias } from '../domain/dias'
 import { contarIndicadores } from '../domain/indicadores'
+import { organizacaoAtiva } from '../domain/organizacao'
 import { useAuth, useEmailEfetivo, useUserId } from '../lib/auth-context'
 import type { Prazo } from '../lib/database.types'
 import type { ContextoLayout } from '../lib/layout-context'
+import { OrganizacaoContext, useOrganizacaoId } from '../lib/organizacao-context'
 import { ausenciaConfiguracao } from '../lib/supabase'
-import { useToast } from '../lib/toast-context'
+import { mensagemDeErro, useToast } from '../lib/toast-context'
 import BuscaAgora from './BuscaAgora'
 import ModalNovoPrazo from './ModalNovoPrazo'
 import ModalPrazo from './ModalPrazo'
-import { alertaAviso, botao, botaoPequeno } from './ui'
+import { alertaAviso, alertaErro, botao, botaoPequeno } from './ui'
 
 const CHAVE_MENU_RECOLHIDO = 'despert:menu-recolhido'
 
@@ -116,22 +119,49 @@ function FaixaAtuacao({ atuacao }: { atuacao: Atuacao }) {
 
 function AreaLogada() {
   const userId = useUserId()
+  const pertencas = usePertencas(userId)
+  const pertenca = organizacaoAtiva(pertencas.data ?? [])
+
+  if (pertencas.isPending) {
+    return <main className="grid min-h-dvh place-items-center text-sm text-muted">Carregando…</main>
+  }
+  if (!pertenca) {
+    return (
+      <main className="grid min-h-dvh place-items-center p-5">
+        <div role="alert" className={`${alertaErro} max-w-md`}>
+          {pertencas.isError
+            ? `Não foi possível carregar sua organização: ${mensagemDeErro(pertencas.error)}`
+            : 'Sua conta não está vinculada a nenhum escritório. Fale com o suporte.'}
+        </div>
+      </main>
+    )
+  }
+  return (
+    <OrganizacaoContext.Provider value={pertenca}>
+      <AreaDaOrganizacao />
+    </OrganizacaoContext.Provider>
+  )
+}
+
+function AreaDaOrganizacao() {
+  const userId = useUserId()
+  const orgId = useOrganizacaoId()
   const email = useEmailEfetivo() ?? ''
   const { sair, atuacao } = useAuth()
   const { pathname } = useLocation()
   const avisar = useToast()
   const hoje = useHoje()
-  useTempoReal(userId)
+  useTempoReal(orgId)
 
-  const prazos = usePrazos(userId)
-  const execucoes = useExecucoes(userId)
+  const prazos = usePrazos(orgId)
+  const execucoes = useExecucoes(orgId)
   const config = useConfiguracao(userId, email)
   const sistema = useConfiguracaoSistema()
-  const monitoramentos = useMonitoramentos(userId)
-  const feriados = useFeriados(userId)
-  const atualizar = useAtualizarPrazo(userId)
-  const excluir = useExcluirPrazo(userId)
-  const criar = useCriarPrazo(userId)
+  const monitoramentos = useMonitoramentos(orgId)
+  const feriados = useFeriados(orgId)
+  const atualizar = useAtualizarPrazo(orgId)
+  const excluir = useExcluirPrazo(orgId)
+  const criar = useCriarPrazo(orgId, userId)
 
   const [modal, setModal] = useState<ModalAberto>(null)
   const fechar = useCallback(() => setModal(null), [])
@@ -253,6 +283,7 @@ function AreaLogada() {
             </button>
             <BuscaAgora
               userId={userId}
+              orgId={orgId}
               config={config.data}
               webhookUrl={sistema.data?.n8n_webhook_url}
               monitoramentos={monitoramentos.data ?? []}

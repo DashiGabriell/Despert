@@ -33,7 +33,23 @@ vi.mock('./lib/supabase', () => ({
 }))
 
 const vazio = { data: [], isPending: false, isError: false, isSuccess: true }
+const PERTENCA = {
+  organizacao_id: 'org-1',
+  user_id: 'advogada-1',
+  papel: 'administrador',
+  criado_em: '2026-10-01T10:00:00Z',
+  organizacao: {
+    id: 'org-1',
+    nome: 'Escritório da Ana',
+    rotulo: 'escritorio',
+    plano: 'solo',
+    situacao: 'ativa',
+    teste_iniciado_em: null,
+    criado_em: '2026-10-01T10:00:00Z',
+  },
+}
 vi.mock('./data/queries', () => ({
+  usePertencas: () => ({ data: [PERTENCA], isPending: false, isError: false, isSuccess: true }),
   usePrazos: () => vazio,
   useExecucoes: () => vazio,
   useMonitoramentos: () => vazio,

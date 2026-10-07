@@ -3,15 +3,15 @@ import CalendarioMes from '../components/CalendarioMes'
 import { alertaErro } from '../components/ui'
 import { useFeriados, usePrazos } from '../data/queries'
 import { mesDe } from '../domain/datas'
-import { useUserId } from '../lib/auth-context'
 import { useLayout } from '../lib/layout-context'
+import { useOrganizacaoId } from '../lib/organizacao-context'
 import { mensagemDeErro } from '../lib/toast-context'
 
 export default function Agenda() {
-  const userId = useUserId()
+  const orgId = useOrganizacaoId()
   const { hoje, abrirPrazo, novoPrazo } = useLayout()
-  const prazos = usePrazos(userId)
-  const feriados = useFeriados(userId)
+  const prazos = usePrazos(orgId)
+  const feriados = useFeriados(orgId)
   const [mes, setMes] = useState(() => mesDe(hoje))
 
   return (

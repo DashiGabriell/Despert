@@ -16,6 +16,7 @@ import BotaoBuscarAgora from './BotaoBuscarAgora'
 
 interface Props {
   userId: string
+  orgId: string
   config: Configuracao | undefined
   /** URL do webhook da configuração do sistema (definida pelo dev). */
   webhookUrl: string | undefined
@@ -32,7 +33,7 @@ function maisRecente(a: string | null | undefined, b: string | null): string | n
  * Dispara o robô pela Production URL do webhook (ADR-0004). A resposta do fetch não é lida:
  * o resultado chega pela tabela de execuções, que a aplicação acompanha em tempo real.
  */
-export default function BuscaAgora({ userId, config, webhookUrl, monitoramentos }: Props) {
+export default function BuscaAgora({ userId, orgId, config, webhookUrl, monitoramentos }: Props) {
   const avisar = useToast()
   const navigate = useNavigate()
   const salvarConfig = useSalvarConfiguracao(userId)
@@ -41,7 +42,7 @@ export default function BuscaAgora({ userId, config, webhookUrl, monitoramentos 
   const ultima = maisRecente(config?.ultima_busca_em, ultimaLocal)
   const agora = useAgora(1000, ultima !== null || disparadoEm !== null)
   const acompanhando = disparadoEm !== null && agora - disparadoEm < LIMITE_ESPERA_MS
-  const { data: execucoes = [] } = useExecucoes(userId, { acompanhar: acompanhando })
+  const { data: execucoes = [] } = useExecucoes(orgId, { acompanhar: acompanhando })
 
   const execucao = disparadoEm === null ? null : execucaoDoDisparo(execucoes, disparadoEm)
   const restanteMs = restanteCooldown(ultima, agora)

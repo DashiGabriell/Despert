@@ -24,11 +24,13 @@ import { formatarData } from '../domain/datas'
 import { validarConfiguracao, validarFeriado, type FormConfiguracao } from '../domain/validacao'
 import { useEmailEfetivo, useUserId } from '../lib/auth-context'
 import type { Configuracao } from '../lib/database.types'
+import { useOrganizacaoId } from '../lib/organizacao-context'
 import { mensagemDeErro, useToast } from '../lib/toast-context'
 import { novoToken } from '../domain/token'
 
 export default function Configuracoes() {
   const userId = useUserId()
+  const orgId = useOrganizacaoId()
   const email = useEmailEfetivo()
   const config = useConfiguracao(userId, email)
 
@@ -51,7 +53,7 @@ export default function Configuracoes() {
           <FormularioConfiguracao key={config.data.updated_at} userId={userId} config={config.data} />
         )}
       </section>
-      <Feriados userId={userId} />
+      <Feriados userId={userId} orgId={orgId} />
     </div>
   )
 }
@@ -196,11 +198,11 @@ function FormularioConfiguracao({ userId, config }: { userId: string; config: Co
   )
 }
 
-function Feriados({ userId }: { userId: string }) {
+function Feriados({ userId, orgId }: { userId: string; orgId: string }) {
   const avisar = useToast()
-  const feriados = useFeriados(userId)
-  const criar = useCriarFeriado(userId)
-  const remover = useRemoverFeriado(userId)
+  const feriados = useFeriados(orgId)
+  const criar = useCriarFeriado(orgId, userId)
+  const remover = useRemoverFeriado(orgId)
   const [data, setData] = useState('')
   const [descricao, setDescricao] = useState('')
   const [erro, setErro] = useState<string | null>(null)

@@ -8,8 +8,32 @@ export type StatusPrazo = 'pendente' | 'conferir' | 'cumprido' | 'arquivado'
 export type TipoMonitoramento = 'oab' | 'processo'
 export type StatusExecucao = 'ok' | 'falha'
 export type Papel = 'dev' | 'advogado'
+export type PapelMembro = 'administrador' | 'advogado' | 'assistente' | 'leitura'
+export type RotuloOrganizacao = 'escritorio' | 'departamento_juridico'
+export type Plano = 'solo' | 'escritorio' | 'corporativo'
+export type SituacaoOrganizacao = 'teste' | 'ativa'
 
 export type Json = string | number | boolean | null | { [chave: string]: Json | undefined } | Json[]
+
+export type Organizacao = {
+  id: string
+  nome: string
+  rotulo: RotuloOrganizacao
+  plano: Plano
+  situacao: SituacaoOrganizacao
+  teste_iniciado_em: string | null
+  criado_em: string
+}
+
+export type Membro = {
+  organizacao_id: string
+  user_id: string
+  papel: PapelMembro
+  criado_em: string
+}
+
+/** Pertença de uma pessoa com os dados da organização (`membros` + `organizacoes`). */
+export type MembroComOrganizacao = Membro & { organizacao: Organizacao }
 
 export type Configuracao = {
   user_id: string
@@ -25,6 +49,7 @@ export type Configuracao = {
 
 export type Monitoramento = {
   id: number
+  organizacao_id: string
   user_id: string
   tipo: TipoMonitoramento
   oab_numero: string | null
@@ -36,6 +61,7 @@ export type Monitoramento = {
 }
 
 export type Feriado = {
+  organizacao_id: string
   user_id: string
   data: string
   descricao: string
@@ -43,7 +69,9 @@ export type Feriado = {
 
 export type Prazo = {
   id: string
+  organizacao_id: string
   user_id: string
+  responsavel_id: string | null
   djen_id: string
   processo: string | null
   tribunal: string | null
@@ -68,6 +96,7 @@ export type Prazo = {
 
 export type Execucao = {
   id: number
+  organizacao_id: string | null
   user_id: string | null
   executado_em: string
   origem: string | null
@@ -162,6 +191,26 @@ export type Database = {
         Update: Partial<Omit<Execucao, 'id'>>
         Relationships: []
       }
+      organizacoes: {
+        Row: Organizacao
+        Insert: Partial<Organizacao>
+        Update: Partial<Omit<Organizacao, 'id'>>
+        Relationships: []
+      }
+      membros: {
+        Row: Membro
+        Insert: Partial<Membro> & Pick<Membro, 'organizacao_id' | 'user_id'>
+        Update: Partial<Pick<Membro, 'papel'>>
+        Relationships: [
+          {
+            foreignKeyName: 'membros_organizacao_id_fkey'
+            columns: ['organizacao_id']
+            isOneToOne: false
+            referencedRelation: 'organizacoes'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       configuracao_sistema: {
         Row: ConfiguracaoSistema
         Insert: Partial<ConfiguracaoSistema>
@@ -178,6 +227,8 @@ export type Database = {
     Views: Record<string, never>
     Functions: {
       is_dev: { Args: Record<string, never>; Returns: boolean }
+      membro_de: { Args: { org: string }; Returns: boolean }
+      organizacao_de: { Args: { uid: string }; Returns: string | null }
       admin_listar_contas: { Args: Record<string, never>; Returns: ContaAdmin[] }
       admin_metricas: { Args: Record<string, never>; Returns: MetricasAdmin }
     }

@@ -18,17 +18,19 @@ import {
 } from '../data/queries'
 import { UFS, validarMonitoramento, type FormMonitoramento } from '../domain/validacao'
 import { useUserId } from '../lib/auth-context'
+import { useOrganizacaoId } from '../lib/organizacao-context'
 import { mensagemDeErro, useToast } from '../lib/toast-context'
 
 const FORM_VAZIO: FormMonitoramento = { tipo: 'oab', oab: '', uf: 'SP', processo: '', descricao: '' }
 
 export default function Monitoramento() {
   const userId = useUserId()
+  const orgId = useOrganizacaoId()
   const avisar = useToast()
-  const monitoramentos = useMonitoramentos(userId)
-  const criar = useCriarMonitoramento(userId)
-  const alternar = useAlternarMonitoramento(userId)
-  const remover = useRemoverMonitoramento(userId)
+  const monitoramentos = useMonitoramentos(orgId)
+  const criar = useCriarMonitoramento(orgId, userId)
+  const alternar = useAlternarMonitoramento(orgId)
+  const remover = useRemoverMonitoramento(orgId)
   const [form, setForm] = useState<FormMonitoramento>(FORM_VAZIO)
   const [erro, setErro] = useState<string | null>(null)
 

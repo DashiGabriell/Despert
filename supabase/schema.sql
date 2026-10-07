@@ -1,5 +1,6 @@
 -- Despert — Monitor de Prazos (DJEN)
--- Schema multitenant: cada advogado é dono exclusivo dos seus dados.
+-- Schema multitenant: a organização é dona dos dados (ADR-0007); o advogado solo é uma
+-- organização de um membro.
 -- Aplique este arquivo inteiro no SQL Editor do Supabase (idempotente: pode rodar de novo).
 
 -- ============================ configurações ============================
@@ -114,14 +115,149 @@ drop trigger if exists configuracoes_updated_at on public.configuracoes;
 create trigger configuracoes_updated_at before update on public.configuracoes
   for each row execute function public.tocar_updated_at();
 
+-- ============================ organizações ============================
+-- Dona dos dados. Por enquanto cada pessoa pertence a uma só organização; convites e
+-- papéis além do administrador chegam com a equipe.
+create table if not exists public.organizacoes (
+  id                uuid primary key default gen_random_uuid(),
+  nome              text not null default '',
+  rotulo            text not null default 'escritorio'
+                    check (rotulo in ('escritorio', 'departamento_juridico')),
+  plano             text not null default 'solo' check (plano in ('solo', 'escritorio', 'corporativo')),
+  situacao          text not null default 'teste' check (situacao in ('teste', 'ativa')),
+  teste_iniciado_em timestamptz,
+  criado_em         timestamptz not null default now()
+);
+
+create table if not exists public.membros (
+  organizacao_id uuid not null references public.organizacoes (id) on delete cascade,
+  user_id        uuid not null references auth.users (id) on delete cascade,
+  papel          text not null default 'administrador'
+                 check (papel in ('administrador', 'advogado', 'assistente', 'leitura')),
+  criado_em      timestamptz not null default now(),
+  primary key (organizacao_id, user_id)
+);
+create index if not exists membros_user_idx on public.membros (user_id);
+
+-- user_id continua: o n8n ainda grava por advogado e é o autor do registro.
+alter table public.monitoramentos add column if not exists organizacao_id uuid references public.organizacoes (id) on delete cascade;
+alter table public.feriados       add column if not exists organizacao_id uuid references public.organizacoes (id) on delete cascade;
+alter table public.prazos         add column if not exists organizacao_id uuid references public.organizacoes (id) on delete cascade;
+alter table public.prazos         add column if not exists responsavel_id uuid references auth.users (id) on delete set null;
+-- Falha geral, antes de identificar o advogado, não tem organização.
+alter table public.execucoes      add column if not exists organizacao_id uuid references public.organizacoes (id) on delete cascade;
+
+create index if not exists monitoramentos_org_idx on public.monitoramentos (organizacao_id);
+create index if not exists feriados_org_idx       on public.feriados (organizacao_id);
+create index if not exists prazos_org_vencimento_idx on public.prazos (organizacao_id, vencimento);
+create index if not exists execucoes_org_idx      on public.execucoes (organizacao_id, executado_em desc);
+
+-- Única organização de uma pessoa (a mais antiga, quando houver mais de uma).
+create or replace function public.organizacao_de(uid uuid) returns uuid
+language sql stable security definer set search_path = '' as $$
+  select organizacao_id from public.membros where user_id = uid order by criado_em limit 1
+$$;
+revoke all on function public.organizacao_de(uuid) from public, anon;
+grant execute on function public.organizacao_de(uuid) to authenticated, service_role;
+
+-- Base do RLS: o usuário logado é membro da organização?
+create or replace function public.membro_de(org uuid) returns boolean
+language sql stable security definer set search_path = '' as $$
+  select exists (select 1 from public.membros where organizacao_id = org and user_id = auth.uid())
+$$;
+revoke all on function public.membro_de(uuid) from public, anon;
+grant execute on function public.membro_de(uuid) to authenticated, service_role;
+
+-- O n8n (service_role) grava só o user_id: a organização vem do membro.
+create or replace function public.preencher_organizacao() returns trigger
+language plpgsql security definer set search_path = '' as $$
+begin
+  if new.organizacao_id is null and new.user_id is not null then
+    new.organizacao_id := public.organizacao_de(new.user_id);
+  end if;
+  if tg_table_name = 'prazos' then
+    if new.responsavel_id is null then
+      new.responsavel_id := new.user_id;
+    end if;
+  end if;
+  return new;
+end $$;
+
+do $$
+declare t text;
+begin
+  foreach t in array array['monitoramentos', 'feriados', 'prazos', 'execucoes'] loop
+    execute format('drop trigger if exists preencher_organizacao on public.%I', t);
+    execute format(
+      'create trigger preencher_organizacao before insert on public.%I
+         for each row execute function public.preencher_organizacao()', t);
+  end loop;
+end $$;
+
+-- Organização sem nenhum membro (conta excluída) não tem mais quem a acesse.
+create or replace function public.remover_organizacao_vazia() returns trigger
+language plpgsql security definer set search_path = '' as $$
+begin
+  if not exists (select 1 from public.membros where organizacao_id = old.organizacao_id) then
+    delete from public.organizacoes where id = old.organizacao_id;
+  end if;
+  return null;
+end $$;
+
+drop trigger if exists remover_organizacao_vazia on public.membros;
+create trigger remover_organizacao_vazia after delete on public.membros
+  for each row execute function public.remover_organizacao_vazia();
+
+-- Migração: cada conta existente (menos o dev) vira uma organização Solo de um membro.
+do $$
+declare
+  conta record;
+  org   uuid;
+begin
+  for conta in
+    select u.id, u.email from auth.users u
+    where coalesce(u.raw_app_meta_data ->> 'app_role', '') <> 'dev'
+      and not exists (select 1 from public.membros m where m.user_id = u.id)
+    order by u.created_at
+  loop
+    insert into public.organizacoes (nome, situacao)
+    values (split_part(coalesce(conta.email, ''), '@', 1), 'ativa')
+    returning id into org;
+    insert into public.membros (organizacao_id, user_id, papel) values (org, conta.id, 'administrador');
+  end loop;
+end $$;
+
+alter table public.prazos disable trigger prazos_updated_at;
+update public.prazos set organizacao_id = public.organizacao_de(user_id) where organizacao_id is null;
+update public.prazos set responsavel_id = user_id where responsavel_id is null;
+alter table public.prazos enable trigger prazos_updated_at;
+update public.monitoramentos set organizacao_id = public.organizacao_de(user_id) where organizacao_id is null;
+update public.feriados       set organizacao_id = public.organizacao_de(user_id) where organizacao_id is null;
+update public.execucoes      set organizacao_id = public.organizacao_de(user_id)
+  where organizacao_id is null and user_id is not null;
+
+-- Falha aqui = existe dado de alguém sem organização (o dev não deve ter dados próprios).
+alter table public.monitoramentos alter column organizacao_id set not null;
+alter table public.feriados       alter column organizacao_id set not null;
+alter table public.prazos         alter column organizacao_id set not null;
+
 -- ============================ nova conta ============================
--- Toda conta nova nasce com uma configuração padrão e o e-mail já como destino do resumo.
+-- Toda conta nova nasce com uma configuração padrão, o e-mail já como destino do resumo,
+-- e a própria organização (Solo, em período de teste) da qual é administradora.
 create or replace function public.ao_criar_conta() returns trigger
 language plpgsql security definer set search_path = public as $$
+declare
+  org uuid;
 begin
   insert into public.configuracoes (user_id, email_destino)
   values (new.id, coalesce(new.email, ''))
   on conflict (user_id) do nothing;
+  if not exists (select 1 from public.membros where user_id = new.id) then
+    insert into public.organizacoes (nome, situacao, teste_iniciado_em)
+    values (split_part(coalesce(new.email, ''), '@', 1), 'teste', now())
+    returning id into org;
+    insert into public.membros (organizacao_id, user_id, papel) values (org, new.id, 'administrador');
+  end if;
   return new;
 end $$;
 
@@ -130,25 +266,43 @@ create trigger criar_conta_configuracoes after insert on auth.users
   for each row execute function public.ao_criar_conta();
 
 -- ============================ RLS ============================
--- Usuário autenticado só toca nos próprios registros.
+-- Dados de negócio: qualquer membro da organização dona da linha.
+-- Configurações: cada pessoa só a própria.
 -- O n8n usa a chave service_role, que ignora o RLS.
 alter table public.configuracoes  enable row level security;
 alter table public.monitoramentos enable row level security;
 alter table public.feriados       enable row level security;
 alter table public.prazos         enable row level security;
 alter table public.execucoes      enable row level security;
+alter table public.organizacoes   enable row level security;
+alter table public.membros        enable row level security;
+
+drop policy if exists "dono_do_registro" on public.configuracoes;
+create policy "dono_do_registro" on public.configuracoes
+  for all to authenticated
+  using (user_id = (select auth.uid()))
+  with check (user_id = (select auth.uid()));
 
 do $$
 declare t text;
 begin
-  foreach t in array array['configuracoes', 'monitoramentos', 'feriados', 'prazos', 'execucoes'] loop
+  foreach t in array array['monitoramentos', 'feriados', 'prazos', 'execucoes'] loop
     execute format('drop policy if exists "dono_do_registro" on public.%I', t);
-    execute format($p$create policy "dono_do_registro" on public.%I
+    execute format('drop policy if exists "membro_da_organizacao" on public.%I', t);
+    execute format($p$create policy "membro_da_organizacao" on public.%I
       for all to authenticated
-      using (user_id = (select auth.uid()))
-      with check (user_id = (select auth.uid()))$p$, t);
+      using (public.membro_de(organizacao_id))
+      with check (public.membro_de(organizacao_id))$p$, t);
   end loop;
 end $$;
+
+-- Organização e equipe: só leitura para os membros nesta fase.
+drop policy if exists "membro_le" on public.organizacoes;
+create policy "membro_le" on public.organizacoes
+  for select to authenticated using (public.membro_de(id));
+drop policy if exists "membro_le" on public.membros;
+create policy "membro_le" on public.membros
+  for select to authenticated using (public.membro_de(organizacao_id));
 
 -- ============================ papel dev ============================
 -- O papel fica em auth.users.raw_app_meta_data ->> 'app_role' (app_metadata): só a service_role altera.
@@ -163,11 +317,11 @@ $$;
 revoke all on function public.is_dev() from public, anon;
 grant execute on function public.is_dev() to authenticated, service_role;
 
--- O dev enxerga e altera os dados de qualquer advogado (suporte e "atuar como advogado").
+-- O dev enxerga e altera os dados de qualquer organização (suporte e "atuar como advogado").
 do $$
 declare t text;
 begin
-  foreach t in array array['configuracoes', 'monitoramentos', 'feriados', 'prazos', 'execucoes'] loop
+  foreach t in array array['configuracoes', 'monitoramentos', 'feriados', 'prazos', 'execucoes', 'organizacoes', 'membros'] loop
     execute format('drop policy if exists "dev_acesso_total" on public.%I', t);
     execute format($p$create policy "dev_acesso_total" on public.%I
       for all to authenticated

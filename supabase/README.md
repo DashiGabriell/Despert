@@ -1,6 +1,14 @@
 # Supabase — schema do Despert
 
-Banco multitenant: cada advogado vê apenas os próprios dados, garantido por Row Level Security.
+Banco multitenant: a **organização** (escritório ou departamento jurídico) é a dona dos dados — veja [ADR-0007](../docs/adr/0007-organizacao-e-o-tenant.md). Cada membro vê apenas os dados das organizações a que pertence, garantido por Row Level Security.
+
+## Organizações e membros
+
+- `organizacoes` é o tenant; `membros` liga uma conta a uma organização com um papel (`administrador`, `advogado`, `assistente`, `leitura`). Uma conta pode pertencer a várias.
+- `monitoramentos`, `feriados`, `prazos` e `execucoes` têm `organizacao_id`; a policy `membro_da_organizacao` usa `public.membro_de(organizacao_id)`.
+- `user_id` continua nas tabelas como autor. Se um insert vier só com `user_id` (como o n8n faz hoje), o gatilho `preencher_organizacao` completa `organizacao_id` com a organização mais antiga da conta — e, em `prazos`, `responsavel_id` com o próprio `user_id`.
+- Toda conta nova ganha uma organização em período de teste com ela como administradora. Contas anteriores viraram organizações Solo ativas na migração.
+- `configuracoes` continua por conta (a divisão entre configuração da organização e do membro vem na fase de equipe).
 
 ## Aplicar
 
@@ -42,6 +50,18 @@ Depois de rodar o `schema.sql`:
 3. Para promover outra conta depois: painel dev → **Usuários → Gerenciar → Promover a dev** (ou o mesmo `update` do fim do `schema.sql` com outro id).
 
 Se a URL do webhook estava salva por advogado (versão anterior), o `schema.sql` copia a mais recente para `configuracao_sistema` antes de remover a coluna antiga.
+
+## Verificar o isolamento (teste automatizado)
+
+[`tests/rls_organizacoes.sql`](./tests/rls_organizacoes.sql) assume a identidade de um membro da organização A e confirma que ele não lê, altera, exclui nem insere dados da organização B (a com mais prazos). Rode-o numa transação desfeita, para não deixar rastro:
+
+```sql
+begin;
+-- cole aqui o conteúdo de tests/rls_organizacoes.sql
+rollback;
+```
+
+Sem erro = isolamento ok. Qualquer vazamento interrompe com a mensagem do que A conseguiu fazer.
 
 ## Verificar o isolamento (2 contas)
 

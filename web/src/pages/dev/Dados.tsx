@@ -12,8 +12,9 @@ import {
   vazioTabela,
 } from '../../components/ui'
 import { useConfiguracaoDaConta, useContasAdmin } from '../../data/admin'
-import { useExecucoes, useFeriados, useMonitoramentos, usePrazos } from '../../data/queries'
+import { useExecucoes, useFeriados, useMonitoramentos, usePertencas, usePrazos } from '../../data/queries'
 import { formatarData, formatarDataHora } from '../../domain/datas'
+import { organizacaoAtiva } from '../../domain/organizacao'
 import { ROTULO_STATUS } from '../../domain/selo'
 import type { ContaAdmin } from '../../lib/database.types'
 import { mensagemDeErro } from '../../lib/toast-context'
@@ -72,6 +73,8 @@ export default function Dados() {
 function DadosDaConta({ conta }: { conta: ContaAdmin }) {
   const [aba, setAba] = useState<Aba>('prazos')
   const entrarComo = useEntrarComo()
+  const pertencas = usePertencas(conta.id)
+  const orgId = organizacaoAtiva(pertencas.data ?? [])?.organizacao_id
 
   return (
     <section className={cartao}>
@@ -93,11 +96,21 @@ function DadosDaConta({ conta }: { conta: ContaAdmin }) {
           Entrar como para editar
         </button>
       </div>
-      {aba === 'prazos' && <Prazos userId={conta.id} />}
-      {aba === 'monitoramentos' && <Monitoramentos userId={conta.id} />}
-      {aba === 'feriados' && <Feriados userId={conta.id} />}
       {aba === 'configuracao' && <Configuracao userId={conta.id} />}
-      {aba === 'execucoes' && <Execucoes userId={conta.id} />}
+      {aba !== 'configuracao' && pertencas.isPending && (
+        <div className="space-y-2.5 p-5">
+          <span className="sr-only">Carregando…</span>
+          <div className="ds-skeleton h-4 w-1/2" />
+        </div>
+      )}
+      {aba !== 'configuracao' && pertencas.isError && <Erro erro={pertencas.error} />}
+      {aba !== 'configuracao' && pertencas.isSuccess && !orgId && (
+        <p className="p-5 text-muted">Esta conta não pertence a nenhuma organização.</p>
+      )}
+      {orgId && aba === 'prazos' && <Prazos orgId={orgId} />}
+      {orgId && aba === 'monitoramentos' && <Monitoramentos orgId={orgId} />}
+      {orgId && aba === 'feriados' && <Feriados orgId={orgId} />}
+      {orgId && aba === 'execucoes' && <Execucoes orgId={orgId} />}
     </section>
   )
 }
@@ -128,8 +141,8 @@ function Erro({ erro }: { erro: unknown }) {
   return <div className={`${alertaErro} m-3.5`}>Não foi possível carregar: {mensagemDeErro(erro)}</div>
 }
 
-function Prazos({ userId }: { userId: string }) {
-  const prazos = usePrazos(userId)
+function Prazos({ orgId }: { orgId: string }) {
+  const prazos = usePrazos(orgId)
   const lista = prazos.data ?? []
   return (
     <div className="overflow-x-auto">
@@ -162,8 +175,8 @@ function Prazos({ userId }: { userId: string }) {
   )
 }
 
-function Monitoramentos({ userId }: { userId: string }) {
-  const monitoramentos = useMonitoramentos(userId)
+function Monitoramentos({ orgId }: { orgId: string }) {
+  const monitoramentos = useMonitoramentos(orgId)
   const lista = monitoramentos.data ?? []
   return (
     <div className="overflow-x-auto">
@@ -202,8 +215,8 @@ function Monitoramentos({ userId }: { userId: string }) {
   )
 }
 
-function Feriados({ userId }: { userId: string }) {
-  const feriados = useFeriados(userId)
+function Feriados({ orgId }: { orgId: string }) {
+  const feriados = useFeriados(orgId)
   const lista = feriados.data ?? []
   return (
     <div className="overflow-x-auto">
@@ -266,8 +279,8 @@ function Configuracao({ userId }: { userId: string }) {
   )
 }
 
-function Execucoes({ userId }: { userId: string }) {
-  const execucoes = useExecucoes(userId)
+function Execucoes({ orgId }: { orgId: string }) {
+  const execucoes = useExecucoes(orgId)
   const lista = execucoes.data ?? []
   return (
     <div className="overflow-x-auto">

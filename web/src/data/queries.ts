@@ -6,6 +6,7 @@ import type {
   Database,
   Execucao,
   Feriado,
+  MembroComOrganizacao,
   Monitoramento,
   Prazo,
 } from '../lib/database.types'
@@ -19,10 +20,11 @@ export function cliente() {
 }
 
 export const chaves = {
-  prazos: (userId: string) => ['prazos', userId] as const,
-  monitoramentos: (userId: string) => ['monitoramentos', userId] as const,
-  feriados: (userId: string) => ['feriados', userId] as const,
-  execucoes: (userId: string) => ['execucoes', userId] as const,
+  pertencas: (userId: string) => ['pertencas', userId] as const,
+  prazos: (orgId: string) => ['prazos', orgId] as const,
+  monitoramentos: (orgId: string) => ['monitoramentos', orgId] as const,
+  feriados: (orgId: string) => ['feriados', orgId] as const,
+  execucoes: (orgId: string) => ['execucoes', orgId] as const,
   configuracao: (userId: string) => ['configuracao', userId] as const,
   configuracaoSistema: ['configuracao-sistema'] as const,
 }
@@ -41,14 +43,40 @@ export function useConfiguracaoSistema() {
 
 // ------------------------------------------------------------------ leitura
 
-export function usePrazos(userId: string) {
+/** Organizações das quais a pessoa é membro, com os dados de cada uma. */
+export function usePertencas(userId: string) {
   return useQuery({
-    queryKey: chaves.prazos(userId),
+    queryKey: chaves.pertencas(userId),
+    queryFn: async (): Promise<MembroComOrganizacao[]> => {
+      const sb = cliente()
+      const membros = await sb.from('membros').select('*').eq('user_id', userId)
+      if (membros.error) throw membros.error
+      if (membros.data.length === 0) return []
+      const organizacoes = await sb
+        .from('organizacoes')
+        .select('*')
+        .in(
+          'id',
+          membros.data.map((m) => m.organizacao_id),
+        )
+      if (organizacoes.error) throw organizacoes.error
+      const porId = new Map(organizacoes.data.map((o) => [o.id, o]))
+      return membros.data.flatMap((m) => {
+        const organizacao = porId.get(m.organizacao_id)
+        return organizacao ? [{ ...m, organizacao }] : []
+      })
+    },
+  })
+}
+
+export function usePrazos(orgId: string) {
+  return useQuery({
+    queryKey: chaves.prazos(orgId),
     queryFn: async (): Promise<Prazo[]> => {
       const { data, error } = await cliente()
         .from('prazos')
         .select('*')
-        .eq('user_id', userId)
+        .eq('organizacao_id', orgId)
         .order('vencimento', { ascending: true, nullsFirst: false })
         .order('created_at', { ascending: true })
         .limit(5000)
@@ -58,14 +86,14 @@ export function usePrazos(userId: string) {
   })
 }
 
-export function useMonitoramentos(userId: string) {
+export function useMonitoramentos(orgId: string) {
   return useQuery({
-    queryKey: chaves.monitoramentos(userId),
+    queryKey: chaves.monitoramentos(orgId),
     queryFn: async (): Promise<Monitoramento[]> => {
       const { data, error } = await cliente()
         .from('monitoramentos')
         .select('*')
-        .eq('user_id', userId)
+        .eq('organizacao_id', orgId)
         .order('created_at', { ascending: true })
       if (error) throw error
       return data
@@ -73,14 +101,14 @@ export function useMonitoramentos(userId: string) {
   })
 }
 
-export function useFeriados(userId: string) {
+export function useFeriados(orgId: string) {
   return useQuery({
-    queryKey: chaves.feriados(userId),
+    queryKey: chaves.feriados(orgId),
     queryFn: async (): Promise<Feriado[]> => {
       const { data, error } = await cliente()
         .from('feriados')
         .select('*')
-        .eq('user_id', userId)
+        .eq('organizacao_id', orgId)
         .order('data', { ascending: true })
       if (error) throw error
       return data
@@ -88,14 +116,14 @@ export function useFeriados(userId: string) {
   })
 }
 
-export function useExecucoes(userId: string, opcoes: { acompanhar?: boolean } = {}) {
+export function useExecucoes(orgId: string, opcoes: { acompanhar?: boolean } = {}) {
   return useQuery({
-    queryKey: chaves.execucoes(userId),
+    queryKey: chaves.execucoes(orgId),
     queryFn: async (): Promise<Execucao[]> => {
       const { data, error } = await cliente()
         .from('execucoes')
         .select('*')
-        .eq('user_id', userId)
+        .eq('organizacao_id', orgId)
         .order('executado_em', { ascending: false })
         .limit(100)
       if (error) throw error
@@ -132,31 +160,31 @@ export function useConfiguracao(userId: string, email: string | undefined) {
 
 // ------------------------------------------------------------------ tempo real
 
-/** Recarrega prazos e execuções quando o robô grava algo para este advogado. */
-export function useTempoReal(userId: string) {
+/** Recarrega prazos e execuções quando o robô grava algo para esta organização. */
+export function useTempoReal(orgId: string) {
   const queryClient = useQueryClient()
   useEffect(() => {
     if (!supabase) return
     const sb = supabase
-    const filtro = `user_id=eq.${userId}`
+    const filtro = `organizacao_id=eq.${orgId}`
     const canal = sb
-      .channel(`despert-${userId}`)
+      .channel(`despert-${orgId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'prazos', filter: filtro }, () => {
-        queryClient.invalidateQueries({ queryKey: chaves.prazos(userId) })
+        queryClient.invalidateQueries({ queryKey: chaves.prazos(orgId) })
       })
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'execucoes', filter: filtro },
         () => {
-          queryClient.invalidateQueries({ queryKey: chaves.execucoes(userId) })
-          queryClient.invalidateQueries({ queryKey: chaves.prazos(userId) })
+          queryClient.invalidateQueries({ queryKey: chaves.execucoes(orgId) })
+          queryClient.invalidateQueries({ queryKey: chaves.prazos(orgId) })
         },
       )
       .subscribe()
     return () => {
       sb.removeChannel(canal)
     }
-  }, [userId, queryClient])
+  }, [orgId, queryClient])
 }
 
 // ------------------------------------------------------------------ escrita
@@ -166,8 +194,8 @@ function useInvalidar(...chavesAlvo: (readonly unknown[])[]) {
   return () => Promise.all(chavesAlvo.map((queryKey) => queryClient.invalidateQueries({ queryKey })))
 }
 
-export function useAtualizarPrazo(userId: string) {
-  const invalidar = useInvalidar(chaves.prazos(userId))
+export function useAtualizarPrazo(orgId: string) {
+  const invalidar = useInvalidar(chaves.prazos(orgId))
   return useMutation({
     mutationFn: async ({ id, dados }: { id: string; dados: Tabelas['prazos']['Update'] }) => {
       const { error } = await cliente().from('prazos').update(dados).eq('id', id)
@@ -177,21 +205,22 @@ export function useAtualizarPrazo(userId: string) {
   })
 }
 
-export function useCriarPrazo(userId: string) {
-  const invalidar = useInvalidar(chaves.prazos(userId))
+/** `userId` é o autor, que também fica como responsável pelo prazo. */
+export function useCriarPrazo(orgId: string, userId: string) {
+  const invalidar = useInvalidar(chaves.prazos(orgId))
   return useMutation({
     mutationFn: async (registro: Tabelas['prazos']['Insert']) => {
       const { error } = await cliente()
         .from('prazos')
-        .insert({ ...registro, user_id: userId })
+        .insert({ ...registro, organizacao_id: orgId, user_id: userId, responsavel_id: userId })
       if (error) throw error
     },
     onSuccess: invalidar,
   })
 }
 
-export function useExcluirPrazo(userId: string) {
-  const invalidar = useInvalidar(chaves.prazos(userId))
+export function useExcluirPrazo(orgId: string) {
+  const invalidar = useInvalidar(chaves.prazos(orgId))
   return useMutation({
     mutationFn: async (id: string) => {
       const { error } = await cliente().from('prazos').delete().eq('id', id)
@@ -201,21 +230,21 @@ export function useExcluirPrazo(userId: string) {
   })
 }
 
-export function useCriarMonitoramento(userId: string) {
-  const invalidar = useInvalidar(chaves.monitoramentos(userId))
+export function useCriarMonitoramento(orgId: string, userId: string) {
+  const invalidar = useInvalidar(chaves.monitoramentos(orgId))
   return useMutation({
     mutationFn: async (registro: Tabelas['monitoramentos']['Insert']) => {
       const { error } = await cliente()
         .from('monitoramentos')
-        .insert({ ...registro, user_id: userId, ativo: true })
+        .insert({ ...registro, organizacao_id: orgId, user_id: userId, ativo: true })
       if (error) throw error
     },
     onSuccess: invalidar,
   })
 }
 
-export function useAlternarMonitoramento(userId: string) {
-  const invalidar = useInvalidar(chaves.monitoramentos(userId))
+export function useAlternarMonitoramento(orgId: string) {
+  const invalidar = useInvalidar(chaves.monitoramentos(orgId))
   return useMutation({
     mutationFn: async ({ id, ativo }: { id: number; ativo: boolean }) => {
       const { error } = await cliente().from('monitoramentos').update({ ativo }).eq('id', id)
@@ -225,8 +254,8 @@ export function useAlternarMonitoramento(userId: string) {
   })
 }
 
-export function useRemoverMonitoramento(userId: string) {
-  const invalidar = useInvalidar(chaves.monitoramentos(userId))
+export function useRemoverMonitoramento(orgId: string) {
+  const invalidar = useInvalidar(chaves.monitoramentos(orgId))
   return useMutation({
     mutationFn: async (id: number) => {
       const { error } = await cliente().from('monitoramentos').delete().eq('id', id)
@@ -250,27 +279,27 @@ export function useSalvarConfiguracao(userId: string) {
   })
 }
 
-export function useCriarFeriado(userId: string) {
-  const invalidar = useInvalidar(chaves.feriados(userId))
+export function useCriarFeriado(orgId: string, userId: string) {
+  const invalidar = useInvalidar(chaves.feriados(orgId))
   return useMutation({
     mutationFn: async (feriado: { data: string; descricao: string }) => {
       const { error } = await cliente()
         .from('feriados')
-        .insert({ ...feriado, user_id: userId })
+        .insert({ ...feriado, organizacao_id: orgId, user_id: userId })
       if (error) throw error
     },
     onSuccess: invalidar,
   })
 }
 
-export function useRemoverFeriado(userId: string) {
-  const invalidar = useInvalidar(chaves.feriados(userId))
+export function useRemoverFeriado(orgId: string) {
+  const invalidar = useInvalidar(chaves.feriados(orgId))
   return useMutation({
     mutationFn: async (data: string) => {
       const { error } = await cliente()
         .from('feriados')
         .delete()
-        .eq('user_id', userId)
+        .eq('organizacao_id', orgId)
         .eq('data', data)
       if (error) throw error
     },

@@ -16,6 +16,10 @@ vi.mock('../lib/auth-context', () => ({
   useUserId: () => 'advogada-1',
 }))
 
+vi.mock('../lib/organizacao-context', () => ({
+  useOrganizacaoId: () => 'org-1',
+}))
+
 vi.mock('../data/queries', () => ({
   usePrazos: () => ({ data: prazos, isPending: false, isError: false, isSuccess: true }),
   useMonitoramentos: () => ({ data: [], isPending: false, isSuccess: true }),

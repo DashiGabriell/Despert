@@ -1,7 +1,7 @@
 import { alertaErro, cartao, tabela, vazioTabela } from '../components/ui'
 import { useExecucoes } from '../data/queries'
 import { formatarDataHora } from '../domain/datas'
-import { useUserId } from '../lib/auth-context'
+import { useOrganizacaoId } from '../lib/organizacao-context'
 import { mensagemDeErro } from '../lib/toast-context'
 
 const ORIGENS: Record<string, string> = {
@@ -11,8 +11,8 @@ const ORIGENS: Record<string, string> = {
 }
 
 export default function Historico() {
-  const userId = useUserId()
-  const execucoes = useExecucoes(userId)
+  const orgId = useOrganizacaoId()
+  const execucoes = useExecucoes(orgId)
   const lista = execucoes.data ?? []
 
   return (
