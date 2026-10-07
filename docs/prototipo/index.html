@@ -1,0 +1,1004 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Monitor de Prazos</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --navy: #1b2540;
+    --navy-2: #26324f;
+    --gold: #b8893b;
+    --bg: #f4f5f8;
+    --card: #ffffff;
+    --text: #1d2433;
+    --muted: #6b7385;
+    --line: #e3e6ec;
+    --red: #c62828;
+    --red-bg: #fdecea;
+    --orange: #d9730d;
+    --orange-bg: #fff3e0;
+    --yellow: #9a7b00;
+    --yellow-bg: #fff8d6;
+    --green: #2e7d32;
+    --green-bg: #e8f5e9;
+    --blue: #1e5bb8;
+    --blue-bg: #e8f0fc;
+    --radius: 10px;
+    --shadow: 0 1px 3px rgba(16, 24, 40, .08), 0 1px 2px rgba(16, 24, 40, .04);
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif; font-size: 14px; color: var(--text); background: var(--bg); }
+  .hidden { display: none !important; }
+  button, input, select, textarea { font: inherit; color: inherit; }
+  a { color: var(--blue); }
+
+  /* Botões e campos */
+  .btn { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); background: #fff; padding: 8px 14px; border-radius: 8px; cursor: pointer; font-weight: 500; white-space: nowrap; }
+  .btn:hover { background: #f7f8fa; }
+  .btn:disabled { opacity: .6; cursor: default; }
+  .btn-primary { background: var(--navy); border-color: var(--navy); color: #fff; }
+  .btn-primary:hover { background: var(--navy-2); }
+  .btn-gold { background: var(--gold); border-color: var(--gold); color: #fff; }
+  .btn-gold:hover { filter: brightness(1.05); background: var(--gold); }
+  .btn-success { background: var(--green); border-color: var(--green); color: #fff; }
+  .btn-success:hover { background: #276b2b; }
+  .btn-danger { color: var(--red); border-color: #f2c4c4; }
+  .btn-sm { padding: 5px 10px; font-size: 13px; }
+  .btn svg { width: 16px; height: 16px; }
+  label { display: block; font-size: 12px; font-weight: 600; color: var(--muted); margin-bottom: 4px; text-transform: uppercase; letter-spacing: .02em; }
+  input, select, textarea { width: 100%; border: 1px solid var(--line); border-radius: 8px; padding: 9px 11px; background: #fff; outline: none; }
+  input:focus, select:focus, textarea:focus { border-color: var(--navy); box-shadow: 0 0 0 3px rgba(27, 37, 64, .1); }
+  textarea { resize: vertical; min-height: 80px; }
+  .field { margin-bottom: 14px; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  .check { display: flex; align-items: center; gap: 8px; text-transform: none; font-size: 14px; color: var(--text); font-weight: 500; letter-spacing: 0; }
+  .check input { width: auto; }
+  .hint { font-size: 12px; color: var(--muted); margin-top: 4px; }
+
+  /* Login */
+  .login { min-height: 100vh; display: grid; place-items: center; background: linear-gradient(135deg, var(--navy), #3a4a73); padding: 20px; }
+  .login-box { width: 100%; max-width: 380px; background: #fff; border-radius: 14px; padding: 32px; box-shadow: 0 20px 50px rgba(0, 0, 0, .25); }
+  .login-box h1 { margin: 12px 0 4px; font-size: 22px; }
+  .login-box p { margin: 0 0 22px; color: var(--muted); }
+  .login-box .btn { width: 100%; justify-content: center; padding: 11px; }
+  .alerta { padding: 10px 12px; border-radius: 8px; font-size: 13px; margin-bottom: 14px; }
+  .alerta-erro { background: var(--red-bg); color: var(--red); }
+  .alerta-aviso { background: var(--yellow-bg); color: #6b5500; }
+
+  /* Layout */
+  .app { display: grid; grid-template-columns: 240px minmax(0, 1fr); min-height: 100vh; }
+  .sidebar { background: var(--navy); color: #cfd5e3; display: flex; flex-direction: column; padding: 20px 14px; position: sticky; top: 0; height: 100vh; }
+  .brand { display: flex; align-items: center; gap: 10px; color: #fff; font-weight: 700; font-size: 16px; padding: 0 8px 22px; }
+  .brand-logo { width: 34px; height: 34px; border-radius: 8px; background: var(--gold); display: grid; place-items: center; color: #fff; }
+  .brand-logo svg { width: 20px; height: 20px; }
+  .brand small { display: block; font-weight: 400; font-size: 11px; color: #9aa5bf; }
+  .nav button { display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px 12px; margin-bottom: 4px; border: 0; border-radius: 8px; background: transparent; color: inherit; cursor: pointer; text-align: left; font-weight: 500; }
+  .nav button svg { width: 18px; height: 18px; opacity: .85; }
+  .nav button:hover { background: rgba(255, 255, 255, .06); color: #fff; }
+  .nav button.ativo { background: rgba(255, 255, 255, .12); color: #fff; }
+  .nav .contador { margin-left: auto; background: var(--red); color: #fff; font-size: 11px; border-radius: 10px; padding: 1px 7px; }
+  .sidebar-footer { margin-top: auto; border-top: 1px solid rgba(255, 255, 255, .1); padding: 14px 8px 0; font-size: 12px; }
+  .sidebar-footer .btn { margin-top: 10px; width: 100%; justify-content: center; background: transparent; color: #cfd5e3; border-color: rgba(255, 255, 255, .2); }
+  .main { padding: 24px 28px 40px; min-width: 0; }
+  .topbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 22px; flex-wrap: wrap; }
+  .topbar h2 { margin: 0; font-size: 22px; }
+  .topbar .sub { color: var(--muted); font-size: 13px; margin-top: 3px; }
+  .topbar-acoes { display: flex; gap: 8px; flex-wrap: wrap; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); }
+  .card-pad { padding: 20px; }
+  .card h3 { margin: 0 0 14px; font-size: 16px; }
+
+  /* Indicadores */
+  .stats { display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; margin-bottom: 20px; }
+  .stat { padding: 16px; cursor: pointer; border-left: 4px solid var(--line); transition: transform .1s; }
+  .stat:hover { transform: translateY(-1px); }
+  .stat.selecionado { outline: 2px solid var(--navy); }
+  .stat .num { font-size: 28px; font-weight: 700; line-height: 1.1; }
+  .stat .rot { color: var(--muted); font-size: 13px; margin-top: 4px; }
+  .stat.vencido { border-left-color: var(--red); } .stat.vencido .num { color: var(--red); }
+  .stat.hoje { border-left-color: var(--orange); } .stat.hoje .num { color: var(--orange); }
+  .stat.semana { border-left-color: var(--gold); } .stat.semana .num { color: var(--gold); }
+  .stat.conferir { border-left-color: var(--blue); } .stat.conferir .num { color: var(--blue); }
+  .stat.abertos { border-left-color: var(--navy); }
+
+  /* Tabela */
+  .filtros { display: flex; gap: 10px; padding: 14px; border-bottom: 1px solid var(--line); flex-wrap: wrap; align-items: center; }
+  .filtros input { max-width: 340px; }
+  .filtros select { max-width: 200px; }
+  .filtros .total { margin-left: auto; color: var(--muted); font-size: 13px; }
+  .tabela-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; }
+  th { text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: .03em; color: var(--muted); font-weight: 600; padding: 10px 14px; border-bottom: 1px solid var(--line); background: #fafbfc; white-space: nowrap; }
+  td { padding: 12px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  tr.clicavel { cursor: pointer; }
+  tr.clicavel:hover td { background: #fafbfd; }
+  tr.linha-fechada td { color: var(--muted); }
+  td .sec { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .mono { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 13px; }
+  .vazio { padding: 40px; text-align: center; color: var(--muted); }
+  .acoes { display: flex; gap: 6px; justify-content: flex-end; }
+
+  /* Selos */
+  .badge { display: inline-block; padding: 3px 9px; border-radius: 999px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+  .b-vencido { background: var(--red-bg); color: var(--red); }
+  .b-hoje { background: var(--red); color: #fff; }
+  .b-urgente { background: var(--orange-bg); color: var(--orange); }
+  .b-proximo { background: var(--yellow-bg); color: var(--yellow); }
+  .b-futuro { background: var(--green-bg); color: var(--green); }
+  .b-fechado { background: #eef0f3; color: var(--muted); }
+  .b-semdata { background: var(--blue-bg); color: var(--blue); }
+  .b-conferir { background: var(--blue-bg); color: var(--blue); }
+  .aviso-prazo { color: var(--blue); font-size: 12px; }
+
+  /* Calendário */
+  .cal-topo { display: flex; align-items: center; gap: 10px; padding: 14px; border-bottom: 1px solid var(--line); }
+  .cal-topo h3 { margin: 0 auto 0 6px; }
+  .cal { display: grid; grid-template-columns: repeat(7, 1fr); }
+  .cal .dow { padding: 8px; font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; text-align: center; border-bottom: 1px solid var(--line); }
+  .cal .dia { min-height: 108px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: 6px; }
+  .cal .dia:nth-child(7n) { border-right: 0; }
+  .cal .dia.fora { background: #fafbfc; }
+  .cal .dia.fora .n { color: #b8bdc8; }
+  .cal .dia.fds { background: #fbfbfd; }
+  .cal .dia.feriado { background: #fff9ec; }
+  .cal .dia.hoje .n { background: var(--navy); color: #fff; }
+  .cal .n { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; font-size: 12px; font-weight: 600; }
+  .cal .fer { font-size: 10px; color: var(--gold); margin-left: 4px; }
+  .chip { display: block; font-size: 11px; padding: 3px 6px; border-radius: 5px; margin-top: 4px; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
+
+  /* Modal */
+  .modal-fundo { position: fixed; inset: 0; background: rgba(15, 20, 35, .5); display: grid; place-items: center; padding: 20px; z-index: 50; }
+  .modal { width: 100%; max-width: 760px; max-height: 92vh; overflow: auto; background: #fff; border-radius: 14px; box-shadow: 0 25px 60px rgba(0, 0, 0, .3); }
+  .modal-topo { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 20px 22px; border-bottom: 1px solid var(--line); position: sticky; top: 0; background: #fff; }
+  .modal-topo h3 { margin: 0; font-size: 18px; }
+  .modal-corpo { padding: 20px 22px; }
+  .modal-rodape { display: flex; gap: 8px; justify-content: flex-end; padding: 14px 22px; border-top: 1px solid var(--line); flex-wrap: wrap; }
+  .modal-rodape .esq { margin-right: auto; }
+  .fechar { border: 0; background: none; font-size: 24px; line-height: 1; cursor: pointer; color: var(--muted); }
+  .info { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px 18px; margin-bottom: 18px; }
+  .info div span { display: block; font-size: 11px; text-transform: uppercase; color: var(--muted); font-weight: 600; letter-spacing: .03em; }
+  .teor { background: #fafbfc; border: 1px solid var(--line); border-radius: 8px; padding: 14px; max-height: 260px; overflow: auto; line-height: 1.55; font-size: 13px; white-space: pre-wrap; margin-bottom: 18px; }
+  .separador { font-size: 12px; font-weight: 700; text-transform: uppercase; color: var(--muted); letter-spacing: .04em; margin: 4px 0 12px; }
+
+  /* Diversos */
+  .toast-area { position: fixed; right: 20px; bottom: 20px; display: flex; flex-direction: column; gap: 8px; z-index: 100; }
+  .toast { background: var(--navy); color: #fff; padding: 12px 16px; border-radius: 8px; box-shadow: 0 8px 24px rgba(0, 0, 0, .2); max-width: 380px; animation: entrar .2s ease-out; }
+  .toast.erro { background: var(--red); }
+  .toast.ok { background: var(--green); }
+  @keyframes entrar { from { opacity: 0; transform: translateY(8px); } }
+  .spin { width: 16px; height: 16px; border: 2px solid rgba(255, 255, 255, .4); border-top-color: #fff; border-radius: 50%; animation: girar .8s linear infinite; }
+  @keyframes girar { to { transform: rotate(360deg); } }
+  .duas-colunas { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: start; }
+  .token-linha { display: flex; gap: 8px; }
+  .token-linha input { font-family: ui-monospace, Consolas, monospace; font-size: 13px; }
+  .switch { position: relative; width: 38px; height: 22px; display: inline-block; }
+  .switch input { opacity: 0; width: 0; height: 0; }
+  .switch span { position: absolute; inset: 0; background: #cfd4dc; border-radius: 22px; cursor: pointer; transition: .15s; }
+  .switch span::before { content: ""; position: absolute; width: 16px; height: 16px; left: 3px; top: 3px; background: #fff; border-radius: 50%; transition: .15s; }
+  .switch input:checked + span { background: var(--green); }
+  .switch input:checked + span::before { transform: translateX(16px); }
+
+  @media (max-width: 1100px) {
+    .stats { grid-template-columns: repeat(3, 1fr); }
+    .duas-colunas { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 800px) {
+    .app { grid-template-columns: minmax(0, 1fr); }
+    .sidebar { position: static; height: auto; flex-direction: row; flex-wrap: wrap; align-items: center; padding: 12px; }
+    .brand { padding: 0 8px 0 0; }
+    .nav { display: flex; overflow-x: auto; width: 100%; order: 3; margin-top: 8px; }
+    .nav button { width: auto; white-space: nowrap; }
+    .sidebar-footer { display: none; }
+    .main { padding: 18px 14px 40px; }
+    .stats { grid-template-columns: repeat(2, 1fr); }
+    .grid-2, .grid-3, .info { grid-template-columns: 1fr; }
+    .cal .dia { min-height: 70px; }
+    .chip { font-size: 10px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Login -->
+<section id="tela-login" class="login hidden">
+  <form class="login-box" id="form-login">
+    <div class="brand-logo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v18M5 7h14M7 7l-3 7a3 3 0 0 0 6 0L7 7zm10 0-3 7a3 3 0 0 0 6 0l-3-7zM8 21h8"/></svg></div>
+    <h1>Monitor de Prazos</h1>
+    <p>Publicações do Diário de Justiça Eletrônico Nacional</p>
+    <div id="login-aviso"></div>
+    <div class="field"><label for="login-email">E-mail</label><input id="login-email" type="email" autocomplete="username" required></div>
+    <div class="field"><label for="login-senha">Senha</label><input id="login-senha" type="password" autocomplete="current-password" required></div>
+    <button class="btn btn-primary" type="submit" id="btn-login">Entrar</button>
+  </form>
+</section>
+
+<!-- Aplicação -->
+<div id="tela-app" class="app hidden">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-logo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v18M5 7h14M7 7l-3 7a3 3 0 0 0 6 0L7 7zm10 0-3 7a3 3 0 0 0 6 0l-3-7zM8 21h8"/></svg></div>
+      <div>Monitor de Prazos<small>DJEN · CNJ</small></div>
+    </div>
+    <nav class="nav">
+      <button data-view="prazos" class="ativo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9"/></svg>Prazos<span class="contador hidden" id="nav-contador"></span></button>
+      <button data-view="calendario"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>Calendário</button>
+      <button data-view="monitoramento"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>Monitoramento</button>
+      <button data-view="historico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l4 2"/></svg>Histórico</button>
+      <button data-view="configuracoes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68 1.65 1.65 0 0 0 10 3.17V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Configurações</button>
+    </nav>
+    <div class="sidebar-footer">
+      <div id="usuario-email"></div>
+      <button class="btn btn-sm" id="btn-sair">Sair</button>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <div>
+        <h2 id="titulo-view">Prazos</h2>
+        <div class="sub" id="ultima-execucao">Carregando…</div>
+      </div>
+      <div class="topbar-acoes">
+        <button class="btn" id="btn-novo-prazo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>Prazo manual</button>
+        <button class="btn btn-gold" id="btn-buscar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-2.64-6.36L21 8"/><path d="M21 3v5h-5"/></svg>Buscar agora</button>
+      </div>
+    </div>
+
+    <!-- Prazos -->
+    <section data-secao="prazos">
+      <div class="stats">
+        <div class="card stat vencido" data-filtro="vencido"><div class="num" id="st-vencido">0</div><div class="rot">Vencidos</div></div>
+        <div class="card stat hoje" data-filtro="hoje"><div class="num" id="st-hoje">0</div><div class="rot">Vencem hoje</div></div>
+        <div class="card stat semana" data-filtro="semana"><div class="num" id="st-semana">0</div><div class="rot">Próximos 7 dias</div></div>
+        <div class="card stat conferir" data-filtro="conferir"><div class="num" id="st-conferir">0</div><div class="rot">Para conferir</div></div>
+        <div class="card stat abertos" data-filtro="abertos"><div class="num" id="st-abertos">0</div><div class="rot">Em aberto</div></div>
+      </div>
+      <div class="card">
+        <div class="filtros">
+          <input id="busca" type="search" placeholder="Buscar processo, tribunal, parte, texto…">
+          <select id="filtro-status">
+            <option value="abertos">Em aberto</option>
+            <option value="pendente">Pendentes</option>
+            <option value="conferir">Para conferir</option>
+            <option value="cumprido">Cumpridos</option>
+            <option value="arquivado">Arquivados</option>
+            <option value="todos">Todos</option>
+          </select>
+          <button class="btn btn-sm hidden" id="limpar-filtro">Limpar filtro rápido</button>
+          <span class="total" id="total-prazos"></span>
+        </div>
+        <div class="tabela-wrap">
+          <table>
+            <thead><tr><th>Situação</th><th>Vencimento</th><th>Processo</th><th>Tribunal / Órgão</th><th>Tipo</th><th>Prazo</th><th></th></tr></thead>
+            <tbody id="tbody-prazos"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- Calendário -->
+    <section data-secao="calendario" class="hidden">
+      <div class="card">
+        <div class="cal-topo">
+          <button class="btn btn-sm" id="cal-ant">‹</button>
+          <button class="btn btn-sm" id="cal-prox">›</button>
+          <h3 id="cal-titulo"></h3>
+          <button class="btn btn-sm" id="cal-hoje">Hoje</button>
+        </div>
+        <div class="cal" id="calendario"></div>
+      </div>
+    </section>
+
+    <!-- Monitoramento -->
+    <section data-secao="monitoramento" class="hidden">
+      <div class="duas-colunas">
+        <div class="card card-pad">
+          <h3>Adicionar monitoramento</h3>
+          <form id="form-monit">
+            <div class="field">
+              <label for="m-tipo">Tipo</label>
+              <select id="m-tipo">
+                <option value="oab">Número da OAB (recebe todas as intimações da advogada)</option>
+                <option value="processo">Processo específico</option>
+              </select>
+            </div>
+            <div id="m-campos-oab" class="grid-2">
+              <div class="field"><label for="m-oab">Número OAB</label><input id="m-oab" inputmode="numeric" placeholder="123456"></div>
+              <div class="field"><label for="m-uf">UF</label>
+                <select id="m-uf"></select>
+              </div>
+            </div>
+            <div id="m-campos-proc" class="field hidden">
+              <label for="m-proc">Número do processo (CNJ)</label>
+              <input id="m-proc" placeholder="0000000-00.0000.0.00.0000">
+            </div>
+            <div class="field"><label for="m-desc">Descrição (opcional)</label><input id="m-desc" placeholder="Ex.: OAB principal, Cliente X…"></div>
+            <button class="btn btn-primary" type="submit">Adicionar</button>
+          </form>
+        </div>
+        <div class="card">
+          <div class="filtros"><strong>O que está sendo monitorado</strong></div>
+          <div class="tabela-wrap">
+            <table>
+              <thead><tr><th>Ativo</th><th>Monitoramento</th><th>Descrição</th><th></th></tr></thead>
+              <tbody id="tbody-monit"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Histórico -->
+    <section data-secao="historico" class="hidden">
+      <div class="card">
+        <div class="tabela-wrap">
+          <table>
+            <thead><tr><th>Data / hora</th><th>Origem</th><th>Encontradas</th><th>Novas</th><th>Status</th><th>Detalhe</th></tr></thead>
+            <tbody id="tbody-hist"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- Configurações -->
+    <section data-secao="configuracoes" class="hidden">
+      <div class="duas-colunas">
+        <div class="card card-pad">
+          <h3>Configurações do robô</h3>
+          <form id="form-config">
+            <div class="field"><label for="c-email">E-mail para alertas</label><input id="c-email" type="email" required></div>
+            <div class="grid-3">
+              <div class="field"><label for="c-retro">Dias para trás</label><input id="c-retro" type="number" min="1" max="30"></div>
+              <div class="field"><label for="c-padrao">Prazo padrão</label><input id="c-padrao" type="number" min="1" max="365"></div>
+              <div class="field"><label for="c-alerta">Janela de alerta</label><input id="c-alerta" type="number" min="1" max="60"></div>
+            </div>
+            <div class="hint" style="margin:-6px 0 14px">"Prazo padrão" é usado quando o texto da publicação não informa o prazo. "Janela de alerta" define quantos dias à frente entram no e-mail diário.</div>
+            <div class="field"><label class="check"><input type="checkbox" id="c-recesso"> Considerar recesso forense (20/12 a 20/01, CPC art. 220)</label></div>
+            <div class="field"><label for="c-cal">ID do Google Agenda</label><input id="c-cal" placeholder="primary"></div>
+            <div class="separador">Integração com o n8n</div>
+            <div class="field"><label for="c-webhook">URL do webhook (Production URL do nó "Disparo pelo Site")</label><input id="c-webhook" type="url" placeholder="https://seu-n8n.com/webhook/monitor-prazos"></div>
+            <div class="field">
+              <label for="c-token">Token de segurança</label>
+              <div class="token-linha">
+                <input id="c-token" readonly>
+                <button class="btn btn-sm" type="button" id="btn-novo-token">Gerar novo</button>
+              </div>
+              <div class="hint">O n8n só aceita o disparo pelo site se este token conferir com o banco.</div>
+            </div>
+            <button class="btn btn-primary" type="submit">Salvar configurações</button>
+          </form>
+        </div>
+        <div class="card card-pad">
+          <h3>Feriados e suspensões locais</h3>
+          <p class="hint" style="margin-top:-8px;margin-bottom:14px">Os feriados nacionais e a Sexta-feira Santa já são considerados. Cadastre aqui carnaval, Corpus Christi, feriados estaduais/municipais e suspensões de expediente do tribunal.</p>
+          <form id="form-feriado" class="grid-2" style="align-items:end">
+            <div class="field"><label for="f-data">Data</label><input id="f-data" type="date" required></div>
+            <div class="field"><label for="f-desc">Descrição</label><input id="f-desc" placeholder="Ex.: Carnaval" required></div>
+            <div><button class="btn btn-primary" type="submit">Adicionar feriado</button></div>
+          </form>
+          <div class="tabela-wrap" style="margin-top:16px">
+            <table>
+              <thead><tr><th>Data</th><th>Descrição</th><th></th></tr></thead>
+              <tbody id="tbody-feriados"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<div id="modal-area"></div>
+<div class="toast-area" id="toasts"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+// ===== Preencha com os dados do seu projeto (Supabase > Project Settings > API) =====
+const SUPABASE_URL = 'https://SEU-PROJETO.supabase.co';
+const SUPABASE_ANON_KEY = 'SUA-CHAVE-ANON-PUBLICA';
+// =====================================================================================
+
+const configurado = !SUPABASE_URL.includes('SEU-PROJETO') && !SUPABASE_ANON_KEY.includes('SUA-CHAVE');
+const sb = configurado ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+
+const state = {
+  prazos: [], monitoramentos: [], feriados: [], execucoes: [], config: null,
+  view: 'prazos', filtroRapido: null, mesCalendario: inicioDoMes(new Date()), canal: null,
+};
+const UFS = 'AC AL AM AP BA CE DF ES GO MA MG MS MT PA PB PE PI PR RJ RN RO RR RS SC SE SP TO'.split(' ');
+const TITULOS = { prazos: 'Prazos', calendario: 'Calendário', monitoramento: 'Monitoramento', historico: 'Histórico de execuções', configuracoes: 'Configurações' };
+const STATUS = { pendente: 'Pendente', conferir: 'Para conferir', cumprido: 'Cumprido', arquivado: 'Arquivado' };
+
+// ---------- utilidades ----------
+const $ = s => document.querySelector(s);
+const $$ = s => Array.from(document.querySelectorAll(s));
+const esc = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+function inicioDoMes(d) { return new Date(d.getFullYear(), d.getMonth(), 1); }
+function hoje() { const d = new Date(); d.setHours(0, 0, 0, 0); return d; }
+function parseISO(s) { if (!s) return null; const [y, m, d] = String(s).slice(0, 10).split('-').map(Number); return new Date(y, m - 1, d); }
+function toISO(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+function fmtData(s) { const d = parseISO(s); return d ? d.toLocaleDateString('pt-BR') : '—'; }
+function fmtDataHora(s) { return s ? new Date(s).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : '—'; }
+function diasAte(s) { const d = parseISO(s); return d ? Math.round((d - hoje()) / 86400000) : null; }
+const emAberto = p => p.status === 'pendente' || p.status === 'conferir';
+const precisaConferir = p => emAberto(p) && (p.status === 'conferir' || /Padrão|CONFERIR/.test(p.origem_prazo || ''));
+function formatarCNJ(v) {
+  const n = String(v || '').replace(/\D/g, '');
+  return n.length === 20 ? n.replace(/^(\d{7})(\d{2})(\d{4})(\d)(\d{2})(\d{4})$/, '$1-$2.$3.$4.$5.$6') : v;
+}
+
+function urgencia(p) {
+  if (!emAberto(p)) return 'fechado';
+  const d = diasAte(p.vencimento);
+  if (d === null) return 'semdata';
+  if (d < 0) return 'vencido';
+  if (d === 0) return 'hoje';
+  if (d <= 3) return 'urgente';
+  if (d <= 7) return 'proximo';
+  return 'futuro';
+}
+function seloSituacao(p) {
+  const u = urgencia(p), d = diasAte(p.vencimento);
+  const texto = {
+    fechado: STATUS[p.status] || p.status,
+    semdata: 'Sem data',
+    vencido: 'Vencido há ' + (-d) + (d === -1 ? ' dia' : ' dias'),
+    hoje: 'Vence hoje',
+    urgente: d === 1 ? 'Amanhã' : 'Em ' + d + ' dias',
+    proximo: 'Em ' + d + ' dias',
+    futuro: 'Em ' + d + ' dias',
+  }[u];
+  return '<span class="badge b-' + u + '">' + esc(texto) + '</span>';
+}
+
+function toast(msg, tipo = '') {
+  const el = document.createElement('div');
+  el.className = 'toast ' + tipo;
+  el.textContent = msg;
+  $('#toasts').appendChild(el);
+  setTimeout(() => el.remove(), tipo === 'erro' ? 7000 : 4000);
+}
+function falha(erro, contexto) {
+  console.error(contexto, erro);
+  toast((contexto ? contexto + ': ' : '') + (erro?.message || erro), 'erro');
+}
+
+// ---------- autenticação ----------
+async function iniciar() {
+  $('#m-uf').innerHTML = UFS.map(u => '<option' + (u === 'SP' ? ' selected' : '') + '>' + u + '</option>').join('');
+  if (!configurado) {
+    mostrarLogin();
+    $('#login-aviso').innerHTML = '<div class="alerta alerta-aviso">Abra este arquivo num editor e preencha <b>SUPABASE_URL</b> e <b>SUPABASE_ANON_KEY</b> no início do script.</div>';
+    $('#btn-login').disabled = true;
+    return;
+  }
+  const { data } = await sb.auth.getSession();
+  data.session ? entrar(data.session) : mostrarLogin();
+  sb.auth.onAuthStateChange((evento, sessao) => {
+    if (evento === 'SIGNED_OUT') mostrarLogin();
+    if (evento === 'SIGNED_IN' && sessao && $('#tela-app').classList.contains('hidden')) entrar(sessao);
+  });
+}
+
+function mostrarLogin() {
+  $('#tela-app').classList.add('hidden');
+  $('#tela-login').classList.remove('hidden');
+  if (state.canal) { sb.removeChannel(state.canal); state.canal = null; }
+}
+
+$('#form-login').addEventListener('submit', async e => {
+  e.preventDefault();
+  const btn = $('#btn-login');
+  btn.disabled = true;
+  $('#login-aviso').innerHTML = '';
+  const { error } = await sb.auth.signInWithPassword({ email: $('#login-email').value.trim(), password: $('#login-senha').value });
+  btn.disabled = false;
+  if (error) $('#login-aviso').innerHTML = '<div class="alerta alerta-erro">E-mail ou senha inválidos.</div>';
+});
+
+$('#btn-sair').addEventListener('click', () => sb.auth.signOut());
+
+async function entrar(sessao) {
+  $('#tela-login').classList.add('hidden');
+  $('#tela-app').classList.remove('hidden');
+  $('#usuario-email').textContent = sessao.user.email;
+  await carregarTudo();
+  assinarTempoReal();
+}
+
+// ---------- carga de dados ----------
+async function carregarTudo() {
+  await Promise.all([carregarPrazos(), carregarMonitoramentos(), carregarFeriados(), carregarExecucoes(), carregarConfig()]);
+}
+async function carregarPrazos() {
+  const { data, error } = await sb.from('prazos').select('*').order('vencimento', { ascending: true, nullsFirst: true }).limit(5000);
+  if (error) return falha(error, 'Erro ao carregar prazos');
+  state.prazos = data;
+  renderPrazos();
+  renderCalendario();
+}
+async function carregarMonitoramentos() {
+  const { data, error } = await sb.from('monitoramentos').select('*').order('created_at');
+  if (error) return falha(error, 'Erro ao carregar monitoramentos');
+  state.monitoramentos = data;
+  renderMonitoramentos();
+}
+async function carregarFeriados() {
+  const { data, error } = await sb.from('feriados').select('*').order('data');
+  if (error) return falha(error, 'Erro ao carregar feriados');
+  state.feriados = data;
+  renderFeriados();
+  renderCalendario();
+}
+async function carregarExecucoes() {
+  const { data, error } = await sb.from('execucoes').select('*').order('executado_em', { ascending: false }).limit(100);
+  if (error) return falha(error, 'Erro ao carregar histórico');
+  state.execucoes = data;
+  renderHistorico();
+}
+async function carregarConfig() {
+  const { data, error } = await sb.from('configuracoes').select('*').eq('id', 1).maybeSingle();
+  if (error) return falha(error, 'Erro ao carregar configurações');
+  state.config = data;
+  renderConfig();
+}
+
+let recargaPendente;
+function assinarTempoReal() {
+  if (state.canal) return;
+  state.canal = sb.channel('monitor-prazos')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'prazos' }, () => {
+      clearTimeout(recargaPendente);
+      recargaPendente = setTimeout(carregarPrazos, 800);
+    })
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'execucoes' }, carregarExecucoes)
+    .subscribe();
+}
+
+// ---------- navegação ----------
+$$('.nav button').forEach(b => b.addEventListener('click', () => mudarView(b.dataset.view)));
+function mudarView(view) {
+  state.view = view;
+  $$('.nav button').forEach(b => b.classList.toggle('ativo', b.dataset.view === view));
+  $$('[data-secao]').forEach(s => s.classList.toggle('hidden', s.dataset.secao !== view));
+  $('#titulo-view').textContent = TITULOS[view];
+}
+
+// ---------- prazos ----------
+$('#busca').addEventListener('input', renderPrazos);
+$('#filtro-status').addEventListener('change', () => { state.filtroRapido = null; renderPrazos(); });
+$('#limpar-filtro').addEventListener('click', () => { state.filtroRapido = null; renderPrazos(); });
+$$('.stat').forEach(c => c.addEventListener('click', () => {
+  const f = c.dataset.filtro;
+  state.filtroRapido = state.filtroRapido === f ? null : f;
+  if (state.filtroRapido) $('#filtro-status').value = 'abertos';
+  renderPrazos();
+}));
+
+function prazosFiltrados() {
+  const q = $('#busca').value.trim().toLowerCase();
+  const st = $('#filtro-status').value;
+  const f = state.filtroRapido;
+  return state.prazos.filter(p => {
+    if (st === 'abertos' && !emAberto(p)) return false;
+    if (!['abertos', 'todos'].includes(st) && p.status !== st) return false;
+    const u = urgencia(p);
+    if (f === 'vencido' && u !== 'vencido') return false;
+    if (f === 'hoje' && u !== 'hoje') return false;
+    if (f === 'semana' && !['hoje', 'urgente', 'proximo'].includes(u)) return false;
+    if (f === 'conferir' && !precisaConferir(p)) return false;
+    if (q && ![p.processo, p.tribunal, p.orgao, p.tipo, p.classe, p.partes, p.teor, p.observacoes].join(' ').toLowerCase().includes(q)) return false;
+    return true;
+  });
+}
+
+function renderPrazos() {
+  const abertos = state.prazos.filter(emAberto);
+  const conta = u => abertos.filter(p => u.includes(urgencia(p))).length;
+  $('#st-vencido').textContent = conta(['vencido']);
+  $('#st-hoje').textContent = conta(['hoje']);
+  $('#st-semana').textContent = conta(['hoje', 'urgente', 'proximo']);
+  $('#st-conferir').textContent = abertos.filter(precisaConferir).length;
+  $('#st-abertos').textContent = abertos.length;
+  const criticos = conta(['vencido', 'hoje']);
+  $('#nav-contador').textContent = criticos;
+  $('#nav-contador').classList.toggle('hidden', !criticos);
+  $$('.stat').forEach(c => c.classList.toggle('selecionado', c.dataset.filtro === state.filtroRapido && state.filtroRapido !== 'abertos'));
+  $('#limpar-filtro').classList.toggle('hidden', !state.filtroRapido || state.filtroRapido === 'abertos');
+
+  const lista = prazosFiltrados();
+  $('#total-prazos').textContent = lista.length + (lista.length === 1 ? ' prazo' : ' prazos');
+  if (!lista.length) {
+    $('#tbody-prazos').innerHTML = '<tr><td colspan="7" class="vazio">' +
+      (state.prazos.length ? 'Nenhum prazo com esses filtros.' : 'Nenhuma publicação capturada ainda. Cadastre uma OAB em <b>Monitoramento</b> e clique em <b>Buscar agora</b>.') + '</td></tr>';
+    return;
+  }
+  $('#tbody-prazos').innerHTML = lista.map(p => `
+    <tr class="clicavel ${emAberto(p) ? '' : 'linha-fechada'}" data-id="${esc(p.id)}">
+      <td>${seloSituacao(p)}</td>
+      <td><strong>${fmtData(p.vencimento)}</strong><div class="sec">Publ. ${fmtData(p.data_publicacao)}</div></td>
+      <td><span class="mono">${esc(p.processo || '—')}</span><div class="sec">${esc(p.classe || '')}</div></td>
+      <td>${esc(p.tribunal || '')}<div class="sec">${esc(p.orgao || '')}</div></td>
+      <td>${esc(p.tipo || '')}</td>
+      <td>${p.prazo_dias ? esc(p.prazo_dias) + ' dias' : '—'}${precisaConferir(p) ? '<div class="aviso-prazo">conferir</div>' : ''}</td>
+      <td><div class="acoes">${emAberto(p) ? `<button class="btn btn-sm btn-success" data-cumprir="${esc(p.id)}" title="Marcar como cumprido">Cumprido</button>` : ''}</div></td>
+    </tr>`).join('');
+}
+
+$('#tbody-prazos').addEventListener('click', e => {
+  const cumprir = e.target.closest('[data-cumprir]');
+  if (cumprir) { e.stopPropagation(); return alterarStatus(cumprir.dataset.cumprir, 'cumprido'); }
+  const tr = e.target.closest('tr[data-id]');
+  if (tr) abrirPrazo(tr.dataset.id);
+});
+
+async function alterarStatus(id, status) {
+  const dados = { status, cumprido_em: status === 'cumprido' ? new Date().toISOString() : null };
+  const { error } = await sb.from('prazos').update(dados).eq('id', id);
+  if (error) return falha(error, 'Não foi possível atualizar');
+  const p = state.prazos.find(x => x.id === id);
+  if (p) Object.assign(p, dados);
+  renderPrazos();
+  renderCalendario();
+  toast(status === 'cumprido' ? 'Prazo marcado como cumprido.' : 'Status atualizado.', 'ok');
+}
+
+// ---------- modal ----------
+function abrirModal(html) {
+  $('#modal-area').innerHTML = '<div class="modal-fundo"><div class="modal">' + html + '</div></div>';
+  const fundo = $('#modal-area .modal-fundo');
+  fundo.addEventListener('mousedown', e => { if (e.target === fundo) fecharModal(); });
+  $$('#modal-area [data-fechar]').forEach(b => b.addEventListener('click', fecharModal));
+}
+function fecharModal() { $('#modal-area').innerHTML = ''; }
+document.addEventListener('keydown', e => { if (e.key === 'Escape') fecharModal(); });
+
+function abrirPrazo(id) {
+  const p = state.prazos.find(x => x.id === id);
+  if (!p) return;
+  abrirModal(`
+    <div class="modal-topo">
+      <div><h3 class="mono">${esc(p.processo || 'Sem número')}</h3><div class="sec" style="margin-top:6px">${seloSituacao(p)} &nbsp;${esc(p.tipo || '')}</div></div>
+      <button class="fechar" data-fechar>&times;</button>
+    </div>
+    <div class="modal-corpo">
+      <div class="info">
+        <div><span>Tribunal</span>${esc(p.tribunal || '—')}</div>
+        <div><span>Órgão</span>${esc(p.orgao || '—')}</div>
+        <div><span>Classe</span>${esc(p.classe || '—')}</div>
+        <div><span>Disponibilização</span>${fmtData(p.data_disponibilizacao)}</div>
+        <div><span>Publicação</span>${fmtData(p.data_publicacao)}</div>
+        <div><span>Início do prazo</span>${fmtData(p.inicio_prazo)}</div>
+        <div><span>Prazo</span>${p.prazo_dias ? esc(p.prazo_dias) + ' dias úteis' : '—'}</div>
+        <div style="grid-column:span 2"><span>Origem do prazo</span>${esc(p.origem_prazo || '—')}</div>
+        <div style="grid-column:1/-1"><span>Partes intimadas</span>${esc(p.partes || '—')}</div>
+      </div>
+      ${p.teor ? `<div class="separador">Teor da publicação</div><div class="teor">${esc(p.teor)}</div>` : ''}
+      ${p.link ? `<p style="margin:-6px 0 18px"><a href="${esc(p.link)}" target="_blank" rel="noopener">Abrir documento no tribunal ↗</a></p>` : ''}
+      <div class="separador">Controle</div>
+      <div class="grid-3">
+        <div class="field"><label for="e-venc">Vencimento</label><input id="e-venc" type="date" value="${esc((p.vencimento || '').slice(0, 10))}"></div>
+        <div class="field"><label for="e-dias">Prazo (dias)</label><input id="e-dias" type="number" min="1" value="${esc(p.prazo_dias ?? '')}"></div>
+        <div class="field"><label for="e-status">Status</label>
+          <select id="e-status">${Object.entries(STATUS).map(([v, t]) => `<option value="${v}" ${p.status === v ? 'selected' : ''}>${t}</option>`).join('')}</select>
+        </div>
+      </div>
+      <div class="field"><label for="e-obs">Observações</label><textarea id="e-obs" placeholder="Anotações internas sobre este prazo…">${esc(p.observacoes || '')}</textarea></div>
+    </div>
+    <div class="modal-rodape">
+      <button class="btn btn-danger esq" id="e-excluir">Excluir</button>
+      <button class="btn" data-fechar>Cancelar</button>
+      ${emAberto(p) ? '<button class="btn btn-success" id="e-cumprido">Marcar cumprido</button>' : ''}
+      <button class="btn btn-primary" id="e-salvar">Salvar</button>
+    </div>`);
+
+  $('#e-salvar').addEventListener('click', () => salvarPrazo(p, $('#e-status').value));
+  $('#e-cumprido')?.addEventListener('click', () => salvarPrazo(p, 'cumprido'));
+  $('#e-excluir').addEventListener('click', async () => {
+    if (!confirm('Excluir este prazo? Se ele ainda estiver no período de busca, o robô vai capturá-lo de novo.')) return;
+    const { error } = await sb.from('prazos').delete().eq('id', p.id);
+    if (error) return falha(error, 'Não foi possível excluir');
+    state.prazos = state.prazos.filter(x => x.id !== p.id);
+    fecharModal(); renderPrazos(); renderCalendario();
+    toast('Prazo excluído.');
+  });
+}
+
+async function salvarPrazo(p, status) {
+  const dados = {
+    vencimento: $('#e-venc').value || null,
+    prazo_dias: $('#e-dias').value ? Number($('#e-dias').value) : null,
+    status,
+    observacoes: $('#e-obs').value.trim() || null,
+    cumprido_em: status === 'cumprido' ? (p.cumprido_em || new Date().toISOString()) : null,
+  };
+  if (dados.vencimento !== (p.vencimento || null) && status === 'conferir') dados.status = 'pendente';
+  const { error } = await sb.from('prazos').update(dados).eq('id', p.id);
+  if (error) return falha(error, 'Não foi possível salvar');
+  Object.assign(p, dados);
+  fecharModal(); renderPrazos(); renderCalendario();
+  toast('Prazo atualizado.', 'ok');
+}
+
+$('#btn-novo-prazo').addEventListener('click', () => {
+  abrirModal(`
+    <div class="modal-topo"><h3>Novo prazo manual</h3><button class="fechar" data-fechar>&times;</button></div>
+    <form id="form-novo">
+      <div class="modal-corpo">
+        <div class="grid-2">
+          <div class="field"><label for="n-proc">Processo</label><input id="n-proc" placeholder="0000000-00.0000.0.00.0000" required></div>
+          <div class="field"><label for="n-trib">Tribunal</label><input id="n-trib" placeholder="TJSP"></div>
+        </div>
+        <div class="grid-3">
+          <div class="field"><label for="n-tipo">Tipo</label><input id="n-tipo" placeholder="Contestação, Recurso…"></div>
+          <div class="field"><label for="n-dias">Prazo (dias)</label><input id="n-dias" type="number" min="1"></div>
+          <div class="field"><label for="n-venc">Vencimento</label><input id="n-venc" type="date" required></div>
+        </div>
+        <div class="field"><label for="n-obs">Observações</label><textarea id="n-obs"></textarea></div>
+      </div>
+      <div class="modal-rodape"><button class="btn" type="button" data-fechar>Cancelar</button><button class="btn btn-primary" type="submit">Criar prazo</button></div>
+    </form>`);
+  $('#form-novo').addEventListener('submit', async e => {
+    e.preventDefault();
+    const registro = {
+      djen_id: 'manual-' + crypto.randomUUID(),
+      processo: formatarCNJ($('#n-proc').value.trim()),
+      tribunal: $('#n-trib').value.trim().toUpperCase() || null,
+      tipo: $('#n-tipo').value.trim() || 'Prazo manual',
+      prazo_dias: $('#n-dias').value ? Number($('#n-dias').value) : null,
+      vencimento: $('#n-venc').value,
+      origem_prazo: 'Cadastro manual',
+      observacoes: $('#n-obs').value.trim() || null,
+      status: 'pendente',
+    };
+    const { data, error } = await sb.from('prazos').insert(registro).select().single();
+    if (error) return falha(error, 'Não foi possível criar');
+    state.prazos.push(data);
+    state.prazos.sort((a, b) => String(a.vencimento || '').localeCompare(String(b.vencimento || '')));
+    fecharModal(); renderPrazos(); renderCalendario();
+    toast('Prazo criado.', 'ok');
+  });
+});
+
+// ---------- calendário ----------
+$('#cal-ant').addEventListener('click', () => { state.mesCalendario.setMonth(state.mesCalendario.getMonth() - 1); renderCalendario(); });
+$('#cal-prox').addEventListener('click', () => { state.mesCalendario.setMonth(state.mesCalendario.getMonth() + 1); renderCalendario(); });
+$('#cal-hoje').addEventListener('click', () => { state.mesCalendario = inicioDoMes(new Date()); renderCalendario(); });
+
+const CORES_CHIP = {
+  vencido: 'background:var(--red-bg);color:var(--red)', hoje: 'background:var(--red);color:#fff',
+  urgente: 'background:var(--orange-bg);color:var(--orange)', proximo: 'background:var(--yellow-bg);color:var(--yellow)',
+  futuro: 'background:var(--green-bg);color:var(--green)', fechado: 'background:#eef0f3;color:var(--muted);text-decoration:line-through',
+  semdata: 'background:var(--blue-bg);color:var(--blue)',
+};
+
+function renderCalendario() {
+  const mes = state.mesCalendario;
+  const titulo = mes.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+  $('#cal-titulo').textContent = titulo.charAt(0).toUpperCase() + titulo.slice(1);
+  const porDia = {};
+  for (const p of state.prazos) {
+    if (!p.vencimento || p.status === 'arquivado') continue;
+    (porDia[p.vencimento.slice(0, 10)] ||= []).push(p);
+  }
+  const feriados = Object.fromEntries(state.feriados.map(f => [f.data, f.descricao]));
+  const inicio = new Date(mes); inicio.setDate(1 - mes.getDay());
+  const hojeISO = toISO(hoje());
+  let html = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map(d => '<div class="dow">' + d + '</div>').join('');
+  for (let i = 0; i < 42; i++) {
+    const d = new Date(inicio); d.setDate(inicio.getDate() + i);
+    const iso = toISO(d);
+    const classes = ['dia'];
+    if (d.getMonth() !== mes.getMonth()) classes.push('fora');
+    if (d.getDay() === 0 || d.getDay() === 6) classes.push('fds');
+    if (feriados[iso]) classes.push('feriado');
+    if (iso === hojeISO) classes.push('hoje');
+    const itens = (porDia[iso] || []).map(p =>
+      `<span class="chip" style="${CORES_CHIP[urgencia(p)]}" data-id="${esc(p.id)}" title="${esc((p.processo || '') + ' - ' + (p.tipo || ''))}">${esc(p.processo || p.tipo || 'Prazo')}</span>`).join('');
+    html += `<div class="${classes.join(' ')}"><span class="n">${d.getDate()}</span>${feriados[iso] ? `<span class="fer">${esc(feriados[iso])}</span>` : ''}${itens}</div>`;
+  }
+  $('#calendario').innerHTML = html;
+}
+$('#calendario').addEventListener('click', e => { const c = e.target.closest('.chip'); if (c) abrirPrazo(c.dataset.id); });
+
+// ---------- monitoramento ----------
+$('#m-tipo').addEventListener('change', () => {
+  const oab = $('#m-tipo').value === 'oab';
+  $('#m-campos-oab').classList.toggle('hidden', !oab);
+  $('#m-campos-proc').classList.toggle('hidden', oab);
+});
+
+$('#form-monit').addEventListener('submit', async e => {
+  e.preventDefault();
+  const tipo = $('#m-tipo').value;
+  const registro = { tipo, descricao: $('#m-desc').value.trim() || null, ativo: true };
+  if (tipo === 'oab') {
+    registro.oab_numero = $('#m-oab').value.replace(/\D/g, '');
+    registro.oab_uf = $('#m-uf').value;
+    if (!registro.oab_numero) return toast('Informe o número da OAB.', 'erro');
+  } else {
+    const n = $('#m-proc').value.replace(/\D/g, '');
+    if (n.length !== 20) return toast('O número do processo deve ter 20 dígitos (padrão CNJ).', 'erro');
+    registro.numero_processo = formatarCNJ(n);
+  }
+  const { data, error } = await sb.from('monitoramentos').insert(registro).select().single();
+  if (error) return falha(error, 'Não foi possível adicionar');
+  state.monitoramentos.push(data);
+  e.target.reset(); $('#m-uf').value = 'SP'; $('#m-tipo').dispatchEvent(new Event('change'));
+  renderMonitoramentos();
+  toast('Monitoramento adicionado. Ele entra na próxima busca.', 'ok');
+});
+
+function renderMonitoramentos() {
+  if (!state.monitoramentos.length) {
+    $('#tbody-monit').innerHTML = '<tr><td colspan="4" class="vazio">Nada cadastrado. Adicione a OAB da advogada para começar.</td></tr>';
+    return;
+  }
+  $('#tbody-monit').innerHTML = state.monitoramentos.map(m => `
+    <tr>
+      <td><label class="switch"><input type="checkbox" data-ativo="${m.id}" ${m.ativo ? 'checked' : ''}><span></span></label></td>
+      <td>${m.tipo === 'oab' ? `<strong>OAB ${esc(m.oab_numero)}/${esc(m.oab_uf)}</strong>` : `<span class="mono">${esc(m.numero_processo)}</span><div class="sec">Processo</div>`}</td>
+      <td>${esc(m.descricao || '')}</td>
+      <td><div class="acoes"><button class="btn btn-sm btn-danger" data-remover="${m.id}">Remover</button></div></td>
+    </tr>`).join('');
+}
+
+$('#tbody-monit').addEventListener('change', async e => {
+  const id = e.target.dataset.ativo;
+  if (!id) return;
+  const { error } = await sb.from('monitoramentos').update({ ativo: e.target.checked }).eq('id', id);
+  if (error) { e.target.checked = !e.target.checked; return falha(error, 'Não foi possível atualizar'); }
+  state.monitoramentos.find(m => String(m.id) === id).ativo = e.target.checked;
+});
+$('#tbody-monit').addEventListener('click', async e => {
+  const id = e.target.closest('[data-remover]')?.dataset.remover;
+  if (!id || !confirm('Remover este monitoramento? Os prazos já capturados continuam salvos.')) return;
+  const { error } = await sb.from('monitoramentos').delete().eq('id', id);
+  if (error) return falha(error, 'Não foi possível remover');
+  state.monitoramentos = state.monitoramentos.filter(m => String(m.id) !== id);
+  renderMonitoramentos();
+});
+
+// ---------- histórico ----------
+const ORIGENS = { agendado: 'Automática (07:00)', manual: 'Manual no n8n', site: 'Botão do site' };
+function renderHistorico() {
+  const ultima = state.execucoes[0];
+  $('#ultima-execucao').innerHTML = ultima
+    ? 'Última verificação: ' + fmtDataHora(ultima.executado_em) + (ultima.status === 'falha' ? ' — <b style="color:var(--red)">falhou</b>' : ' — ' + ultima.novas + ' nova(s)')
+    : 'O robô ainda não rodou nenhuma vez.';
+  if (!state.execucoes.length) {
+    $('#tbody-hist').innerHTML = '<tr><td colspan="6" class="vazio">Nenhuma execução registrada.</td></tr>';
+    return;
+  }
+  $('#tbody-hist').innerHTML = state.execucoes.map(x => `
+    <tr>
+      <td>${fmtDataHora(x.executado_em)}</td>
+      <td>${esc(ORIGENS[x.origem] || x.origem || '—')}</td>
+      <td>${x.encontradas}</td>
+      <td><strong>${x.novas}</strong></td>
+      <td>${x.status === 'ok' ? '<span class="badge b-futuro">OK</span>' : '<span class="badge b-vencido">Falha</span>'}</td>
+      <td class="sec" style="max-width:420px;word-break:break-word">${esc((x.detalhe || '').slice(0, 300))}</td>
+    </tr>`).join('');
+}
+
+// ---------- configurações ----------
+function renderConfig() {
+  const c = state.config;
+  if (!c) return;
+  $('#c-email').value = c.email_destino || '';
+  $('#c-retro').value = c.dias_retroativos;
+  $('#c-padrao').value = c.prazo_padrao_dias;
+  $('#c-alerta').value = c.dias_alerta;
+  $('#c-recesso').checked = c.considerar_recesso;
+  $('#c-cal').value = c.calendario_id || 'primary';
+  $('#c-webhook').value = c.n8n_webhook_url || '';
+  $('#c-token').value = c.webhook_token || '';
+}
+
+$('#form-config').addEventListener('submit', async e => {
+  e.preventDefault();
+  const dados = {
+    email_destino: $('#c-email').value.trim(),
+    dias_retroativos: Number($('#c-retro').value) || 5,
+    prazo_padrao_dias: Number($('#c-padrao').value) || 15,
+    dias_alerta: Number($('#c-alerta').value) || 7,
+    considerar_recesso: $('#c-recesso').checked,
+    calendario_id: $('#c-cal').value.trim() || 'primary',
+    n8n_webhook_url: $('#c-webhook').value.trim(),
+    webhook_token: $('#c-token').value,
+  };
+  const { data, error } = await sb.from('configuracoes').update(dados).eq('id', 1).select().single();
+  if (error) return falha(error, 'Não foi possível salvar');
+  state.config = data;
+  toast('Configurações salvas.', 'ok');
+});
+
+$('#btn-novo-token').addEventListener('click', () => {
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  $('#c-token').value = Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+  toast('Novo token gerado. Clique em "Salvar configurações" para aplicar.');
+});
+
+$('#form-feriado').addEventListener('submit', async e => {
+  e.preventDefault();
+  const registro = { data: $('#f-data').value, descricao: $('#f-desc').value.trim() };
+  const { error } = await sb.from('feriados').upsert(registro);
+  if (error) return falha(error, 'Não foi possível adicionar');
+  e.target.reset();
+  await carregarFeriados();
+  toast('Feriado adicionado. Vale para os próximos cálculos.', 'ok');
+});
+
+function renderFeriados() {
+  if (!state.feriados.length) {
+    $('#tbody-feriados').innerHTML = '<tr><td colspan="3" class="vazio">Nenhum feriado local cadastrado.</td></tr>';
+    return;
+  }
+  $('#tbody-feriados').innerHTML = state.feriados.map(f => `
+    <tr>
+      <td>${fmtData(f.data)}</td>
+      <td>${esc(f.descricao)}</td>
+      <td><div class="acoes"><button class="btn btn-sm btn-danger" data-feriado="${esc(f.data)}">Remover</button></div></td>
+    </tr>`).join('');
+}
+$('#tbody-feriados').addEventListener('click', async e => {
+  const data = e.target.closest('[data-feriado]')?.dataset.feriado;
+  if (!data) return;
+  const { error } = await sb.from('feriados').delete().eq('data', data);
+  if (error) return falha(error, 'Não foi possível remover');
+  await carregarFeriados();
+});
+
+// ---------- disparo manual pelo site ----------
+$('#btn-buscar').addEventListener('click', async () => {
+  const c = state.config;
+  if (!c?.n8n_webhook_url) {
+    mudarView('configuracoes');
+    return toast('Informe a URL do webhook do n8n e salve as configurações.', 'erro');
+  }
+  if (!state.monitoramentos.some(m => m.ativo)) {
+    mudarView('monitoramento');
+    return toast('Cadastre ao menos uma OAB ou processo ativo.', 'erro');
+  }
+  const btn = $('#btn-buscar');
+  const htmlOriginal = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spin"></span>Buscando…';
+  const inicio = new Date();
+  const url = c.n8n_webhook_url + (c.n8n_webhook_url.includes('?') ? '&' : '?') + 'token=' + encodeURIComponent(c.webhook_token);
+  try {
+    await fetch(url, { method: 'GET' });
+  } catch (err) {
+    try { await fetch(url, { method: 'GET', mode: 'no-cors' }); } catch (e2) {
+      btn.disabled = false; btn.innerHTML = htmlOriginal;
+      return falha(e2, 'Não foi possível acessar o n8n');
+    }
+  }
+  toast('Busca iniciada no Diário. Isso costuma levar menos de um minuto.');
+
+  const limite = Date.now() + 180000;
+  while (Date.now() < limite) {
+    await new Promise(r => setTimeout(r, 5000));
+    const { data } = await sb.from('execucoes').select('*').gte('executado_em', inicio.toISOString()).order('executado_em', { ascending: false }).limit(1);
+    if (data && data.length) {
+      const x = data[0];
+      await Promise.all([carregarPrazos(), carregarExecucoes()]);
+      x.status === 'ok'
+        ? toast(`Busca concluída: ${x.encontradas} publicação(ões) encontrada(s), ${x.novas} nova(s).`, 'ok')
+        : toast('A busca falhou. Veja os detalhes no Histórico.', 'erro');
+      btn.disabled = false; btn.innerHTML = htmlOriginal;
+      return;
+    }
+  }
+  btn.disabled = false; btn.innerHTML = htmlOriginal;
+  toast('O n8n não registrou a execução em 3 minutos. Verifique se o fluxo está ativo e se o token confere.', 'erro');
+});
+
+iniciar();
+</script>
+</body>
+</html>

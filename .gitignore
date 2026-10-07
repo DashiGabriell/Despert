@@ -1,0 +1,26 @@
+# Dependências e build
+node_modules/
+dist/
+.vite/
+*.tsbuildinfo
+
+# Segredos
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+npm-debug.log*
+yarn-error.log*
+
+# Sistema e editors
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/extensions.json
+.idea/
+
+# Skills CLI (symlinks recriados pelo `npx skills update`)
+.claude/
+.cursor/
