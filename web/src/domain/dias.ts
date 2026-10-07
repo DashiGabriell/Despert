@@ -25,17 +25,19 @@ function somaDias(data: Date, quantidade: number): Date {
   return copia
 }
 
-const FERIADOS_NACIONAIS_FIXOS = [
-  '01-01', // Confraternização Universal
-  '04-21', // Tiradentes
-  '05-01', // Dia do Trabalho
-  '09-07', // Independência
-  '10-12', // Nossa Senhora Aparecida
-  '11-02', // Finados
-  '11-15', // Proclamação da República
-  '11-20', // Consciência Negra
-  '12-25', // Natal
-]
+const NOMES_FERIADOS_FIXOS: Record<string, string> = {
+  '01-01': 'Confraternização Universal',
+  '04-21': 'Tiradentes',
+  '05-01': 'Dia do Trabalho',
+  '09-07': 'Independência',
+  '10-12': 'Nossa Senhora Aparecida',
+  '11-02': 'Finados',
+  '11-15': 'Proclamação da República',
+  '11-20': 'Consciência Negra',
+  '12-25': 'Natal',
+}
+
+const FERIADOS_NACIONAIS_FIXOS = Object.keys(NOMES_FERIADOS_FIXOS)
 
 const sextaFeiraSanta = new Map<number, DataISO>()
 
@@ -53,6 +55,12 @@ function ehSextaFeiraSanta(iso: DataISO): boolean {
 function emRecesso(iso: DataISO): boolean {
   const mesDia = iso.slice(5)
   return mesDia >= '12-20' || mesDia <= '01-20'
+}
+
+/** Nome do feriado nacional na data (inclui a Sexta-feira Santa), ou `null`. */
+export function nomeFeriadoNacional(iso: DataISO): string | null {
+  if (ehSextaFeiraSanta(iso)) return 'Sexta-feira Santa'
+  return NOMES_FERIADOS_FIXOS[iso.slice(5)] ?? null
 }
 
 export function ehDiaUtil(iso: DataISO, opcoes: OpcoesDias = {}): boolean {

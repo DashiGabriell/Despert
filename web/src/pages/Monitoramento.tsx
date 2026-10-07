@@ -1,10 +1,247 @@
-import CartaoVazio from '../components/CartaoVazio'
+import { useState, type FormEvent } from 'react'
+import {
+  alertaErro,
+  botaoPerigoPequeno,
+  botaoPrimario,
+  campo,
+  cartao,
+  dica,
+  rotulo,
+  td,
+  th,
+} from '../components/ui'
+import {
+  useAlternarMonitoramento,
+  useCriarMonitoramento,
+  useMonitoramentos,
+  useRemoverMonitoramento,
+} from '../data/queries'
+import { UFS, validarMonitoramento, type FormMonitoramento } from '../domain/validacao'
+import { useUserId } from '../lib/auth-context'
+import { mensagemDeErro, useToast } from '../lib/toast-context'
+
+const FORM_VAZIO: FormMonitoramento = { tipo: 'oab', oab: '', uf: 'SP', processo: '', descricao: '' }
 
 export default function Monitoramento() {
+  const userId = useUserId()
+  const avisar = useToast()
+  const monitoramentos = useMonitoramentos(userId)
+  const criar = useCriarMonitoramento(userId)
+  const alternar = useAlternarMonitoramento(userId)
+  const remover = useRemoverMonitoramento(userId)
+  const [form, setForm] = useState<FormMonitoramento>(FORM_VAZIO)
+  const [erro, setErro] = useState<string | null>(null)
+
+  const lista = monitoramentos.data ?? []
+
+  function enviar(e: FormEvent) {
+    e.preventDefault()
+    const resultado = validarMonitoramento(form, lista)
+    if (!resultado.ok) {
+      setErro(resultado.erro)
+      return
+    }
+    setErro(null)
+    criar.mutate(resultado.valor, {
+      onSuccess: () => {
+        setForm({ ...FORM_VAZIO, tipo: form.tipo, uf: form.uf })
+        avisar('Monitoramento adicionado. Ele entra na próxima busca.', 'ok')
+      },
+      onError: (falha) => setErro(`Não foi possível adicionar: ${mensagemDeErro(falha)}`),
+    })
+  }
+
   return (
-    <CartaoVazio
-      titulo="O que está sendo monitorado"
-      descricao="Cadastro de OAB com UF ou número de processo no padrão CNJ, com ativação, desativação e remoção. Montado no ticket de monitoramento."
-    />
+    <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
+      <section className={`${cartao} p-5`}>
+        <h2 className="mb-4 text-base font-semibold text-navy">Adicionar monitoramento</h2>
+        <form onSubmit={enviar} noValidate className="space-y-3.5">
+          <div>
+            <label className={rotulo} htmlFor="m-tipo">
+              Tipo
+            </label>
+            <select
+              id="m-tipo"
+              className={campo}
+              value={form.tipo}
+              onChange={(e) => {
+                setForm({ ...form, tipo: e.target.value as FormMonitoramento['tipo'] })
+                setErro(null)
+              }}
+            >
+              <option value="oab">Número da OAB (todas as intimações da advogada)</option>
+              <option value="processo">Processo específico</option>
+            </select>
+          </div>
+          {form.tipo === 'oab' ? (
+            <div className="grid grid-cols-[minmax(0,2fr)_minmax(0,1fr)] gap-3.5">
+              <div>
+                <label className={rotulo} htmlFor="m-oab">
+                  Número da OAB
+                </label>
+                <input
+                  id="m-oab"
+                  inputMode="numeric"
+                  placeholder="123456"
+                  className={campo}
+                  value={form.oab}
+                  onChange={(e) => setForm({ ...form, oab: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className={rotulo} htmlFor="m-uf">
+                  UF
+                </label>
+                <select
+                  id="m-uf"
+                  className={campo}
+                  value={form.uf}
+                  onChange={(e) => setForm({ ...form, uf: e.target.value })}
+                >
+                  {UFS.map((uf) => (
+                    <option key={uf}>{uf}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          ) : (
+            <div>
+              <label className={rotulo} htmlFor="m-proc">
+                Número do processo (CNJ)
+              </label>
+              <input
+                id="m-proc"
+                placeholder="0000000-00.0000.0.00.0000"
+                className={`${campo} font-mono`}
+                value={form.processo}
+                onChange={(e) => setForm({ ...form, processo: e.target.value })}
+              />
+              <p className={dica}>20 dígitos, com ou sem pontuação.</p>
+            </div>
+          )}
+          <div>
+            <label className={rotulo} htmlFor="m-desc">
+              Descrição (opcional)
+            </label>
+            <input
+              id="m-desc"
+              placeholder="Ex.: OAB principal, Cliente X…"
+              className={campo}
+              value={form.descricao}
+              onChange={(e) => setForm({ ...form, descricao: e.target.value })}
+            />
+          </div>
+          {erro && <div className={alertaErro}>{erro}</div>}
+          <button type="submit" className={botaoPrimario} disabled={criar.isPending}>
+            Adicionar
+          </button>
+        </form>
+      </section>
+
+      <section className={cartao}>
+        <div className="border-b border-line p-3.5 text-sm font-semibold text-navy">
+          O que está sendo monitorado
+        </div>
+        {monitoramentos.isError && (
+          <div className={`${alertaErro} m-3.5`}>
+            Não foi possível carregar: {mensagemDeErro(monitoramentos.error)}
+          </div>
+        )}
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse text-sm">
+            <thead>
+              <tr>
+                <th className={th}>Ativo</th>
+                <th className={th}>Monitoramento</th>
+                <th className={th}>Descrição</th>
+                <th className={th}>
+                  <span className="sr-only">Ações</span>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {monitoramentos.isPending && (
+                <tr>
+                  <td colSpan={4} className="px-6 py-8 text-center text-muted">
+                    Carregando…
+                  </td>
+                </tr>
+              )}
+              {monitoramentos.isSuccess && lista.length === 0 && (
+                <tr>
+                  <td colSpan={4} className="px-6 py-10 text-center text-muted">
+                    Nada cadastrado ainda. Adicione a sua OAB ao lado para o robô começar a buscar as
+                    intimações no Diário.
+                  </td>
+                </tr>
+              )}
+              {lista.map((m) => {
+                const nome =
+                  m.tipo === 'oab' ? `OAB ${m.oab_numero}/${m.oab_uf}` : (m.numero_processo ?? '')
+                return (
+                  <tr key={m.id} className={m.ativo ? '' : '[&>td]:text-muted'}>
+                    <td className={td}>
+                      <label className="relative inline-block h-[22px] w-[38px] cursor-pointer">
+                        <input
+                          type="checkbox"
+                          className="peer sr-only"
+                          aria-label={`${m.ativo ? 'Desativar' : 'Ativar'} ${nome}`}
+                          checked={m.ativo}
+                          disabled={alternar.isPending}
+                          onChange={(e) =>
+                            alternar.mutate(
+                              { id: m.id, ativo: e.target.checked },
+                              {
+                                onError: (falha) =>
+                                  avisar(`Não foi possível atualizar: ${mensagemDeErro(falha)}`, 'erro'),
+                              },
+                            )
+                          }
+                        />
+                        <span className="absolute inset-0 rounded-full bg-[#cfd4dc] transition peer-checked:bg-ok" />
+                        <span className="absolute top-[3px] left-[3px] size-4 rounded-full bg-white transition peer-checked:translate-x-4" />
+                      </label>
+                    </td>
+                    <td className={td}>
+                      {m.tipo === 'oab' ? (
+                        <strong>{nome}</strong>
+                      ) : (
+                        <>
+                          <span className="font-mono text-[13px]">{nome}</span>
+                          <div className="text-xs text-muted">Processo</div>
+                        </>
+                      )}
+                    </td>
+                    <td className={td}>{m.descricao}</td>
+                    <td className={`${td} text-right`}>
+                      <button
+                        type="button"
+                        className={botaoPerigoPequeno}
+                        onClick={() => {
+                          if (
+                            !window.confirm(
+                              `Remover ${nome}? Ele sai das próximas buscas; os prazos já capturados continuam salvos.`,
+                            )
+                          ) {
+                            return
+                          }
+                          remover.mutate(m.id, {
+                            onSuccess: () => avisar('Monitoramento removido.'),
+                            onError: (falha) =>
+                              avisar(`Não foi possível remover: ${mensagemDeErro(falha)}`, 'erro'),
+                          })
+                        }}
+                      >
+                        Remover
+                      </button>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
   )
 }

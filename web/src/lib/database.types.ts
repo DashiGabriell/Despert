@@ -8,7 +8,7 @@ export type StatusPrazo = 'pendente' | 'conferir' | 'cumprido' | 'arquivado'
 export type TipoMonitoramento = 'oab' | 'processo'
 export type StatusExecucao = 'ok' | 'falha'
 
-export interface Configuracao {
+export type Configuracao = {
   user_id: string
   email_destino: string
   dias_retroativos: number
@@ -17,10 +17,11 @@ export interface Configuracao {
   considerar_recesso: boolean
   n8n_webhook_url: string
   webhook_token: string
+  ultima_busca_em: string | null
   updated_at: string
 }
 
-export interface Monitoramento {
+export type Monitoramento = {
   id: number
   user_id: string
   tipo: TipoMonitoramento
@@ -32,13 +33,13 @@ export interface Monitoramento {
   created_at: string
 }
 
-export interface Feriado {
+export type Feriado = {
   user_id: string
   data: string
   descricao: string
 }
 
-export interface Prazo {
+export type Prazo = {
   id: string
   user_id: string
   djen_id: string
@@ -63,7 +64,7 @@ export interface Prazo {
   updated_at: string
 }
 
-export interface Execucao {
+export type Execucao = {
   id: number
   user_id: string | null
   executado_em: string
@@ -74,7 +75,7 @@ export interface Execucao {
   detalhe: string | null
 }
 
-export interface Database {
+export type Database = {
   public: {
     Tables: {
       configuracoes: {
@@ -85,26 +86,26 @@ export interface Database {
       }
       monitoramentos: {
         Row: Monitoramento
-        Insert: Partial<Monitoramento> & Pick<Monitoramento, 'user_id' | 'tipo'>
-        Update: Partial<Monitoramento>
+        Insert: Partial<Omit<Monitoramento, 'id'>> & Pick<Monitoramento, 'tipo'>
+        Update: Partial<Omit<Monitoramento, 'id'>>
         Relationships: []
       }
       feriados: {
         Row: Feriado
-        Insert: Feriado
+        Insert: Partial<Feriado> & Pick<Feriado, 'data'>
         Update: Partial<Feriado>
         Relationships: []
       }
       prazos: {
         Row: Prazo
-        Insert: Partial<Prazo> & Pick<Prazo, 'user_id' | 'djen_id'>
+        Insert: Partial<Prazo> & Pick<Prazo, 'djen_id'>
         Update: Partial<Prazo>
         Relationships: []
       }
       execucoes: {
         Row: Execucao
-        Insert: Partial<Execucao>
-        Update: Partial<Execucao>
+        Insert: Partial<Omit<Execucao, 'id'>>
+        Update: Partial<Omit<Execucao, 'id'>>
         Relationships: []
       }
     }

@@ -74,6 +74,31 @@ describe('filtrarPrazos', () => {
     ).toEqual([venceHoje, amanha, emCincoDias])
   })
 
+  it('com filtro rápido "abertos", devolve pendentes e para conferir', () => {
+    const pendente = prazo()
+    const conferir = prazo({ status: 'conferir' })
+    const cumprido = prazo({ status: 'cumprido' })
+
+    expect(
+      filtrarPrazos([pendente, conferir, cumprido], { status: 'todos', rapido: 'abertos', hoje: HOJE }),
+    ).toEqual([pendente, conferir])
+  })
+
+  it('combina status, filtro rápido e busca textual', () => {
+    const alvo = prazo({ vencimento: '2026-10-05' })
+    const vencidoDeOutro = prazo({ vencimento: '2026-10-05', partes: 'OUTRA PARTE' })
+    const naoVencido = prazo()
+
+    expect(
+      filtrarPrazos([alvo, vencidoDeOutro, naoVencido], {
+        status: 'abertos',
+        rapido: 'vencido',
+        busca: 'acme',
+        hoje: HOJE,
+      }),
+    ).toEqual([alvo])
+  })
+
   it('com filtro rápido "conferir", devolve só o que o advogado precisa confirmar', () => {
     const precisaConfirmar = prazo({ origem_prazo: 'Padrão (15 dias)' })
     const certo = prazo()

@@ -1,5 +1,30 @@
-import { NavLink, Outlet, useLocation } from 'react-router-dom'
+import type { Session } from '@supabase/supabase-js'
+import { useCallback, useMemo, useState } from 'react'
+import { Navigate, NavLink, Outlet, useLocation } from 'react-router-dom'
+import {
+  useAtualizarPrazo,
+  useConfiguracao,
+  useCriarPrazo,
+  useExcluirPrazo,
+  useExecucoes,
+  useFeriados,
+  useMonitoramentos,
+  usePrazos,
+  useTempoReal,
+} from '../data/queries'
+import { useHoje } from '../data/relogio'
+import { formatarDataHora } from '../domain/datas'
+import type { DataISO, OpcoesDias } from '../domain/dias'
+import { contarIndicadores } from '../domain/indicadores'
+import { useAuth } from '../lib/auth-context'
+import type { Prazo } from '../lib/database.types'
+import type { ContextoLayout } from '../lib/layout-context'
 import { ausenciaConfiguracao } from '../lib/supabase'
+import { useToast } from '../lib/toast-context'
+import BuscaAgora from './BuscaAgora'
+import ModalNovoPrazo from './ModalNovoPrazo'
+import ModalPrazo from './ModalPrazo'
+import { botao } from './ui'
 
 const TITULOS: Record<string, string> = {
   '/prazos': 'Prazos',
@@ -7,14 +32,6 @@ const TITULOS: Record<string, string> = {
   '/monitoramento': 'Monitoramento',
   '/historico': 'Histórico de execuções',
   '/configuracoes': 'Configurações',
-}
-
-const SUBTITULOS: Record<string, string> = {
-  '/prazos': 'Publicações do Diário de Justiça Eletrônico Nacional',
-  '/agenda': 'Vencimentos do mês, um por dia',
-  '/monitoramento': 'OAB e processos que o robô acompanha',
-  '/historico': 'Quando o robô rodou e o que encontrou',
-  '/configuracoes': 'Parâmetros do robô, webhook e feriados',
 }
 
 function Icone({ d }: { d: string }) {
@@ -54,12 +71,67 @@ const ITENS = [
   },
 ]
 
+type ModalAberto = { tipo: 'prazo'; id: string } | { tipo: 'novo'; data?: DataISO } | null
+
 export default function Layout() {
+  const { sessao } = useAuth()
+  if (sessao === undefined) {
+    return (
+      <main className="grid min-h-dvh place-items-center bg-surface text-sm text-muted">
+        Carregando…
+      </main>
+    )
+  }
+  if (!sessao) return <Navigate to="/login" replace />
+  return <AreaLogada sessao={sessao} />
+}
+
+function AreaLogada({ sessao }: { sessao: Session }) {
+  const userId = sessao.user.id
+  const { sair } = useAuth()
   const { pathname } = useLocation()
+  const avisar = useToast()
+  const hoje = useHoje()
+  useTempoReal(userId)
+
+  const prazos = usePrazos(userId)
+  const execucoes = useExecucoes(userId)
+  const config = useConfiguracao(userId, sessao.user.email)
+  const monitoramentos = useMonitoramentos(userId)
+  const feriados = useFeriados(userId)
+  const atualizar = useAtualizarPrazo(userId)
+  const excluir = useExcluirPrazo(userId)
+  const criar = useCriarPrazo(userId)
+
+  const [modal, setModal] = useState<ModalAberto>(null)
+  const fechar = useCallback(() => setModal(null), [])
+
+  const opcoesDias: OpcoesDias = useMemo(
+    () => ({
+      feriadosLocais: (feriados.data ?? []).map((f) => f.data),
+      considerarRecesso: config.data?.considerar_recesso ?? true,
+    }),
+    [feriados.data, config.data?.considerar_recesso],
+  )
+
+  const contexto: ContextoLayout = useMemo(
+    () => ({
+      hoje,
+      abrirPrazo: (prazo: Prazo) => setModal({ tipo: 'prazo', id: prazo.id }),
+      novoPrazo: (data?: DataISO) => setModal({ tipo: 'novo', data }),
+    }),
+    [hoje],
+  )
+
+  const indicadores = contarIndicadores(prazos.data ?? [], hoje)
+  const criticos = indicadores.vencido + indicadores.hoje
+  const ultima = execucoes.data?.[0]
+  const prazoAberto =
+    modal?.tipo === 'prazo' ? (prazos.data ?? []).find((p) => p.id === modal.id) : undefined
 
   return (
     <div className="grid min-h-dvh grid-cols-1 md:grid-cols-[240px_minmax(0,1fr)]">
-      <aside className="flex flex-col gap-6 bg-navy p-4 text-white/80 md:sticky md:top-0 md:h-dvh">
+      <aside className="flex flex-col gap-4 bg-navy p-3 text-white/80 md:sticky md:top-0 md:h-dvh md:gap-6 md:p-4">
         <div className="flex items-center gap-2.5 px-2">
           <span className="grid size-8 place-items-center rounded-lg bg-gold text-sm font-bold text-white">
             D
@@ -68,6 +140,13 @@ export default function Layout() {
             <span className="block text-base font-bold text-white">Despert</span>
             <span className="block text-[11px] text-white/50">DJEN · CNJ</span>
           </span>
+          <button
+            type="button"
+            onClick={() => void sair()}
+            className="ml-auto cursor-pointer rounded-md border border-white/20 px-2.5 py-1 text-xs md:hidden"
+          >
+            Sair
+          </button>
         </div>
 
         <nav className="flex gap-1 overflow-x-auto md:flex-col md:overflow-visible">
@@ -84,16 +163,33 @@ export default function Layout() {
             >
               <Icone d={item.d} />
               {item.label}
+              {item.to === '/prazos' && criticos > 0 && (
+                <span
+                  className="ml-auto rounded-full bg-danger px-1.5 text-[11px] text-white"
+                  title="Vencidos e vencendo hoje"
+                >
+                  {criticos}
+                </span>
+              )}
             </NavLink>
           ))}
         </nav>
 
         <div className="mt-auto hidden border-t border-white/10 pt-4 text-xs text-white/60 md:block">
-          Conta conectada ao Supabase
+          <div className="truncate" title={sessao.user.email}>
+            {sessao.user.email}
+          </div>
+          <button
+            type="button"
+            onClick={() => void sair()}
+            className="mt-2.5 w-full cursor-pointer rounded-lg border border-white/20 py-1.5 text-white/80 hover:bg-white/10"
+          >
+            Sair
+          </button>
         </div>
       </aside>
 
-      <main className="min-w-0 px-5 py-6 md:px-7 md:py-8">
+      <main className="min-w-0 px-4 py-5 md:px-7 md:py-7">
         {ausenciaConfiguracao && (
           <div className="mb-5 rounded-lg border border-caution/30 bg-caution-soft px-4 py-3 text-sm text-caution">
             {ausenciaConfiguracao}
@@ -102,17 +198,74 @@ export default function Layout() {
 
         <header className="mb-6 flex flex-wrap items-end justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-bold text-navy">
-              {TITULOS[pathname] ?? 'Despert'}
-            </h1>
+            <h1 className="text-2xl font-bold text-navy">{TITULOS[pathname] ?? 'Despert'}</h1>
             <p className="mt-1 text-sm text-muted">
-              {SUBTITULOS[pathname] ?? ''}
+              {ultima ? (
+                <>
+                  Última verificação: {formatarDataHora(ultima.executado_em)} —{' '}
+                  {ultima.status === 'falha' ? (
+                    <strong className="text-danger">falhou</strong>
+                  ) : (
+                    `${ultima.novas} nova(s)`
+                  )}
+                </>
+              ) : execucoes.isPending ? (
+                'Carregando…'
+              ) : (
+                'O robô ainda não rodou nenhuma vez.'
+              )}
             </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" className={botao} onClick={() => contexto.novoPrazo()}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="size-4" aria-hidden>
+                <path d="M12 5v14M5 12h14" />
+              </svg>
+              Prazo manual
+            </button>
+            <BuscaAgora userId={userId} config={config.data} monitoramentos={monitoramentos.data ?? []} />
           </div>
         </header>
 
-        <Outlet />
+        <Outlet context={contexto} />
       </main>
+
+      {prazoAberto && (
+        <ModalPrazo
+          key={prazoAberto.id}
+          prazo={prazoAberto}
+          hoje={hoje}
+          opcoesDias={opcoesDias}
+          onFechar={fechar}
+          onSalvar={async (dados) => {
+            await atualizar.mutateAsync({ id: prazoAberto.id, dados })
+            avisar(
+              dados.status === 'cumprido' && prazoAberto.status !== 'cumprido'
+                ? 'Prazo marcado como cumprido.'
+                : 'Prazo atualizado.',
+              'ok',
+            )
+            fechar()
+          }}
+          onExcluir={async () => {
+            await excluir.mutateAsync(prazoAberto.id)
+            avisar('Prazo excluído.')
+            fechar()
+          }}
+        />
+      )}
+      {modal?.tipo === 'novo' && (
+        <ModalNovoPrazo
+          dataInicial={modal.data}
+          opcoesDias={opcoesDias}
+          onFechar={fechar}
+          onCriar={async (registro) => {
+            await criar.mutateAsync({ ...registro, djen_id: `manual-${crypto.randomUUID()}` })
+            avisar('Prazo criado.', 'ok')
+            fechar()
+          }}
+        />
+      )}
     </div>
   )
 }

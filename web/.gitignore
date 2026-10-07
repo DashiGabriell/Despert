@@ -26,4 +26,6 @@ dist-ssr
 # Segredos do ambiente
 .env
 .env.*
+!.env.example
+.vercel
 

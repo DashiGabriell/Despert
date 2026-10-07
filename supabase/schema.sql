@@ -13,8 +13,13 @@ create table if not exists public.configuracoes (
   considerar_recesso boolean not null default true,
   n8n_webhook_url    text    not null default '',
   webhook_token      text    not null default replace(gen_random_uuid()::text, '-', ''),
+  ultima_busca_em    timestamptz,
   updated_at         timestamptz not null default now()
 );
+-- Disparo do "Buscar agora": a aplicação respeita 10 min entre buscas a partir desta data.
+alter table public.configuracoes add column if not exists ultima_busca_em timestamptz;
+-- O n8n identifica o advogado pelo token do webhook.
+create unique index if not exists configuracoes_webhook_token_idx on public.configuracoes (webhook_token);
 
 -- ============================ monitoramentos ============================
 create table if not exists public.monitoramentos (
@@ -88,6 +93,11 @@ create table if not exists public.execucoes (
 );
 create index if not exists execucoes_data_idx on public.execucoes (executado_em desc);
 create index if not exists execucoes_user_idx on public.execucoes (user_id, executado_em desc);
+
+-- A aplicação pode omitir o dono: o banco assume o usuário logado (o RLS confere de todo jeito).
+alter table public.monitoramentos alter column user_id set default auth.uid();
+alter table public.feriados       alter column user_id set default auth.uid();
+alter table public.prazos         alter column user_id set default auth.uid();
 
 -- ============================ updated_at automático ============================
 create or replace function public.tocar_updated_at() returns trigger

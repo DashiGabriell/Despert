@@ -17,7 +17,7 @@ export interface PrazoFiltravel {
 
 export type FiltroStatus = 'abertos' | 'todos' | StatusPrazo
 
-export type FiltroRapido = 'vencido' | 'hoje' | 'semana' | 'conferir' | null
+export type FiltroRapido = 'vencido' | 'hoje' | 'semana' | 'conferir' | 'abertos' | null
 
 export interface FiltrosPrazos {
   busca?: string
@@ -37,7 +37,7 @@ const CAMPOS_BUSCA = [
   'observacoes',
 ] as const
 
-export function filtrarPrazos(prazos: PrazoFiltravel[], filtros: FiltrosPrazos): PrazoFiltravel[] {
+export function filtrarPrazos<T extends PrazoFiltravel>(prazos: readonly T[], filtros: FiltrosPrazos): T[] {
   let selecionados = prazos
   if (filtros.status === 'abertos') {
     selecionados = selecionados.filter(emAberto)
@@ -48,6 +48,7 @@ export function filtrarPrazos(prazos: PrazoFiltravel[], filtros: FiltrosPrazos):
   if (filtros.rapido) {
     const busca = filtros.rapido
     selecionados = selecionados.filter((prazo) => {
+      if (busca === 'abertos') return emAberto(prazo)
       const urgencia = classificarUrgencia(prazo, filtros.hoje)
       if (busca === 'vencido') return urgencia === 'vencido'
       if (busca === 'hoje') return urgencia === 'hoje'
