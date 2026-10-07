@@ -5,6 +5,7 @@ export const BASE_DEV = '/dashitecnology'
 export const MODOS_DEV = [
   { modo: 'visao-geral', rotulo: 'Visão geral' },
   { modo: 'usuarios', rotulo: 'Usuários' },
+  { modo: 'organizacoes', rotulo: 'Organizações' },
   { modo: 'dados', rotulo: 'Dados' },
   { modo: 'execucoes', rotulo: 'Execuções' },
   { modo: 'n8n', rotulo: 'n8n' },
@@ -69,6 +70,8 @@ const TABELAS: Record<string, string> = {
   feriados: 'feriado',
   configuracoes: 'configuração do advogado',
   configuracao_sistema: 'configuração do sistema',
+  organizacoes: 'organização',
+  membros: 'membro',
 }
 
 const OPERACOES: Record<string, string> = {
@@ -102,6 +105,10 @@ const NOMES_CAMPOS: Record<string, string> = {
   ultima_busca_em: 'última busca',
   email_destino: 'e-mail do resumo',
   cumprido_em: 'data de cumprimento',
+  pago_ate: 'pago até',
+  dias_teste: 'dias de teste',
+  carencia_aviso_dias: 'dias de aviso',
+  carencia_total_dias: 'carência total',
 }
 
 /** Uma linha legível a partir do `detalhe` gravado na auditoria. */

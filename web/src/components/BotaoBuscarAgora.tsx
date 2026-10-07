@@ -5,20 +5,35 @@ interface Props {
   estado: EstadoBusca
   restanteMs: number
   onBuscar: () => void
+  /** Intervalo mínimo entre buscas da organização, para a dica do botão. */
+  intervaloMin?: number
+  /** Buscas que a organização ainda pode disparar hoje. */
+  restantesHoje?: number
 }
 
-export default function BotaoBuscarAgora({ estado, restanteMs, onBuscar }: Props) {
+function dica(estado: EstadoBusca, intervaloMin: number, restantesHoje: number | undefined): string | undefined {
+  switch (estado) {
+    case 'bloqueado':
+      return `Para não sobrecarregar o Diário, a busca manual fica disponível a cada ${intervaloMin} minutos.`
+    case 'esgotado':
+      return 'As buscas manuais de hoje já foram usadas pela organização. Liberam de novo à meia-noite; a busca automática continua normalmente.'
+    case 'indisponivel':
+      return 'Organização em modo somente leitura: a busca manual fica desligada até a reativação.'
+    case 'ocioso':
+      return restantesHoje === undefined ? undefined : `${restantesHoje} busca(s) manual(is) disponível(is) hoje.`
+    default:
+      return undefined
+  }
+}
+
+export default function BotaoBuscarAgora({ estado, restanteMs, onBuscar, intervaloMin = 10, restantesHoje }: Props) {
   return (
     <button
       type="button"
       className={botaoDourado}
       disabled={estado !== 'ocioso'}
       onClick={onBuscar}
-      title={
-        estado === 'bloqueado'
-          ? 'Para não sobrecarregar o Diário, a busca manual fica disponível a cada 10 minutos.'
-          : undefined
-      }
+      title={dica(estado, intervaloMin, restantesHoje)}
     >
       {estado === 'buscando' ? (
         <>
@@ -27,6 +42,8 @@ export default function BotaoBuscarAgora({ estado, restanteMs, onBuscar }: Props
         </>
       ) : estado === 'bloqueado' ? (
         <>Nova busca em {formatarRestante(restanteMs)}</>
+      ) : estado === 'esgotado' ? (
+        <>Buscas de hoje usadas</>
       ) : (
         <>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="size-4" aria-hidden>

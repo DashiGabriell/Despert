@@ -75,4 +75,27 @@ describe('estadoDaBusca', () => {
       'ocioso',
     )
   })
+
+  it('cota do dia esgotada e somente leitura travam o botão, mesmo sem cooldown', () => {
+    const base = { disparadoEm: null, respondida: false, restanteMs: 0, agora }
+    expect(estadoDaBusca({ ...base, esgotado: true })).toBe('esgotado')
+    expect(estadoDaBusca({ ...base, esgotado: true, indisponivel: true })).toBe('indisponivel')
+    expect(estadoDaBusca({ ...base, restanteMs: 5000, esgotado: true })).toBe('esgotado')
+  })
+
+  it('uma busca em andamento continua aparecendo como "buscando"', () => {
+    expect(
+      estadoDaBusca({ disparadoEm: agora - 1000, respondida: false, restanteMs: 1, agora, esgotado: true }),
+    ).toBe('buscando')
+  })
+})
+
+describe('intervalo mínimo do plano', () => {
+  it('usa o intervalo informado (30 min no Solo)', () => {
+    const disparo = '2026-10-06T10:00:00.000Z'
+    const base = Date.parse(disparo)
+    const trinta = 30 * 60_000
+    expect(restanteCooldown(disparo, base + 10 * 60_000, trinta)).toBe(20 * 60_000)
+    expect(restanteCooldown(disparo, base + 30 * 60_000, trinta)).toBe(0)
+  })
 })

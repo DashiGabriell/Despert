@@ -1,4 +1,4 @@
-/** Intervalo mínimo entre dois disparos do "Buscar agora" pelo mesmo advogado. */
+/** Intervalo mínimo padrão entre dois disparos do "Buscar agora" (o plano pode mudar). */
 export const COOLDOWN_MS = 10 * 60 * 1000
 
 /** Quanto tempo depois do disparo a aplicação desiste de esperar a execução aparecer. */
@@ -28,11 +28,15 @@ export function urlDisparo(webhook: string, token: string): string {
 }
 
 /** Milissegundos que ainda faltam para liberar um novo disparo (0 quando liberado). */
-export function restanteCooldown(ultimaBusca: string | null | undefined, agora: number): number {
+export function restanteCooldown(
+  ultimaBusca: string | null | undefined,
+  agora: number,
+  intervaloMs: number = COOLDOWN_MS,
+): number {
   if (!ultimaBusca) return 0
   const decorrido = agora - Date.parse(ultimaBusca)
   if (Number.isNaN(decorrido)) return 0
-  return Math.min(COOLDOWN_MS, Math.max(0, COOLDOWN_MS - decorrido))
+  return Math.min(intervaloMs, Math.max(0, intervaloMs - decorrido))
 }
 
 /** `m:ss` para a contagem regressiva do botão. */
@@ -53,17 +57,25 @@ export function execucaoDoDisparo<T extends { executado_em: string }>(
   )
 }
 
-export type EstadoBusca = 'ocioso' | 'buscando' | 'bloqueado'
+/**
+ * `bloqueado` = aguardando o intervalo mínimo; `esgotado` = cota diária da organização usada;
+ * `indisponivel` = organização em somente leitura.
+ */
+export type EstadoBusca = 'ocioso' | 'buscando' | 'bloqueado' | 'esgotado' | 'indisponivel'
 
 export function estadoDaBusca(opcoes: {
   disparadoEm: number | null
   respondida: boolean
   restanteMs: number
   agora: number
+  esgotado?: boolean
+  indisponivel?: boolean
 }): EstadoBusca {
   const { disparadoEm, respondida, restanteMs, agora } = opcoes
   if (disparadoEm !== null && !respondida && agora - disparadoEm < LIMITE_ESPERA_MS) {
     return 'buscando'
   }
+  if (opcoes.indisponivel) return 'indisponivel'
+  if (opcoes.esgotado) return 'esgotado'
   return restanteMs > 0 ? 'bloqueado' : 'ocioso'
 }

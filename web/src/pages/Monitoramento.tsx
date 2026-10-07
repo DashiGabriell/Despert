@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import {
+  alertaAviso,
   alertaErro,
   botaoPerigoPequeno,
   botaoPrimario,
@@ -13,15 +14,65 @@ import {
 import {
   useAlternarMonitoramento,
   useCriarMonitoramento,
+  useMembros,
   useMonitoramentos,
   useRemoverMonitoramento,
 } from '../data/queries'
+import { usePlano } from '../data/plano'
+import {
+  limiteDe,
+  podeAdicionar,
+  situacaoDoLimite,
+  type Limites,
+  type Recurso,
+  type Uso,
+} from '../domain/planos'
 import { UFS, validarMonitoramento, type FormMonitoramento } from '../domain/validacao'
 import { useUserId } from '../lib/auth-context'
 import { useOrganizacaoId } from '../lib/organizacao-context'
 import { mensagemDeErro, useToast } from '../lib/toast-context'
 
 const FORM_VAZIO: FormMonitoramento = { tipo: 'oab', oab: '', uf: 'SP', processo: '', descricao: '' }
+
+const NOMES_RECURSO: Record<'oabs' | 'processos', string> = {
+  oabs: 'OABs monitoradas',
+  processos: 'Processos avulsos',
+}
+
+/** Uso atual frente ao limite do plano; avisa a partir de 80% (ADR-0008). */
+function UsoDoPlano({ limites, uso }: { limites: Limites; uso: Uso }) {
+  const linhas = (['oabs', 'processos'] as const).map((recurso) => {
+    const limite = limiteDe(recurso, limites, uso.advogados)
+    return { recurso, limite, usados: uso[recurso], situacao: situacaoDoLimite(uso[recurso], limite) }
+  })
+  const alerta = linhas.find((l) => l.situacao === 'excedido') ?? linhas.find((l) => l.situacao === 'perto')
+  return (
+    <div className="mb-4 space-y-2">
+      <p className="text-sm text-muted">
+        {linhas.map((l, i) => (
+          <span key={l.recurso}>
+            {i > 0 && ' · '}
+            {NOMES_RECURSO[l.recurso]} ativos:{' '}
+            <strong className="text-ink">
+              {l.usados} de {l.limite}
+            </strong>
+          </span>
+        ))}
+      </p>
+      {alerta?.situacao === 'excedido' && (
+        <div className={alertaErro}>
+          {NOMES_RECURSO[alerta.recurso]} ativos acima do que o plano permite ({alerta.usados} de {alerta.limite}).
+          Pause os que não precisam de acompanhamento; enquanto isso, nada novo pode ser cadastrado.
+        </div>
+      )}
+      {alerta?.situacao === 'perto' && (
+        <div className={alertaAviso}>
+          {NOMES_RECURSO[alerta.recurso]} ativos: {alerta.usados} de {alerta.limite} do plano. Perto do limite.
+        </div>
+      )}
+    </div>
+  )
+}
 
 export default function Monitoramento() {
   const userId = useUserId()
@@ -31,13 +82,27 @@ export default function Monitoramento() {
   const criar = useCriarMonitoramento(orgId, userId)
   const alternar = useAlternarMonitoramento(orgId)
   const remover = useRemoverMonitoramento(orgId)
+  const membros = useMembros(orgId)
+  const { limites, escrita } = usePlano()
   const [form, setForm] = useState<FormMonitoramento>(FORM_VAZIO)
   const [erro, setErro] = useState<string | null>(null)
 
   const lista = monitoramentos.data ?? []
+  // Enquanto os membros carregam, conta só a própria pessoa.
+  const uso: Uso = {
+    usuarios: membros.data?.length ?? 1,
+    advogados: membros.data
+      ? membros.data.filter((m) => m.papel === 'administrador' || m.papel === 'advogado').length
+      : 1,
+    oabs: lista.filter((m) => m.ativo && m.tipo === 'oab').length,
+    processos: lista.filter((m) => m.ativo && m.tipo === 'processo').length,
+  }
+  const recursoDoForm: Recurso = form.tipo === 'oab' ? 'oabs' : 'processos'
+  const cheio = !podeAdicionar(recursoDoForm, limites, uso)
 
   function enviar(e: FormEvent) {
     e.preventDefault()
+    if (cheio) return
     const resultado = validarMonitoramento(form, lista)
     if (!resultado.ok) {
       setErro(resultado.erro)
@@ -57,6 +122,10 @@ export default function Monitoramento() {
     <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
       <section className={`${cartao} p-5`}>
         <h2 className="mb-4 text-2xl font-bold text-navy">Adicionar monitoramento</h2>
+        <UsoDoPlano limites={limites} uso={uso} />
+        {!escrita && (
+          <div className={`${alertaAviso} mb-4`}>Organização em modo somente leitura: não é possível alterar os monitoramentos.</div>
+        )}
         <form onSubmit={enviar} noValidate className="space-y-3.5">
           <div>
             <label className={rotulo} htmlFor="m-tipo">
@@ -134,7 +203,14 @@ export default function Monitoramento() {
             />
           </div>
           {erro && <div className={alertaErro}>{erro}</div>}
-          <button type="submit" className={botaoPrimario} disabled={criar.isPending}>
+          {cheio && escrita && (
+            <div className={alertaAviso}>
+              {form.tipo === 'oab'
+                ? 'O limite de OABs monitoradas foi atingido. Pause uma OAB para cadastrar outra ou fale com o suporte.'
+                : 'O limite de processos avulsos foi atingido. Pause um processo para cadastrar outro ou fale com o suporte.'}
+            </div>
+          )}
+          <button type="submit" className={botaoPrimario} disabled={criar.isPending || cheio || !escrita}>
             Adicionar
           </button>
         </form>
@@ -189,7 +265,7 @@ export default function Monitoramento() {
                           className="sr-only"
                           aria-label={`${m.ativo ? 'Desativar' : 'Ativar'} ${nome}`}
                           checked={m.ativo}
-                          disabled={alternar.isPending}
+                          disabled={alternar.isPending || !escrita}
                           onChange={(e) =>
                             alternar.mutate(
                               { id: m.id, ativo: e.target.checked },
@@ -218,6 +294,7 @@ export default function Monitoramento() {
                       <button
                         type="button"
                         className={botaoPerigoPequeno}
+                        disabled={!escrita}
                         onClick={() => {
                           if (
                             !window.confirm(

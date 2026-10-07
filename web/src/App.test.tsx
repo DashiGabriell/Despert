@@ -45,11 +45,17 @@ const PERTENCA = {
     plano: 'solo',
     situacao: 'ativa',
     teste_iniciado_em: null,
+    pago_ate: null,
+    limites: {},
     criado_em: '2026-10-01T10:00:00Z',
   },
 }
 vi.mock('./data/queries', () => ({
   usePertencas: () => ({ data: [PERTENCA], isPending: false, isError: false, isSuccess: true }),
+  useMembros: () => vazio,
+  useBuscasAgora: () => vazio,
+  useRegistrarBuscaAgora: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useCancelarBuscaAgora: () => ({ mutate: vi.fn() }),
   usePrazos: () => vazio,
   useExecucoes: () => vazio,
   useMonitoramentos: () => vazio,
@@ -73,6 +79,10 @@ vi.mock('./data/queries', () => ({
 const mutacao = { mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false }
 vi.mock('./data/admin', () => ({
   useContasAdmin: () => vazio,
+  useOrganizacoesAdmin: () => vazio,
+  useAtualizarOrganizacao: () => mutacao,
+  useCriarOrganizacao: () => mutacao,
+  useSalvarCarencia: () => mutacao,
   useExecucoesGlobais: () => vazio,
   useAuditoria: () => vazio,
   useMetricasAdmin: () => ({ data: undefined, isPending: true, isError: false }),

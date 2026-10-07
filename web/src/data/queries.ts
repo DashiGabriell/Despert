@@ -1,11 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect } from 'react'
 import type {
+  BuscaAgora,
   Configuracao,
   ConfiguracaoSistema,
   Database,
   Execucao,
   Feriado,
+  Membro,
   MembroComOrganizacao,
   Monitoramento,
   Prazo,
@@ -27,6 +29,8 @@ export const chaves = {
   execucoes: (orgId: string) => ['execucoes', orgId] as const,
   configuracao: (userId: string) => ['configuracao', userId] as const,
   configuracaoSistema: ['configuracao-sistema'] as const,
+  membros: (orgId: string) => ['membros', orgId] as const,
+  buscasAgora: (orgId: string) => ['buscas-agora', orgId] as const,
 }
 
 /** Configuração global (URL do webhook do n8n): todos leem, só o dev altera. */
@@ -65,6 +69,34 @@ export function usePertencas(userId: string) {
         const organizacao = porId.get(m.organizacao_id)
         return organizacao ? [{ ...m, organizacao }] : []
       })
+    },
+  })
+}
+
+export function useMembros(orgId: string) {
+  return useQuery({
+    queryKey: chaves.membros(orgId),
+    queryFn: async (): Promise<Membro[]> => {
+      const { data, error } = await cliente().from('membros').select('*').eq('organizacao_id', orgId)
+      if (error) throw error
+      return data
+    },
+  })
+}
+
+/** Disparos do Buscar agora da organização nos últimos 2 dias (cota do dia e intervalo mínimo). */
+export function useBuscasAgora(orgId: string) {
+  return useQuery({
+    queryKey: chaves.buscasAgora(orgId),
+    queryFn: async (): Promise<BuscaAgora[]> => {
+      const { data, error } = await cliente()
+        .from('buscas_agora')
+        .select('*')
+        .eq('organizacao_id', orgId)
+        .gte('criado_em', new Date(Date.now() - 2 * 86_400_000).toISOString())
+        .order('criado_em', { ascending: false })
+      if (error) throw error
+      return data
     },
   })
 }
@@ -262,6 +294,30 @@ export function useRemoverMonitoramento(orgId: string) {
       if (error) throw error
     },
     onSuccess: invalidar,
+  })
+}
+
+/** O banco confere intervalo, cota diária e etapa da organização antes de registrar. */
+export function useRegistrarBuscaAgora(orgId: string) {
+  const invalidar = useInvalidar(chaves.buscasAgora(orgId))
+  return useMutation({
+    mutationFn: async (): Promise<number> => {
+      const { data, error } = await cliente().rpc('registrar_busca_agora', { org: orgId })
+      if (error) throw error
+      return data
+    },
+    onSettled: invalidar,
+  })
+}
+
+export function useCancelarBuscaAgora(orgId: string) {
+  const invalidar = useInvalidar(chaves.buscasAgora(orgId))
+  return useMutation({
+    mutationFn: async (busca: number) => {
+      const { error } = await cliente().rpc('cancelar_busca_agora', { busca })
+      if (error) throw error
+    },
+    onSettled: invalidar,
   })
 }
 

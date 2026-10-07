@@ -24,7 +24,6 @@ O script é idempotente: rodar de novo não quebra nada. Ele cria as tabelas **j
 ## O que nasce junto
 
 - Toda conta nova recebe uma linha em `configuracoes` com o e-mail já como destino do resumo diário e um token de webhook gerado.
-- `configuracoes.ultima_busca_em` guarda o último "Buscar agora" — a aplicação libera um novo disparo a cada 10 minutos.
 - `webhook_token` é único: o n8n identifica o advogado do "Buscar agora" por ele.
 - `prazos`, `execucoes` ficam na publicação de tempo real (a aplicação assina).
 - O n8n entra com a chave **service_role**, que ignora o RLS e grava com o `user_id` certo.
@@ -50,6 +49,19 @@ Depois de rodar o `schema.sql`:
 3. Para promover outra conta depois: painel dev → **Usuários → Gerenciar → Promover a dev** (ou o mesmo `update` do fim do `schema.sql` com outro id).
 
 Se a URL do webhook estava salva por advogado (versão anterior), o `schema.sql` copia a mais recente para `configuracao_sistema` antes de remover a coluna antiga.
+
+## Planos, limites, teste e carência
+
+Veja [ADR-0008](../docs/adr/0008-planos-limites-e-cobranca-manual.md). Só o dev altera, pelo painel **Organizações**.
+
+- `organizacoes.plano` dá os limites padrão (`public.limites_padrao()`, espelhado em `web/src/domain/planos.ts`); `organizacoes.limites` guarda só os ajustes do dev, validados pela constraint `limites_validos`.
+- `organizacoes.pago_ate` é o último dia pago (nulo = sem vencimento). O teste dura `configuracao_sistema.dias_teste` dias a partir de `teste_iniciado_em`.
+- `public.etapa_de(org)` calcula a etapa pelas datas, sem tarefa agendada: `teste`/`ativa` → `aviso` (até `carencia_aviso_dias` depois do vencimento) → `leitura` (até `carencia_total_dias`) → `suspensa`.
+- O gatilho `reforcar_plano` recusa, para membros: qualquer escrita em `leitura`/`suspensa`, e OAB ou processo ativo acima do limite (inclusive ao reativar). Em `membros`, recusa usuário acima do limite e papel além do Administrador quando o plano não tem papéis. O robô (service_role) e o dev não são barrados.
+- Trocar para um plano menor (`aplicar_limites`) não apaga nada: pausa os monitoramentos mais novos acima do limite e passa os usuários excedentes a Leitura.
+- O Buscar agora é registrado por `public.registrar_busca_agora(org)`, que confere etapa, intervalo mínimo e cota diária (zera à meia-noite de Brasília) da organização. A conferência pelo robô e as buscas automáticas por plano chegam com a fase do robô.
+
+[`tests/limites_planos.sql`](./tests/limites_planos.sql) cria uma organização Solo temporária e tenta passar de cada limite; rode-o como o teste de isolamento abaixo, numa transação desfeita.
 
 ## Verificar o isolamento (teste automatizado)
 

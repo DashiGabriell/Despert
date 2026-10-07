@@ -13,6 +13,7 @@ import {
   usePrazos,
   useTempoReal,
 } from '../data/queries'
+import { usePlano } from '../data/plano'
 import { useHoje } from '../data/relogio'
 import { rotaDev, type Atuacao } from '../domain/acesso'
 import { formatarDataHora } from '../domain/datas'
@@ -22,7 +23,7 @@ import { organizacaoAtiva } from '../domain/organizacao'
 import { useAuth, useEmailEfetivo, useUserId } from '../lib/auth-context'
 import type { Prazo } from '../lib/database.types'
 import type { ContextoLayout } from '../lib/layout-context'
-import { OrganizacaoContext, useOrganizacaoId } from '../lib/organizacao-context'
+import { OrganizacaoContext, useOrganizacaoId, usePertenca } from '../lib/organizacao-context'
 import { ausenciaConfiguracao } from '../lib/supabase'
 import { mensagemDeErro, useToast } from '../lib/toast-context'
 import BuscaAgora from './BuscaAgora'
@@ -117,6 +118,42 @@ function FaixaAtuacao({ atuacao }: { atuacao: Atuacao }) {
   )
 }
 
+function emDias(dias: number | null): string {
+  if (dias === null) return ''
+  return dias === 1 ? ' amanhã' : ` em ${dias} dias`
+}
+
+/** Etapa da carência (ADR-0008): o aviso é para o Administrador; a trava vale para todos. */
+function FaixaEtapa() {
+  const { papel } = usePertenca()
+  const { etapa, diasAteMudar } = usePlano()
+  if (etapa === 'aviso' && papel === 'administrador') {
+    return (
+      <div role="status" className={`${alertaAviso} mb-5`}>
+        <strong>O acesso desta organização venceu.</strong> Tudo continua funcionando, mas o Despert entra em
+        modo somente leitura{emDias(diasAteMudar)}. Fale com o suporte para regularizar.
+      </div>
+    )
+  }
+  if (etapa === 'leitura') {
+    return (
+      <div role="status" className={`${alertaErro} mb-5`}>
+        <strong>Modo somente leitura.</strong> O acesso desta organização venceu: os prazos continuam sendo
+        capturados e avisados, mas nada pode ser alterado. Fale com o suporte para reativar.
+      </div>
+    )
+  }
+  if (etapa === 'suspensa') {
+    return (
+      <div role="status" className={`${alertaErro} mb-5`}>
+        <strong>Acesso suspenso.</strong> Seus dados continuam guardados e podem ser consultados. Fale com o
+        suporte para reativar.
+      </div>
+    )
+  }
+  return null
+}
+
 function AreaLogada() {
   const userId = useUserId()
   const pertencas = usePertencas(userId)
@@ -162,6 +199,7 @@ function AreaDaOrganizacao() {
   const atualizar = useAtualizarPrazo(orgId)
   const excluir = useExcluirPrazo(orgId)
   const criar = useCriarPrazo(orgId, userId)
+  const plano = usePlano()
 
   const [modal, setModal] = useState<ModalAberto>(null)
   const fechar = useCallback(() => setModal(null), [])
@@ -253,6 +291,7 @@ function AreaDaOrganizacao() {
       <main className="min-w-0 px-4 py-5 md:px-8 md:py-8">
         {ausenciaConfiguracao && <div className={`${alertaAviso} mb-5`}>{ausenciaConfiguracao}</div>}
         {atuacao && <FaixaAtuacao atuacao={atuacao} />}
+        <FaixaEtapa />
 
         <header className="mb-7 flex flex-wrap items-end justify-between gap-3">
           <div>
@@ -275,14 +314,19 @@ function AreaDaOrganizacao() {
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <button type="button" className={botao} onClick={() => contexto.novoPrazo()}>
+            <button
+              type="button"
+              className={botao}
+              disabled={!plano.escrita}
+              title={plano.escrita ? undefined : 'Organização em modo somente leitura.'}
+              onClick={() => contexto.novoPrazo()}
+            >
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="size-4" aria-hidden>
                 <path d="M12 5v14M5 12h14" />
               </svg>
               Prazo manual
             </button>
             <BuscaAgora
-              userId={userId}
               orgId={orgId}
               config={config.data}
               webhookUrl={sistema.data?.n8n_webhook_url}

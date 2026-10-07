@@ -4,12 +4,14 @@ import Auditoria from './Auditoria'
 import Dados from './Dados'
 import ExecucoesGlobais from './ExecucoesGlobais'
 import IntegracaoN8n from './IntegracaoN8n'
+import Organizacoes from './Organizacoes'
 import Usuarios from './Usuarios'
 import VisaoGeral from './VisaoGeral'
 
 const SUBTITULOS: Record<ModoDev, string> = {
   'visao-geral': 'Saúde do sistema, do robô e dos prazos de todas as contas.',
   usuarios: 'Contas, papéis, senhas, bloqueios e acesso como advogado.',
+  organizacoes: 'Planos, limites, pagamentos, teste e carência. Só o dev vê e altera.',
   dados: 'Consulta dos dados de qualquer advogado, sem alterar nada.',
   execucoes: 'Todas as rodadas do robô, inclusive as falhas gerais.',
   n8n: 'Conexão do site com o robô. Configuração exclusiva do dev.',
@@ -22,6 +24,8 @@ function Conteudo({ modo }: { modo: ModoDev }) {
       return <VisaoGeral />
     case 'usuarios':
       return <Usuarios />
+    case 'organizacoes':
+      return <Organizacoes />
     case 'dados':
       return <Dados />
     case 'execucoes':

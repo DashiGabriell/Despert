@@ -15,6 +15,8 @@ function pertenca(id: string, criadoEm: string): MembroComOrganizacao {
       plano: 'solo',
       situacao: 'ativa',
       teste_iniciado_em: null,
+      pago_ate: null,
+      limites: {},
       criado_em: criadoEm,
     },
   }

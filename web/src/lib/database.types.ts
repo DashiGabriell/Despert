@@ -22,6 +22,26 @@ export type Organizacao = {
   plano: Plano
   situacao: SituacaoOrganizacao
   teste_iniciado_em: string | null
+  /** Último dia pago (`YYYY-MM-DD`); nulo = sem vencimento. Só o dev altera. */
+  pago_ate: string | null
+  /** Ajustes do dev que sobrescrevem os limites do plano. */
+  limites: Json
+  criado_em: string
+}
+
+/** Retorno de `admin_listar_organizacoes()`. */
+export type OrganizacaoAdmin = Organizacao & {
+  qtd_membros: number
+  qtd_advogados: number
+  oabs_ativas: number
+  processos_ativos: number
+  administrador_email: string | null
+}
+
+export type BuscaAgora = {
+  id: number
+  organizacao_id: string
+  user_id: string | null
   criado_em: string
 }
 
@@ -110,6 +130,9 @@ export type Execucao = {
 export type ConfiguracaoSistema = {
   id: number
   n8n_webhook_url: string
+  dias_teste: number
+  carencia_aviso_dias: number
+  carencia_total_dias: number
   updated_at: string
   updated_by: string | null
 }
@@ -214,7 +237,15 @@ export type Database = {
       configuracao_sistema: {
         Row: ConfiguracaoSistema
         Insert: Partial<ConfiguracaoSistema>
-        Update: Partial<Pick<ConfiguracaoSistema, 'n8n_webhook_url'>>
+        Update: Partial<
+          Pick<ConfiguracaoSistema, 'n8n_webhook_url' | 'dias_teste' | 'carencia_aviso_dias' | 'carencia_total_dias'>
+        >
+        Relationships: []
+      }
+      buscas_agora: {
+        Row: BuscaAgora
+        Insert: Record<string, never>
+        Update: Record<string, never>
         Relationships: []
       }
       auditoria: {
@@ -231,6 +262,9 @@ export type Database = {
       organizacao_de: { Args: { uid: string }; Returns: string | null }
       admin_listar_contas: { Args: Record<string, never>; Returns: ContaAdmin[] }
       admin_metricas: { Args: Record<string, never>; Returns: MetricasAdmin }
+      admin_listar_organizacoes: { Args: Record<string, never>; Returns: OrganizacaoAdmin[] }
+      registrar_busca_agora: { Args: { org: string }; Returns: number }
+      cancelar_busca_agora: { Args: { busca: number }; Returns: undefined }
     }
     Enums: Record<string, never>
     CompositeTypes: Record<string, never>
