@@ -42,7 +42,7 @@ export default function CalendarioMes({
   const locais = new Map(feriados.map((f) => [f.data, f.descricao]))
 
   return (
-    <section className="rounded-xl border border-line bg-card shadow-sm">
+    <section className="ds-card overflow-hidden">
       <div className="flex flex-wrap items-center gap-2.5 border-b border-line p-3.5">
         <button
           type="button"
@@ -60,7 +60,7 @@ export default function CalendarioMes({
         >
           ›
         </button>
-        <h2 className="mr-auto ml-1.5 text-base font-semibold text-navy">{nomeDoMes(mes)}</h2>
+        <h2 className="mr-auto ml-1.5 text-2xl font-bold text-navy">{nomeDoMes(mes)}</h2>
         <button type="button" className={botaoPequeno} onClick={() => onMudarMes(mesDe(hoje))}>
           Hoje
         </button>
@@ -70,7 +70,7 @@ export default function CalendarioMes({
         {DIAS_SEMANA.map((d) => (
           <div
             key={d}
-            className="border-b border-line p-2 text-center text-xs font-semibold text-muted uppercase"
+            className="border-b border-line bg-secondary/70 p-2 text-center text-[11px] font-semibold tracking-wider text-muted uppercase"
           >
             {d}
           </div>
@@ -84,17 +84,17 @@ export default function CalendarioMes({
           const classes = [
             'min-h-[70px] border-b border-line p-1.5 text-left md:min-h-[108px]',
             indice % 7 === 6 ? '' : 'border-r',
-            feriado ? 'bg-[#fff9ec]' : !doMes ? 'bg-[#fafbfc]' : fimDeSemana ? 'bg-[#fbfbfd]' : '',
+            feriado ? 'bg-gold/10' : !doMes ? 'bg-secondary/60' : fimDeSemana ? 'bg-secondary/30' : '',
           ].join(' ')
           const cabecalho = (
             <div className="flex items-start gap-1">
               <span
-                className={`inline-grid size-6 shrink-0 place-items-center rounded-full text-xs font-semibold ${ehHoje ? 'bg-navy text-white' : doMes ? '' : 'text-[#b8bdc8]'}`}
+                className={`inline-grid size-6 shrink-0 place-items-center rounded-full text-xs font-semibold ${ehHoje ? 'ds-marca size-6 rounded-full text-xs' : doMes ? '' : 'text-muted/50'}`}
               >
                 {Number(dia.slice(8))}
               </span>
               {feriado && (
-                <span className="truncate pt-1 text-[10px] text-gold" title={feriado}>
+                <span className="truncate pt-1 text-[10px] font-semibold text-alert" title={feriado}>
                   {feriado}
                 </span>
               )}
@@ -108,7 +108,7 @@ export default function CalendarioMes({
                 type="button"
                 data-dia={dia}
                 aria-label={`Criar prazo em ${formatarData(dia)}`}
-                className={`${classes} cursor-pointer hover:bg-surface`}
+                className={`${classes} cursor-pointer transition-colors hover:bg-primary/5`}
                 onClick={() => onCriarNoDia(dia)}
               >
                 {cabecalho}
@@ -127,7 +127,7 @@ export default function CalendarioMes({
                     data-urgencia={urgencia}
                     title={`${prazo.processo ?? ''} — ${prazo.tipo ?? ''}`}
                     onClick={() => onAbrirPrazo(prazo)}
-                    className={`mt-1 block w-full cursor-pointer truncate rounded-md px-1.5 py-0.5 text-left text-[10px] font-medium md:text-[11px] ${CORES_URGENCIA[urgencia]} ${urgencia === 'fechado' ? 'line-through' : ''}`}
+                    className={`mt-1 block w-full cursor-pointer truncate rounded-lg px-1.5 py-0.5 text-left text-[10px] font-semibold transition-transform hover:-translate-y-px md:text-[11px] ${CORES_URGENCIA[urgencia]} ${urgencia === 'fechado' ? 'line-through' : ''}`}
                   >
                     {prazo.processo || prazo.tipo || 'Prazo'}
                   </button>

@@ -4,7 +4,7 @@ import type { DataISO } from '../domain/dias'
 import { emAberto, precisaConferir } from '../domain/urgencia'
 import type { Prazo } from '../lib/database.types'
 import SeloPrazo from './SeloPrazo'
-import { botaoSucessoPequeno, td, th } from './ui'
+import { botaoSucessoPequeno, tabela, vazioTabela } from './ui'
 
 interface Props {
   prazos: Prazo[]
@@ -18,16 +18,16 @@ interface Props {
 export default function TabelaPrazos({ prazos, hoje, vazio, onAbrir, onCumprir, cumprindo }: Props) {
   return (
     <div className="overflow-x-auto">
-      <table className="w-full border-collapse text-sm">
+      <table className={tabela}>
         <thead>
           <tr>
-            <th className={th}>Situação</th>
-            <th className={th}>Vencimento</th>
-            <th className={th}>Processo</th>
-            <th className={th}>Tribunal / Órgão</th>
-            <th className={th}>Tipo</th>
-            <th className={th}>Prazo</th>
-            <th className={th}>
+            <th>Situação</th>
+            <th>Vencimento</th>
+            <th>Processo</th>
+            <th>Tribunal / Órgão</th>
+            <th>Tipo</th>
+            <th>Prazo</th>
+            <th>
               <span className="sr-only">Ações</span>
             </th>
           </tr>
@@ -35,7 +35,7 @@ export default function TabelaPrazos({ prazos, hoje, vazio, onAbrir, onCumprir, 
         <tbody>
           {prazos.length === 0 && (
             <tr>
-              <td colSpan={7} className="px-6 py-10 text-center text-muted">
+              <td colSpan={7} className={vazioTabela}>
                 {vazio}
               </td>
             </tr>
@@ -47,33 +47,31 @@ export default function TabelaPrazos({ prazos, hoje, vazio, onAbrir, onCumprir, 
               <tr
                 key={prazo.id}
                 onClick={() => onAbrir(prazo)}
-                className={`cursor-pointer hover:[&>td]:bg-[#fafbfd] ${aberto ? '' : '[&>td]:text-muted'} ${conferir ? '[&>td:first-child]:shadow-[inset_3px_0_0_var(--color-info)]' : ''}`}
+                className={`ds-linha-clicavel ${aberto ? '' : '[&>td]:text-muted'} ${conferir ? '[&>td:first-child]:shadow-[inset_3px_0_0_var(--color-gold)]' : ''}`}
               >
-                <td className={td}>
+                <td>
                   <SeloPrazo prazo={prazo} hoje={hoje} />
                 </td>
-                <td className={td}>
+                <td>
                   <strong>{formatarData(prazo.vencimento)}</strong>
                   {prazo.data_publicacao && (
-                    <div className="mt-0.5 text-xs text-muted">
-                      Publ. {formatarData(prazo.data_publicacao)}
-                    </div>
+                    <div className="mt-0.5 text-xs text-muted">Publ. {formatarData(prazo.data_publicacao)}</div>
                   )}
                 </td>
-                <td className={td}>
+                <td>
                   <span className="font-mono text-[13px]">{prazo.processo || '—'}</span>
                   {prazo.classe && <div className="mt-0.5 text-xs text-muted">{prazo.classe}</div>}
                 </td>
-                <td className={td}>
+                <td>
                   {prazo.tribunal}
                   {prazo.orgao && <div className="mt-0.5 text-xs text-muted">{prazo.orgao}</div>}
                 </td>
-                <td className={td}>{prazo.tipo}</td>
-                <td className={`${td} whitespace-nowrap`}>
+                <td>{prazo.tipo}</td>
+                <td className="whitespace-nowrap">
                   {prazo.prazo_dias ? `${prazo.prazo_dias} dias` : '—'}
-                  {conferir && <div className="text-xs font-medium text-info">conferir</div>}
+                  {conferir && <div className="text-xs font-semibold text-alert">conferir</div>}
                 </td>
-                <td className={`${td} text-right`}>
+                <td className="text-right">
                   {aberto && (
                     <button
                       type="button"

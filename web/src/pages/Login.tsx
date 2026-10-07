@@ -64,21 +64,21 @@ export default function Login() {
   }
 
   return (
-    <main className="grid min-h-dvh place-items-center bg-gradient-to-br from-navy to-[#3a4a73] p-5">
+    <main className="grid min-h-dvh place-items-center p-5">
       <form
         onSubmit={enviar}
-        className="w-full max-w-sm rounded-2xl bg-card p-8 shadow-2xl"
+        className="ds-card ds-entrar w-full max-w-sm p-8"
         aria-label={modo === 'entrar' ? 'Entrar' : 'Criar conta'}
       >
-        <div className="mb-6 flex items-center gap-3">
-          <span className="grid size-9 place-items-center rounded-lg bg-gold font-bold text-white">D</span>
+        <div className="mb-7 flex items-center gap-3">
+          <span className="ds-marca size-10 text-2xl">D</span>
           <span>
-            <span className="block text-lg font-bold text-navy">Despert</span>
-            <span className="block text-xs text-muted">Monitor de prazos · DJEN</span>
+            <span className="block font-display text-3xl leading-tight font-bold text-navy">Despert</span>
+            <span className="block text-[11px] tracking-wider text-muted uppercase">Monitor de prazos · DJEN</span>
           </span>
         </div>
 
-        <h1 className="mb-1 text-xl font-semibold text-ink">
+        <h1 className="mb-1 text-3xl leading-tight font-bold text-navy">
           {modo === 'entrar' ? 'Entrar' : 'Criar conta'}
         </h1>
         <p className="mb-5 text-sm text-muted">
@@ -125,7 +125,7 @@ export default function Login() {
         </div>
         <button
           type="submit"
-          className={`${botaoPrimario} w-full py-2.5`}
+          className={`${botaoPrimario} w-full`}
           disabled={ocupado || !supabase}
         >
           {ocupado ? 'Aguarde…' : modo === 'entrar' ? 'Entrar' : 'Criar conta'}
@@ -134,7 +134,7 @@ export default function Login() {
           {modo === 'entrar' ? 'Ainda não tem conta?' : 'Já tem conta?'}{' '}
           <button
             type="button"
-            className="cursor-pointer font-semibold text-info underline"
+            className="cursor-pointer font-semibold text-primary underline underline-offset-2"
             onClick={() => {
               setModo(modo === 'entrar' ? 'criar' : 'entrar')
               setErro(null)

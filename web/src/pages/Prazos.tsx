@@ -35,13 +35,28 @@ export default function Prazos() {
   const [rapido, setRapido] = useState<FiltroRapido>(null)
 
   if (prazos.isPending) {
-    return <p className="text-sm text-muted">Carregando prazos…</p>
+    return (
+      <div aria-busy="true">
+        <span className="sr-only">Carregando prazos…</span>
+        <div className="mb-6 grid grid-cols-2 gap-3.5 sm:grid-cols-3 xl:grid-cols-5">
+          {[0, 1, 2, 3, 4].map((i) => (
+            <div key={i} className="ds-skeleton h-24" />
+          ))}
+        </div>
+        <div className="ds-card space-y-3 p-5">
+          <div className="ds-skeleton h-10 w-1/2" />
+          {[0, 1, 2, 3].map((i) => (
+            <div key={i} className="ds-skeleton h-12" />
+          ))}
+        </div>
+      </div>
+    )
   }
   if (prazos.isError) {
     return (
       <div className={alertaErro}>
         Não foi possível carregar os prazos: {mensagemDeErro(prazos.error)}{' '}
-        <button type="button" className="ml-2 underline" onClick={() => void prazos.refetch()}>
+        <button type="button" className="ml-2 font-semibold underline" onClick={() => void prazos.refetch()}>
           Tentar de novo
         </button>
       </div>
@@ -73,7 +88,7 @@ export default function Prazos() {
         }}
       />
 
-      <section className="rounded-xl border border-line bg-card shadow-sm">
+      <section className="ds-card overflow-hidden">
         <div className="flex flex-wrap items-center gap-2.5 border-b border-line p-3.5">
           <input
             type="search"

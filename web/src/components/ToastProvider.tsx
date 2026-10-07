@@ -7,10 +7,10 @@ interface Toast {
   tipo: TipoToast
 }
 
-const CORES: Record<TipoToast, string> = {
-  info: 'bg-navy',
-  ok: 'bg-ok',
-  erro: 'bg-danger',
+const ICONES: Record<TipoToast, { simbolo: string; cor: string }> = {
+  info: { simbolo: 'i', cor: 'bg-white/15 text-white' },
+  ok: { simbolo: '✓', cor: 'bg-ok text-white' },
+  erro: { simbolo: '!', cor: 'bg-danger text-white' },
 }
 
 export default function ToastProvider({ children }: { children: ReactNode }) {
@@ -35,11 +35,14 @@ export default function ToastProvider({ children }: { children: ReactNode }) {
         aria-live="polite"
       >
         {toasts.map((t) => (
-          <div
-            key={t.id}
-            className={`${CORES[t.tipo]} rounded-lg px-4 py-3 text-sm text-white shadow-lg`}
-          >
-            {t.mensagem}
+          <div key={t.id} className="ds-toast">
+            <span
+              aria-hidden
+              className={`grid size-5 shrink-0 place-items-center rounded-full text-[11px] font-bold ${ICONES[t.tipo].cor}`}
+            >
+              {ICONES[t.tipo].simbolo}
+            </span>
+            <span>{t.mensagem}</span>
           </div>
         ))}
       </div>

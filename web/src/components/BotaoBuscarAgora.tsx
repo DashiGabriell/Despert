@@ -22,7 +22,7 @@ export default function BotaoBuscarAgora({ estado, restanteMs, onBuscar }: Props
     >
       {estado === 'buscando' ? (
         <>
-          <span className="size-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+          <span className="size-4 animate-spin rounded-full border-2 border-current/30 border-t-current" />
           Buscando…
         </>
       ) : estado === 'bloqueado' ? (

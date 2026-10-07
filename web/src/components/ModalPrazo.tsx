@@ -14,6 +14,7 @@ import {
   alertaErro,
   botao,
   botaoPerigo,
+  botaoPerigoForte,
   botaoPrimario,
   botaoSucesso,
   campo,
@@ -94,7 +95,7 @@ export default function ModalPrazo({ prazo, hoje, opcoesDias, onSalvar, onExclui
       </button>
       <button
         type="button"
-        className={botaoPerigo}
+        className={botaoPerigoForte}
         disabled={ocupado}
         onClick={() => void executar(onExcluir)}
       >
@@ -167,14 +168,14 @@ export default function ModalPrazo({ prazo, hoje, opcoesDias, onSalvar, onExclui
       {prazo.teor && (
         <>
           <div className={separador}>Teor da publicação</div>
-          <div className="mb-3 max-h-64 overflow-auto rounded-lg border border-line bg-[#fafbfc] p-3.5 text-[13px] leading-relaxed whitespace-pre-wrap">
+          <div className="mb-3 max-h-64 overflow-auto rounded-xl border border-line bg-secondary/60 p-3.5 text-[13px] leading-relaxed whitespace-pre-wrap">
             {prazo.teor}
           </div>
         </>
       )}
       {prazo.link && (
         <p className="mb-5 text-sm">
-          <a href={prazo.link} target="_blank" rel="noopener noreferrer" className="text-info underline">
+          <a href={prazo.link} target="_blank" rel="noopener noreferrer" className="font-semibold text-primary underline underline-offset-2">
             Abrir documento no tribunal ↗
           </a>
         </p>

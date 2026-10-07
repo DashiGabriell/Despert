@@ -8,7 +8,7 @@ export default function SeloPrazo({ prazo, hoje }: { prazo: PrazoUrgencia; hoje:
   return (
     <span
       data-urgencia={selo.urgencia}
-      className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold whitespace-nowrap ${CORES_URGENCIA[selo.urgencia]}`}
+      className={`ds-badge ${CORES_URGENCIA[selo.urgencia]}`}
     >
       {selo.texto}
     </span>

@@ -24,7 +24,9 @@ import { useToast } from '../lib/toast-context'
 import BuscaAgora from './BuscaAgora'
 import ModalNovoPrazo from './ModalNovoPrazo'
 import ModalPrazo from './ModalPrazo'
-import { botao } from './ui'
+import { alertaAviso, botao, botaoPequeno } from './ui'
+
+const CHAVE_MENU_RECOLHIDO = 'despert:menu-recolhido'
 
 const TITULOS: Record<string, string> = {
   '/prazos': 'Prazos',
@@ -77,7 +79,7 @@ export default function Layout() {
   const { sessao } = useAuth()
   if (sessao === undefined) {
     return (
-      <main className="grid min-h-dvh place-items-center bg-surface text-sm text-muted">
+      <main className="grid min-h-dvh place-items-center text-sm text-muted">
         Carregando…
       </main>
     )
@@ -105,6 +107,12 @@ function AreaLogada({ sessao }: { sessao: Session }) {
 
   const [modal, setModal] = useState<ModalAberto>(null)
   const fechar = useCallback(() => setModal(null), [])
+  const [recolhida, setRecolhida] = useState(() => localStorage.getItem(CHAVE_MENU_RECOLHIDO) === '1')
+  const alternarRecolhida = () =>
+    setRecolhida((atual) => {
+      localStorage.setItem(CHAVE_MENU_RECOLHIDO, atual ? '0' : '1')
+      return !atual
+    })
 
   const opcoesDias: OpcoesDias = useMemo(
     () => ({
@@ -129,43 +137,39 @@ function AreaLogada({ sessao }: { sessao: Session }) {
   const prazoAberto =
     modal?.tipo === 'prazo' ? (prazos.data ?? []).find((p) => p.id === modal.id) : undefined
 
+  const email = sessao.user.email ?? ''
+
   return (
-    <div className="grid min-h-dvh grid-cols-1 md:grid-cols-[240px_minmax(0,1fr)]">
-      <aside className="flex flex-col gap-4 bg-navy p-3 text-white/80 md:sticky md:top-0 md:h-dvh md:gap-6 md:p-4">
-        <div className="flex items-center gap-2.5 px-2">
-          <span className="grid size-8 place-items-center rounded-lg bg-gold text-sm font-bold text-white">
-            D
-          </span>
-          <span className="leading-tight">
-            <span className="block text-base font-bold text-white">Despert</span>
-            <span className="block text-[11px] text-white/50">DJEN · CNJ</span>
+    <div className="grid min-h-dvh grid-cols-1 md:grid-cols-[auto_minmax(0,1fr)]">
+      <aside className="ds-sidebar" data-recolhida={recolhida}>
+        <div className="ds-sb-cabeca flex items-center gap-2.5">
+          <span className="ds-marca">D</span>
+          <span className="ds-sb-texto leading-tight">
+            <span className="block font-display text-2xl font-bold text-navy">Despert</span>
+            <span className="block text-[11px] tracking-wider text-muted uppercase">DJEN · CNJ</span>
           </span>
           <button
             type="button"
-            onClick={() => void sair()}
-            className="ml-auto cursor-pointer rounded-md border border-white/20 px-2.5 py-1 text-xs md:hidden"
+            onClick={alternarRecolhida}
+            className="ds-sb-toggle ml-auto max-md:hidden"
+            aria-label={recolhida ? 'Expandir menu' : 'Recolher menu'}
+            title={recolhida ? 'Expandir menu' : 'Recolher menu'}
           >
+            <Icone d="M15 18l-6-6 6-6" />
+          </button>
+          <button type="button" onClick={() => void sair()} className={`${botaoPequeno} ml-auto md:hidden`}>
             Sair
           </button>
         </div>
 
         <nav className="flex gap-1 overflow-x-auto md:flex-col md:overflow-visible">
           {ITENS.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              className={({ isActive }) =>
-                [
-                  'flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium whitespace-nowrap transition-colors',
-                  isActive ? 'bg-white/15 text-white' : 'hover:bg-white/10 hover:text-white',
-                ].join(' ')
-              }
-            >
+            <NavLink key={item.to} to={item.to} className="ds-sb-item" title={recolhida ? item.label : undefined}>
               <Icone d={item.d} />
-              {item.label}
+              <span className="ds-sb-texto">{item.label}</span>
               {item.to === '/prazos' && criticos > 0 && (
                 <span
-                  className="ml-auto rounded-full bg-danger px-1.5 text-[11px] text-white"
+                  className={`ds-badge ds-badge-solido px-1.5 text-[11px] ${recolhida ? 'absolute top-0.5 right-1' : 'ml-auto'}`}
                   title="Vencidos e vencendo hoje"
                 >
                   {criticos}
@@ -175,30 +179,27 @@ function AreaLogada({ sessao }: { sessao: Session }) {
           ))}
         </nav>
 
-        <div className="mt-auto hidden border-t border-white/10 pt-4 text-xs text-white/60 md:block">
-          <div className="truncate" title={sessao.user.email}>
-            {sessao.user.email}
+        <div className="mt-auto hidden flex-col gap-2 border-t border-line pt-4 md:flex">
+          <div className="ds-sb-usuario flex items-center gap-2.5 px-1" title={email}>
+            <span className="ds-avatar">{(email[0] ?? '?').toUpperCase()}</span>
+            <span className="ds-sb-texto min-w-0">
+              <span className="block truncate text-sm font-semibold text-ink">{email.split('@')[0]}</span>
+              <span className="block truncate text-[11px] text-muted">{email}</span>
+            </span>
           </div>
-          <button
-            type="button"
-            onClick={() => void sair()}
-            className="mt-2.5 w-full cursor-pointer rounded-lg border border-white/20 py-1.5 text-white/80 hover:bg-white/10"
-          >
-            Sair
+          <button type="button" onClick={() => void sair()} className="ds-sb-logout" title="Sair">
+            <Icone d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" />
+            <span className="ds-sb-texto">Sair</span>
           </button>
         </div>
       </aside>
 
-      <main className="min-w-0 px-4 py-5 md:px-7 md:py-7">
-        {ausenciaConfiguracao && (
-          <div className="mb-5 rounded-lg border border-caution/30 bg-caution-soft px-4 py-3 text-sm text-caution">
-            {ausenciaConfiguracao}
-          </div>
-        )}
+      <main className="min-w-0 px-4 py-5 md:px-8 md:py-8">
+        {ausenciaConfiguracao && <div className={`${alertaAviso} mb-5`}>{ausenciaConfiguracao}</div>}
 
-        <header className="mb-6 flex flex-wrap items-end justify-between gap-3">
+        <header className="mb-7 flex flex-wrap items-end justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-bold text-navy">{TITULOS[pathname] ?? 'Despert'}</h1>
+            <h1 className="text-4xl leading-tight font-bold text-navy">{TITULOS[pathname] ?? 'Despert'}</h1>
             <p className="mt-1 text-sm text-muted">
               {ultima ? (
                 <>
@@ -227,7 +228,9 @@ function AreaLogada({ sessao }: { sessao: Session }) {
           </div>
         </header>
 
-        <Outlet context={contexto} />
+        <div key={pathname} className="ds-entrar">
+          <Outlet context={contexto} />
+        </div>
       </main>
 
       {prazoAberto && (

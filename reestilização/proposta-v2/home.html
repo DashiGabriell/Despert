@@ -1,0 +1,855 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Meritum — Proposta Home v2</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="./tokens.css" />
+  <style>
+    .site-header {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      height: var(--header-h);
+      display: flex;
+      align-items: center;
+      background: hsl(var(--background) / 0.85);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid hsl(var(--border));
+    }
+
+    .nav-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+    }
+
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.65rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      font-size: 1.15rem;
+    }
+
+    .brand img {
+      width: 36px;
+      height: 36px;
+      object-fit: contain;
+    }
+
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+
+    .nav-links a {
+      padding: 0.55rem 0.85rem;
+      border-radius: 999px;
+      font-size: 0.9rem;
+      font-weight: 500;
+      color: hsl(var(--muted-foreground));
+      transition: background 0.15s ease, color 0.15s ease;
+    }
+
+    .nav-links a:hover {
+      background: hsl(var(--muted));
+      color: hsl(var(--foreground));
+    }
+
+    .nav-actions {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+    }
+
+    .menu-btn {
+      display: none;
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      border: 1px solid hsl(var(--border));
+      background: hsl(var(--card));
+      cursor: pointer;
+    }
+
+    .mobile-panel {
+      display: none;
+      border-bottom: 1px solid hsl(var(--border));
+      background: hsl(var(--card));
+      padding: 0.75rem 1rem 1rem;
+    }
+
+    .mobile-panel.open { display: block; }
+
+    .mobile-panel a {
+      display: block;
+      padding: 0.85rem 0.75rem;
+      border-radius: 12px;
+      font-weight: 600;
+      color: hsl(var(--foreground));
+    }
+
+    .mobile-panel a:hover { background: hsl(var(--muted)); }
+
+    /* Hero */
+    .hero {
+      position: relative;
+      overflow: hidden;
+      padding: 4.5rem 0 3.5rem;
+    }
+
+    .hero-bg {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background:
+        radial-gradient(900px 420px at 85% 15%, hsl(var(--primary) / 0.16), transparent 60%),
+        radial-gradient(700px 380px at 10% 80%, hsl(43 96% 56% / 0.14), transparent 55%),
+        linear-gradient(180deg, hsl(var(--background)), hsl(210 25% 96%));
+    }
+
+    .hero-grid {
+      position: relative;
+      display: grid;
+      grid-template-columns: 1.05fr 0.95fr;
+      gap: 2.5rem;
+      align-items: center;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      padding: 0.4rem 0.8rem;
+      border-radius: 999px;
+      background: hsl(var(--primary) / 0.1);
+      color: hsl(var(--primary));
+      font-size: 0.8rem;
+      font-weight: 700;
+      margin-bottom: 1.1rem;
+    }
+
+    .hero h1 {
+      margin: 0;
+      font-size: clamp(2.1rem, 4.5vw, 3.4rem);
+      line-height: 1.08;
+      letter-spacing: -0.035em;
+      font-weight: 800;
+      max-width: 14ch;
+    }
+
+    .hero h1 em {
+      font-style: normal;
+      color: hsl(var(--primary));
+    }
+
+    .hero-lead {
+      margin: 1.1rem 0 1.6rem;
+      font-size: 1.125rem;
+      color: hsl(var(--muted-foreground));
+      max-width: 38ch;
+    }
+
+    .hero-cta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .hero-proof {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1.25rem;
+      color: hsl(var(--muted-foreground));
+      font-size: 0.875rem;
+      font-weight: 500;
+    }
+
+    .hero-proof strong {
+      display: block;
+      color: hsl(var(--foreground));
+      font-size: 1.15rem;
+      font-weight: 800;
+    }
+
+    .hero-panel {
+      position: relative;
+      min-height: 420px;
+    }
+
+    .preview-card {
+      position: absolute;
+      background: hsl(var(--card));
+      border: 1px solid hsl(var(--border));
+      border-radius: calc(var(--radius) + 4px);
+      box-shadow: var(--shadow-soft);
+      padding: 1rem;
+    }
+
+    .preview-main {
+      inset: 10% 0 auto auto;
+      width: min(100%, 360px);
+      right: 0;
+      top: 8%;
+    }
+
+    .preview-float {
+      left: 0;
+      bottom: 8%;
+      width: min(240px, 70%);
+      animation: float 5.5s ease-in-out infinite;
+    }
+
+    .preview-float.alt {
+      left: auto;
+      right: 4%;
+      bottom: auto;
+      top: 0;
+      width: min(210px, 62%);
+      animation-delay: 0.8s;
+    }
+
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-10px); }
+    }
+
+    .preview-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 0.9rem;
+    }
+
+    .rank-row {
+      display: flex;
+      align-items: center;
+      gap: 0.7rem;
+      padding: 0.65rem 0;
+      border-top: 1px solid hsl(var(--border));
+    }
+
+    .rank-row:first-of-type { border-top: none; }
+
+    .rank-pos {
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
+      display: grid;
+      place-items: center;
+      font-size: 0.75rem;
+      font-weight: 800;
+      background: hsl(var(--muted));
+    }
+
+    .rank-pos.gold { background: #fef3c7; color: #b45309; }
+    .rank-pos.silver { background: #e2e8f0; color: #475569; }
+    .rank-pos.bronze { background: #ffedd5; color: #c2410c; }
+
+    /* Sections */
+    .section {
+      padding: 4.5rem 0;
+    }
+
+    .section-alt {
+      background: hsl(var(--card));
+      border-block: 1px solid hsl(var(--border));
+    }
+
+    .section-head {
+      max-width: 640px;
+      margin: 0 auto 2.5rem;
+      text-align: center;
+    }
+
+    .section-head h2 {
+      margin: 0 0 0.65rem;
+      font-size: clamp(1.6rem, 3vw, 2.25rem);
+      letter-spacing: -0.03em;
+      font-weight: 800;
+    }
+
+    .section-head p {
+      margin: 0;
+      color: hsl(var(--muted-foreground));
+      font-size: 1.05rem;
+    }
+
+    .audience-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1rem;
+    }
+
+    .audience-card {
+      padding: 1.35rem;
+      border-radius: var(--radius);
+      background: hsl(var(--background));
+      border: 1px solid hsl(var(--border));
+      transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+      height: 100%;
+    }
+
+    .audience-card:hover {
+      transform: translateY(-3px);
+      box-shadow: var(--shadow-card);
+      border-color: hsl(var(--primary) / 0.35);
+    }
+
+    .audience-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      display: grid;
+      place-items: center;
+      background: hsl(var(--primary) / 0.1);
+      color: hsl(var(--primary));
+      margin-bottom: 1rem;
+    }
+
+    .audience-card h3 {
+      margin: 0 0 0.4rem;
+      font-size: 1.05rem;
+      font-weight: 750;
+    }
+
+    .audience-card p {
+      margin: 0;
+      color: hsl(var(--muted-foreground));
+      font-size: 0.925rem;
+    }
+
+    .feature {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 2.5rem;
+      align-items: center;
+      margin-bottom: 3.5rem;
+    }
+
+    .feature:last-child { margin-bottom: 0; }
+    .feature.reverse .feature-media { order: 2; }
+
+    .feature-media {
+      border-radius: calc(var(--radius) + 4px);
+      overflow: hidden;
+      border: 1px solid hsl(var(--border));
+      box-shadow: var(--shadow-soft);
+      aspect-ratio: 4 / 3;
+      background: hsl(var(--muted));
+    }
+
+    .feature-media img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .feature-copy h3 {
+      margin: 0.75rem 0 0.75rem;
+      font-size: clamp(1.35rem, 2.4vw, 1.85rem);
+      letter-spacing: -0.025em;
+      font-weight: 800;
+    }
+
+    .feature-copy p {
+      margin: 0;
+      color: hsl(var(--muted-foreground));
+      font-size: 1.05rem;
+      max-width: 42ch;
+    }
+
+    .steps {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1rem;
+    }
+
+    .step {
+      padding: 1.4rem;
+      border-radius: var(--radius);
+      background: hsl(var(--card));
+      border: 1px solid hsl(var(--border));
+      box-shadow: var(--shadow-card);
+    }
+
+    .step-num {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+      border-radius: 10px;
+      background: hsl(var(--primary));
+      color: white;
+      font-weight: 800;
+      font-size: 0.85rem;
+      margin-bottom: 0.9rem;
+    }
+
+    .step h3 {
+      margin: 0 0 0.4rem;
+      font-size: 1.05rem;
+    }
+
+    .step p {
+      margin: 0;
+      color: hsl(var(--muted-foreground));
+      font-size: 0.925rem;
+    }
+
+    .cta-band {
+      margin: 1rem 0 4rem;
+      padding: 2.5rem;
+      border-radius: calc(var(--radius) + 6px);
+      background:
+        linear-gradient(135deg, hsl(var(--primary)) 0%, #4f46e5 55%, #4338ca 100%);
+      color: white;
+      box-shadow: 0 20px 40px -20px hsl(var(--primary) / 0.7);
+      display: grid;
+      grid-template-columns: 1.4fr auto;
+      gap: 1.5rem;
+      align-items: center;
+    }
+
+    .cta-band h2 {
+      margin: 0 0 0.5rem;
+      font-size: clamp(1.5rem, 3vw, 2rem);
+      letter-spacing: -0.02em;
+    }
+
+    .cta-band p {
+      margin: 0;
+      opacity: 0.92;
+      max-width: 46ch;
+    }
+
+    .cta-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.7rem;
+      justify-content: flex-end;
+    }
+
+    .cta-band .btn-secondary {
+      background: white;
+      color: hsl(var(--primary));
+      border-color: transparent;
+    }
+
+    .cta-band .btn-outline {
+      color: white;
+      border-color: rgba(255, 255, 255, 0.4);
+    }
+
+    .cta-band .btn-outline:hover {
+      background: rgba(255, 255, 255, 0.12);
+    }
+
+    .site-footer {
+      padding: 2.5rem 0;
+      border-top: 1px solid hsl(var(--border));
+      background: hsl(var(--card));
+    }
+
+    .footer-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+      align-items: center;
+      justify-content: space-between;
+      color: hsl(var(--muted-foreground));
+      font-size: 0.9rem;
+    }
+
+    .footer-links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+
+    .footer-links a:hover { color: hsl(var(--foreground)); }
+
+    @media (max-width: 960px) {
+      .nav-links { display: none; }
+      .nav-actions .btn { display: none; }
+      .menu-btn { display: inline-grid; place-items: center; }
+
+      .hero-grid,
+      .feature,
+      .feature.reverse,
+      .audience-grid,
+      .steps,
+      .cta-band {
+        grid-template-columns: 1fr;
+      }
+
+      .feature.reverse .feature-media { order: 0; }
+      .hero h1 { max-width: none; }
+      .hero-panel { min-height: 360px; margin-top: 0.5rem; }
+      .preview-main { position: relative; inset: auto; width: 100%; }
+      .preview-float { display: none; }
+      .cta-actions { justify-content: flex-start; }
+    }
+
+    @media (max-width: 640px) {
+      .hero { padding: 3rem 0 2rem; }
+      .section { padding: 3.25rem 0; }
+      .cta-band { padding: 1.5rem; }
+      .audience-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header class="site-header">
+    <div class="container nav-row">
+      <a class="brand" href="./home.html">
+        <img src="../../public/LOGO.png" alt="" width="36" height="36" />
+        <span>Meritum</span>
+      </a>
+
+      <nav aria-label="Principal">
+        <ul class="nav-links">
+          <li><a href="#alunos">Alunos</a></li>
+          <li><a href="#professores">Professores</a></li>
+          <li><a href="#loja">Loja</a></li>
+          <li><a href="#admin">Admin</a></li>
+          <li><a href="./design-system.html">Design System</a></li>
+        </ul>
+      </nav>
+
+      <div class="nav-actions">
+        <a class="btn btn-primary" href="#acesso">Acessar sistema</a>
+        <button class="menu-btn" id="menuBtn" type="button" aria-expanded="false" aria-controls="mobilePanel" aria-label="Abrir menu">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <div class="mobile-panel" id="mobilePanel" hidden>
+    <a href="#alunos">Alunos</a>
+    <a href="#professores">Professores</a>
+    <a href="#loja">Loja</a>
+    <a href="#admin">Admin</a>
+    <a href="./design-system.html">Design System</a>
+    <a class="btn btn-primary" style="width:100%;margin-top:0.5rem" href="#acesso">Acessar sistema</a>
+  </div>
+
+  <main>
+    <section class="hero">
+      <div class="hero-bg" aria-hidden="true"></div>
+      <div class="container hero-grid">
+        <div>
+          <div class="eyebrow">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.4 7.2L22 12l-7.6 2.8L12 22l-2.4-7.2L2 12l7.6-2.8L12 2z"/></svg>
+            Economia escolar gamificada
+          </div>
+          <h1>Meritum transforma mérito em <em>moeda viva</em> na escola.</h1>
+          <p class="hero-lead">
+            Alunos ganham, professores recompensam, a loja entrega e a gestão
+            controla a economia — tudo em um só sistema.
+          </p>
+          <div class="hero-cta">
+            <a class="btn btn-primary btn-lg" href="#acesso">Acessar sistema</a>
+            <a class="btn btn-secondary btn-lg" href="#como-funciona">Ver como funciona</a>
+          </div>
+          <div class="hero-proof">
+            <div><strong>4 perfis</strong> Aluno · Professor · Loja · Admin</div>
+            <div><strong>1 economia</strong> Moedas, ranking e loja unificada</div>
+          </div>
+        </div>
+
+        <div class="hero-panel" aria-hidden="true">
+          <aside class="preview-card preview-float alt">
+            <div class="wallet-chip">
+              <span class="coin">M</span>
+              +50 coins
+            </div>
+            <p class="hint" style="margin:0.55rem 0 0">Nota 10 em Geometria</p>
+          </aside>
+
+          <div class="preview-card preview-main">
+            <div class="preview-head">
+              <strong>Ranking da turma</strong>
+              <span class="badge badge-primary">Ao vivo</span>
+            </div>
+            <div class="rank-row">
+              <span class="rank-pos gold">1</span>
+              <div style="flex:1">
+                <strong style="font-size:0.9rem">Ana Souza</strong>
+                <div class="hint">8º Ano A</div>
+              </div>
+              <span class="badge badge-coin">1.240</span>
+            </div>
+            <div class="rank-row">
+              <span class="rank-pos silver">2</span>
+              <div style="flex:1">
+                <strong style="font-size:0.9rem">Pedro Lima</strong>
+                <div class="hint">8º Ano A</div>
+              </div>
+              <span class="badge badge-coin">1.180</span>
+            </div>
+            <div class="rank-row">
+              <span class="rank-pos bronze">3</span>
+              <div style="flex:1">
+                <strong style="font-size:0.9rem">Você</strong>
+                <div class="hint">Subiu 2 posições</div>
+              </div>
+              <span class="badge badge-coin">1.050</span>
+            </div>
+          </div>
+
+          <aside class="preview-card preview-float">
+            <div style="display:flex;align-items:center;gap:0.7rem">
+              <div class="avatar">JS</div>
+              <div>
+                <strong style="font-size:0.9rem">Prof. Julia</strong>
+                <div class="hint">Enviou 20 coins</div>
+              </div>
+            </div>
+          </aside>
+        </div>
+      </div>
+    </section>
+
+    <section class="section section-alt" id="para-quem">
+      <div class="container">
+        <div class="section-head">
+          <h2>Um sistema, quatro jornadas</h2>
+          <p>Cada perfil tem o que precisa — sem ruído, com o mesmo equilíbrio econômico.</p>
+        </div>
+        <div class="audience-grid">
+          <article class="audience-card">
+            <div class="audience-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>
+            </div>
+            <h3>Alunos</h3>
+            <p>Saldo, ranking, histórico e loja com autonomia real sobre as escolhas.</p>
+          </article>
+          <article class="audience-card">
+            <div class="audience-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            </div>
+            <h3>Professores</h3>
+            <p>Recompensa imediata com orçamento mensal — incentivo sem inflação.</p>
+          </article>
+          <article class="audience-card">
+            <div class="audience-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/></svg>
+            </div>
+            <h3>Loja</h3>
+            <p>Catálogo unificado, estoque e pedidos físicos ou digitais no mesmo fluxo.</p>
+          </article>
+          <article class="audience-card">
+            <div class="audience-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            </div>
+            <h3>Administração</h3>
+            <p>Dashboard, auditoria e taxas para manter a economia estável.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="alunos">
+      <div class="container">
+        <div class="section-head">
+          <h2>Para os alunos</h2>
+          <p>Reconhecimento tangível, autonomia e gamificação saudável.</p>
+        </div>
+
+        <article class="feature">
+          <div class="feature-media">
+            <img src="https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&q=80&w=900" alt="Estudantes colaborando" width="900" height="675" />
+          </div>
+          <div class="feature-copy">
+            <span class="badge badge-primary">Ranking</span>
+            <h3>Progresso visível, competição saudável</h3>
+            <p>Moedas, posições e conquistas geram engajamento sem perder o foco pedagógico.</p>
+          </div>
+        </article>
+
+        <article class="feature reverse">
+          <div class="feature-media">
+            <img src="https://images.unsplash.com/photo-1577896851231-70ef18881754?auto=format&fit=crop&q=80&w=900" alt="Educação financeira" width="900" height="675" />
+          </div>
+          <div class="feature-copy">
+            <span class="badge badge-coin">Educação financeira</span>
+            <h3>Saldo vivo, decisões reais</h3>
+            <p>Gastar na loja ou guardar para subir de nível ensina orçamento na prática.</p>
+          </div>
+        </article>
+
+        <article class="feature">
+          <div class="feature-media">
+            <img src="https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?auto=format&fit=crop&q=80&w=900" alt="Controle da conta" width="900" height="675" />
+          </div>
+          <div class="feature-copy">
+            <span class="badge badge-secondary">Transparência</span>
+            <h3>Histórico completo de cada moeda</h3>
+            <p>Quem recompensou, por quê e quando — clareza total nas movimentações.</p>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section class="section section-alt" id="professores">
+      <div class="container">
+        <div class="section-head">
+          <h2>Para professores</h2>
+          <p>Incentivo digital, imediato e com limites saudáveis.</p>
+        </div>
+
+        <article class="feature reverse">
+          <div class="feature-media">
+            <img src="https://images.unsplash.com/photo-1427504494785-3b9cacef0042?auto=format&fit=crop&q=80&w=900" alt="Professor em sala" width="900" height="675" />
+          </div>
+          <div class="feature-copy">
+            <span class="badge badge-success">Na hora</span>
+            <h3>Recompensa no momento do mérito</h3>
+            <p>Comportamento, esforço ou conquista: poucos cliques no celular ou no notebook.</p>
+          </div>
+        </article>
+
+        <article class="feature">
+          <div class="feature-media">
+            <img src="https://images.unsplash.com/photo-1516321497487-e288fb19713f?auto=format&fit=crop&q=80&w=900" alt="Gestão de orçamento" width="900" height="675" />
+          </div>
+          <div class="feature-copy">
+            <span class="badge badge-warning">Orçamento</span>
+            <h3>Limites mensais que evitam inflação</h3>
+            <p>Cada professor distribui com coerência. A escola preserva o valor da moeda.</p>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section class="section" id="loja">
+      <div class="container">
+        <div class="section-head">
+          <h2>Para a loja escolar</h2>
+          <p>Troque Meritum Coins por itens, experiências e benefícios digitais.</p>
+        </div>
+
+        <article class="feature">
+          <div class="feature-media">
+            <img src="https://images.unsplash.com/photo-1600880292203-757bb62b4baf?auto=format&fit=crop&q=80&w=900" alt="Operação da loja" width="900" height="675" />
+          </div>
+          <div class="feature-copy">
+            <span class="badge badge-primary">Catálogo</span>
+            <h3>Escola + Meritum no mesmo lugar</h3>
+            <p>Ative itens do catálogo-mestre, controle estoque e confirme pedidos físicos.</p>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section class="section section-alt" id="admin">
+      <div class="container">
+        <div class="section-head">
+          <h2>Para administradores</h2>
+          <p>Visibilidade total da economia escolar.</p>
+        </div>
+
+        <article class="feature reverse">
+          <div class="feature-media">
+            <img src="https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&q=80&w=900" alt="Dashboard econômico" width="900" height="675" />
+          </div>
+          <div class="feature-copy">
+            <span class="badge badge-primary">Dashboard</span>
+            <h3>Fluxo de moedas em tempo real</h3>
+            <p>Emissão, consumo, anomalias e taxa de uso — o coração do Meritum.</p>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section class="section" id="como-funciona">
+      <div class="container">
+        <div class="section-head">
+          <h2>Como a escola começa</h2>
+          <p>Três passos claros, do onboarding ao primeiro ciclo econômico.</p>
+        </div>
+        <div class="steps">
+          <article class="step">
+            <div class="step-num">1</div>
+            <h3>Configure perfis e turmas</h3>
+            <p>Admin cria usuários, turmas e orçamentos dos professores.</p>
+          </article>
+          <article class="step">
+            <div class="step-num">2</div>
+            <h3>Ative a loja</h3>
+            <p>Monte o catálogo local e ative itens Meritum conforme a escola.</p>
+          </article>
+          <article class="step">
+            <div class="step-num">3</div>
+            <h3>Recompense e acompanhe</h3>
+            <p>Professores enviam coins; a gestão monitora e equilibra a economia.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="container" id="acesso">
+      <div class="cta-band">
+        <div>
+          <h2>Pronto para o próximo nível da sua escola?</h2>
+          <p>Mais engajamento para alunos, mais ferramenta para professores, mais controle para a gestão.</p>
+        </div>
+        <div class="cta-actions">
+          <a class="btn btn-secondary btn-lg" href="#">Acessar o sistema</a>
+          <a class="btn btn-outline btn-lg" href="./design-system.html">Ver design system</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-row">
+      <div class="brand">
+        <img src="../../public/LOGO.png" alt="" width="28" height="28" />
+        <span>Meritum</span>
+      </div>
+      <div class="footer-links">
+        <a href="./home.html">Home</a>
+        <a href="./design-system.html">Design System</a>
+      </div>
+      <p>© 2026 Meritum · Proposta visual v2 (HTML estático)</p>
+    </div>
+  </footer>
+
+  <script>
+    (function () {
+      var btn = document.getElementById('menuBtn');
+      var panel = document.getElementById('mobilePanel');
+      if (!btn || !panel) return;
+
+      btn.addEventListener('click', function () {
+        var open = panel.classList.toggle('open');
+        panel.hidden = !open;
+        btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+      });
+
+      panel.querySelectorAll('a').forEach(function (link) {
+        link.addEventListener('click', function () {
+          panel.classList.remove('open');
+          panel.hidden = true;
+          btn.setAttribute('aria-expanded', 'false');
+        });
+      });
+    })();
+  </script>
+</body>
+</html>

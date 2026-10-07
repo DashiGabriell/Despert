@@ -10,8 +10,8 @@ import {
   dica,
   rotulo,
   separador,
-  td,
-  th,
+  tabela,
+  vazioTabela,
 } from '../components/ui'
 import {
   useConfiguracao,
@@ -39,8 +39,15 @@ export default function Configuracoes() {
   return (
     <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-2">
       <section className={`${cartao} p-5`}>
-        <h2 className="mb-4 text-base font-semibold text-navy">Configurações do robô</h2>
-        {config.isPending && <p className="text-sm text-muted">Carregando…</p>}
+        <h2 className="mb-4 text-2xl font-bold text-navy">Configurações do robô</h2>
+        {config.isPending && (
+          <div className="space-y-3">
+            <span className="sr-only">Carregando…</span>
+            <div className="ds-skeleton h-10" />
+            <div className="ds-skeleton h-10" />
+            <div className="ds-skeleton h-10 w-2/3" />
+          </div>
+        )}
         {config.isError && (
           <div className={alertaErro}>Não foi possível carregar: {mensagemDeErro(config.error)}</div>
         )}
@@ -149,9 +156,10 @@ function FormularioConfiguracao({ userId, config }: { userId: string; config: Co
         publicação não informa o prazo (o prazo fica para conferir). "Janela de alerta" define quantos dias
         à frente entram no resumo diário por e-mail.
       </p>
-      <label className="flex items-center gap-2 text-sm font-medium">
+      <label className="flex cursor-pointer items-center gap-2.5 text-sm font-medium">
         <input
           type="checkbox"
+          className="ds-checkbox"
           checked={form.considerar_recesso}
           onChange={(e) => alterar('considerar_recesso', e.target.checked)}
         />
@@ -238,7 +246,7 @@ function Feriados({ userId }: { userId: string }) {
 
   return (
     <section className={`${cartao} p-5`}>
-      <h2 className="text-base font-semibold text-navy">Feriados e suspensões locais</h2>
+      <h2 className="text-2xl font-bold text-navy">Feriados e suspensões locais</h2>
       <p className={`${dica} mb-4`}>
         Os feriados nacionais e a Sexta-feira Santa já são considerados. Cadastre aqui carnaval, Corpus
         Christi, feriados estaduais e municipais e suspensões de expediente do tribunal.
@@ -271,12 +279,12 @@ function Feriados({ userId }: { userId: string }) {
         <div className={`${alertaErro} mt-3`}>Não foi possível carregar: {mensagemDeErro(feriados.error)}</div>
       )}
       <div className="mt-4 overflow-x-auto">
-        <table className="w-full border-collapse text-sm">
+        <table className={tabela}>
           <thead>
             <tr>
-              <th className={th}>Data</th>
-              <th className={th}>Descrição</th>
-              <th className={th}>
+              <th>Data</th>
+              <th>Descrição</th>
+              <th>
                 <span className="sr-only">Ações</span>
               </th>
             </tr>
@@ -284,16 +292,16 @@ function Feriados({ userId }: { userId: string }) {
           <tbody>
             {feriados.isSuccess && lista.length === 0 && (
               <tr>
-                <td colSpan={3} className="px-6 py-8 text-center text-muted">
+                <td colSpan={3} className={vazioTabela}>
                   Nenhum feriado local cadastrado.
                 </td>
               </tr>
             )}
             {lista.map((f) => (
               <tr key={f.data}>
-                <td className={`${td} whitespace-nowrap`}>{formatarData(f.data)}</td>
-                <td className={td}>{f.descricao}</td>
-                <td className={`${td} text-right`}>
+                <td className={`whitespace-nowrap`}>{formatarData(f.data)}</td>
+                <td>{f.descricao}</td>
+                <td className={`text-right`}>
                   <button
                     type="button"
                     className={botaoPerigoPequeno}

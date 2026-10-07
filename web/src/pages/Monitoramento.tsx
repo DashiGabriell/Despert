@@ -7,8 +7,8 @@ import {
   cartao,
   dica,
   rotulo,
-  td,
-  th,
+  tabela,
+  vazioTabela,
 } from '../components/ui'
 import {
   useAlternarMonitoramento,
@@ -54,7 +54,7 @@ export default function Monitoramento() {
   return (
     <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
       <section className={`${cartao} p-5`}>
-        <h2 className="mb-4 text-base font-semibold text-navy">Adicionar monitoramento</h2>
+        <h2 className="mb-4 text-2xl font-bold text-navy">Adicionar monitoramento</h2>
         <form onSubmit={enviar} noValidate className="space-y-3.5">
           <div>
             <label className={rotulo} htmlFor="m-tipo">
@@ -139,22 +139,20 @@ export default function Monitoramento() {
       </section>
 
       <section className={cartao}>
-        <div className="border-b border-line p-3.5 text-sm font-semibold text-navy">
-          O que está sendo monitorado
-        </div>
+        <h2 className="border-b border-line px-5 py-4 text-2xl font-bold text-navy">O que está sendo monitorado</h2>
         {monitoramentos.isError && (
           <div className={`${alertaErro} m-3.5`}>
             Não foi possível carregar: {mensagemDeErro(monitoramentos.error)}
           </div>
         )}
         <div className="overflow-x-auto">
-          <table className="w-full border-collapse text-sm">
+          <table className={tabela}>
             <thead>
               <tr>
-                <th className={th}>Ativo</th>
-                <th className={th}>Monitoramento</th>
-                <th className={th}>Descrição</th>
-                <th className={th}>
+                <th>Ativo</th>
+                <th>Monitoramento</th>
+                <th>Descrição</th>
+                <th>
                   <span className="sr-only">Ações</span>
                 </th>
               </tr>
@@ -162,14 +160,16 @@ export default function Monitoramento() {
             <tbody>
               {monitoramentos.isPending && (
                 <tr>
-                  <td colSpan={4} className="px-6 py-8 text-center text-muted">
-                    Carregando…
+                  <td colSpan={4} className="space-y-2.5 py-5">
+                    <span className="sr-only">Carregando…</span>
+                    <div className="ds-skeleton h-4 w-2/3" />
+                    <div className="ds-skeleton h-4 w-1/2" />
                   </td>
                 </tr>
               )}
               {monitoramentos.isSuccess && lista.length === 0 && (
                 <tr>
-                  <td colSpan={4} className="px-6 py-10 text-center text-muted">
+                  <td colSpan={4} className={vazioTabela}>
                     Nada cadastrado ainda. Adicione a sua OAB ao lado para o robô começar a buscar as
                     intimações no Diário.
                   </td>
@@ -180,11 +180,11 @@ export default function Monitoramento() {
                   m.tipo === 'oab' ? `OAB ${m.oab_numero}/${m.oab_uf}` : (m.numero_processo ?? '')
                 return (
                   <tr key={m.id} className={m.ativo ? '' : '[&>td]:text-muted'}>
-                    <td className={td}>
-                      <label className="relative inline-block h-[22px] w-[38px] cursor-pointer">
+                    <td>
+                      <label className="ds-switch">
                         <input
                           type="checkbox"
-                          className="peer sr-only"
+                          className="sr-only"
                           aria-label={`${m.ativo ? 'Desativar' : 'Ativar'} ${nome}`}
                           checked={m.ativo}
                           disabled={alternar.isPending}
@@ -198,11 +198,10 @@ export default function Monitoramento() {
                             )
                           }
                         />
-                        <span className="absolute inset-0 rounded-full bg-[#cfd4dc] transition peer-checked:bg-ok" />
-                        <span className="absolute top-[3px] left-[3px] size-4 rounded-full bg-white transition peer-checked:translate-x-4" />
+                        <span aria-hidden />
                       </label>
                     </td>
-                    <td className={td}>
+                    <td>
                       {m.tipo === 'oab' ? (
                         <strong>{nome}</strong>
                       ) : (
@@ -212,8 +211,8 @@ export default function Monitoramento() {
                         </>
                       )}
                     </td>
-                    <td className={td}>{m.descricao}</td>
-                    <td className={`${td} text-right`}>
+                    <td>{m.descricao}</td>
+                    <td className={`text-right`}>
                       <button
                         type="button"
                         className={botaoPerigoPequeno}

@@ -1,33 +1,45 @@
 @import 'tailwindcss';
+@import './design-system.css';
 
 @theme {
-  --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-serif: 'Source Serif 4', Georgia, 'Times New Roman', serif;
+  --font-display: 'Cormorant Garamond', Garamond, Georgia, serif;
 
-  /* identidade */
-  --color-navy: #1b2540;
-  --color-navy-soft: #26324f;
-  --color-gold: #b8893b;
-  --color-surface: #f4f5f8;
+  /* identidade (paleta Direito) */
+  --color-primary: #8b1e2d;
+  --color-primary-soft: #f6e8ea;
+  --color-navy: #14213d;
+  --color-navy-soft: #22325a;
+  --color-gold: #c9a227;
+  --color-surface: #f8f5ef;
+  --color-secondary: #f1ede6;
   --color-card: #ffffff;
-  --color-ink: #1d2433;
-  --color-muted: #6b7385;
-  --color-line: #e3e6ec;
+  --color-ink: #191f2e;
+  --color-muted: #6b6157;
+  --color-line: #e6dfd3;
 
   /* situação do prazo */
   --color-danger: #c62828;
-  --color-danger-soft: #fdecea;
-  --color-alert: #d9730d;
-  --color-alert-soft: #fff3e0;
-  --color-caution: #9a7b00;
-  --color-caution-soft: #fff8d6;
-  --color-ok: #2e7d32;
-  --color-ok-soft: #e8f5e9;
-  --color-info: #1e5bb8;
-  --color-info-soft: #e8f0fc;
+  --color-danger-soft: #fbeaea;
+  --color-alert: #b7791f;
+  --color-alert-soft: #fbf0dc;
+  --color-caution: #8a6d12;
+  --color-caution-soft: #f8f0d4;
+  --color-ok: #2e7d4f;
+  --color-ok-soft: #e5f1ea;
+  --color-info: #14213d;
+  --color-info-soft: #e8ebf2;
 }
 
 @layer base {
   body {
-    @apply bg-surface font-sans text-ink antialiased;
+    @apply font-serif text-ink antialiased;
+    font-variant-numeric: lining-nums tabular-nums;
+  }
+
+  h1,
+  h2,
+  h3 {
+    @apply font-display tracking-[0.01em];
   }
 }

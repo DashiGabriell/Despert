@@ -12,7 +12,7 @@ function Passo({ numero, feito, children }: { numero: number; feito: boolean; ch
   return (
     <li className="flex items-start gap-3">
       <span
-        className={`grid size-6 shrink-0 place-items-center rounded-full text-xs font-bold ${feito ? 'bg-ok text-white' : 'bg-navy/10 text-navy'}`}
+        className={`grid size-6 shrink-0 place-items-center rounded-full text-xs font-bold ${feito ? 'bg-ok text-white' : 'bg-primary/10 text-primary'}`}
         aria-label={feito ? 'Concluído' : `Passo ${numero}`}
       >
         {feito ? '✓' : numero}
@@ -25,22 +25,22 @@ function Passo({ numero, feito, children }: { numero: number; feito: boolean; ch
 /** Primeira utilização: orienta o próximo passo sem inventar dados de exemplo. */
 export default function GuiaInicio({ temMonitoramento, temWebhook, onPrazoManual }: Props) {
   return (
-    <div className="mx-auto max-w-lg py-4 text-left">
-      <h2 className="text-center text-lg font-semibold text-navy">Nenhuma publicação capturada ainda</h2>
+    <div className="ds-empty mx-auto max-w-xl text-left">
+      <h2 className="text-center text-2xl font-bold text-navy">Nenhuma publicação capturada ainda</h2>
       <p className="mt-1 mb-5 text-center text-sm text-muted">
         Em três passos o robô passa a ler o Diário de Justiça Eletrônico Nacional por você.
       </p>
-      <ol className="space-y-3 text-sm text-ink">
+      <ol className="mx-auto max-w-md space-y-3 text-sm text-ink">
         <Passo numero={1} feito={temMonitoramento}>
           Cadastre sua OAB (ou um processo) em{' '}
-          <Link className="font-semibold text-info underline" to="/monitoramento">
+          <Link className="font-semibold text-primary underline underline-offset-2" to="/monitoramento">
             Monitoramento
           </Link>
           .
         </Passo>
         <Passo numero={2} feito={temWebhook}>
           Informe a URL do webhook do n8n em{' '}
-          <Link className="font-semibold text-info underline" to="/configuracoes">
+          <Link className="font-semibold text-primary underline underline-offset-2" to="/configuracoes">
             Configurações
           </Link>
           .

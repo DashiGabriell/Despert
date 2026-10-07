@@ -1,0 +1,1449 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Meritum — Design System 3D</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="./tokens.css" />
+  <link rel="stylesheet" href="./tokens-3d.css" />
+  <link rel="stylesheet" href="./tokens-direito.css" />
+  <style>
+    /* Página 3D: reforço local (sombra zero + volume) */
+    .ds-shell,
+    .ds-sidebar,
+    .ds-main,
+    .toast-demo,
+    .mobile-nav,
+    .table-wrap,
+    .empty {
+      box-shadow: none !important;
+    }
+
+    .ds-shell {
+      display: grid;
+      grid-template-columns: 240px 1fr;
+      min-height: 100vh;
+      background:
+        radial-gradient(900px 420px at 100% 0%, hsl(var(--primary) / 0.1), transparent 55%),
+        hsl(var(--background));
+    }
+
+    .ds-sidebar {
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      overflow: auto;
+      padding: 1.25rem 1rem;
+      border-right: 1px solid hsl(var(--border));
+      background: hsl(var(--card));
+    }
+
+    .ds-brand {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      font-weight: 800;
+      margin-bottom: 1.25rem;
+      padding: 0.25rem 0.4rem;
+    }
+
+    .ds-brand img {
+      width: 28px;
+      height: 28px;
+    }
+
+    .ds-nav {
+      display: grid;
+      gap: 0.2rem;
+    }
+
+    .ds-nav a {
+      padding: 0.55rem 0.7rem;
+      border-radius: 10px;
+      font-size: 0.875rem;
+      font-weight: 500;
+      color: hsl(var(--muted-foreground));
+    }
+
+    .ds-nav a:hover,
+    .ds-nav a:focus-visible {
+      background: hsl(var(--muted));
+      color: hsl(var(--foreground));
+    }
+
+    .ds-main {
+      padding: 1.5rem 1.5rem 4rem;
+      overflow-x: hidden;
+    }
+
+    .ds-top {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 2rem;
+    }
+
+    .ds-top h1 {
+      margin: 0 0 0.35rem;
+      font-size: clamp(1.6rem, 3vw, 2rem);
+      letter-spacing: -0.03em;
+    }
+
+    .ds-top p {
+      margin: 0;
+      color: hsl(var(--muted-foreground));
+      max-width: 52ch;
+    }
+
+    .ds-section {
+      margin-bottom: 2.75rem;
+      scroll-margin-top: 1rem;
+    }
+
+    .ds-section > h2 {
+      margin: 0 0 0.35rem;
+      font-size: 1.25rem;
+      letter-spacing: -0.02em;
+    }
+
+    .ds-section > .lead {
+      margin: 0 0 1.1rem;
+      color: hsl(var(--muted-foreground));
+      font-size: 0.95rem;
+    }
+
+    .swatch-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 0.75rem;
+    }
+
+    .swatch {
+      border: 1px solid hsl(var(--border));
+      border-radius: 14px;
+      overflow: hidden;
+      background: hsl(var(--card));
+    }
+
+    .swatch-color {
+      height: 72px;
+    }
+
+    .swatch-meta {
+      padding: 0.7rem 0.75rem;
+    }
+
+    .swatch-meta strong {
+      display: block;
+      font-size: 0.85rem;
+    }
+
+    .swatch-meta span {
+      font-size: 0.75rem;
+      color: hsl(var(--muted-foreground));
+    }
+
+    .demo-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      align-items: center;
+    }
+
+    .demo-stack {
+      display: grid;
+      gap: 1rem;
+    }
+
+    .demo-grid-2 {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 1rem;
+    }
+
+    .demo-grid-3 {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1rem;
+    }
+
+    .demo-grid-4 {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1rem;
+    }
+
+    .panel {
+      padding: 1.15rem;
+      border: 1px solid hsl(var(--border));
+      border-radius: var(--radius);
+      background: hsl(var(--card));
+    }
+
+    .type-sample {
+      display: grid;
+      gap: 0.85rem;
+    }
+
+    .type-sample > div {
+      display: grid;
+      gap: 0.15rem;
+      padding-bottom: 0.85rem;
+      border-bottom: 1px solid hsl(var(--border));
+    }
+
+    .type-sample > div:last-child { border-bottom: none; padding-bottom: 0; }
+
+    .type-meta {
+      font-size: 0.75rem;
+      color: hsl(var(--muted-foreground));
+    }
+
+    .product-card {
+      overflow: hidden;
+    }
+
+    .product-card .thumb {
+      aspect-ratio: 16 / 10;
+      background: hsl(var(--muted));
+      position: relative;
+    }
+
+    .product-card .thumb img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .product-card .body {
+      padding: 1rem;
+    }
+
+    .product-card .price {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 0.85rem;
+    }
+
+    .section-head-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      align-items: flex-start;
+      justify-content: space-between;
+    }
+
+    .section-head-row .lead {
+      margin: 0 0 1.1rem;
+      color: hsl(var(--muted-foreground));
+      font-size: 0.95rem;
+    }
+
+    .toast-demo {
+      max-width: 360px;
+      padding: 0.9rem 1rem;
+      border-radius: 14px;
+      background: hsl(var(--foreground));
+      color: white;
+      box-shadow: none;
+      display: flex;
+      gap: 0.75rem;
+      align-items: flex-start;
+    }
+
+    .empty {
+      text-align: center;
+      padding: 2rem 1rem;
+      border: 1px dashed hsl(var(--border));
+      border-radius: var(--radius);
+      background: hsl(var(--muted) / 0.45);
+    }
+
+    .empty h3 { margin: 0.75rem 0 0.35rem; }
+    .empty p { margin: 0 0 1rem; color: hsl(var(--muted-foreground)); }
+
+    .dialog-mock {
+      max-width: 420px;
+      margin: 0 auto;
+      padding: 1.25rem;
+      border-radius: var(--radius);
+      background: var(--surface-3d);
+      border: 1px solid hsl(var(--border));
+      box-shadow: none;
+    }
+
+    .dialog-mock h3 { margin: 0 0 0.4rem; }
+    .dialog-mock p { margin: 0 0 1.1rem; color: hsl(var(--muted-foreground)); }
+    .dialog-actions { display: flex; justify-content: flex-end; gap: 0.5rem; }
+
+    .sidebar-item {
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+      padding: 0.7rem 0.8rem;
+      border-radius: 12px;
+      color: hsl(var(--muted-foreground));
+      font-weight: 500;
+      font-size: 0.9rem;
+    }
+
+    .sidebar-item.active {
+      background: hsl(var(--primary) / 0.1);
+      color: hsl(var(--primary));
+      font-weight: 700;
+    }
+
+    .mobile-nav {
+      display: flex;
+      justify-content: space-between;
+      gap: 0.25rem;
+      padding: 0.65rem 0.5rem;
+      border-radius: 20px 20px 0 0;
+      background: hsl(var(--card));
+      border: 1px solid hsl(var(--border));
+      box-shadow: none;
+    }
+
+    .mobile-nav button {
+      flex: 1;
+      border: none;
+      background: transparent;
+      display: grid;
+      gap: 0.25rem;
+      place-items: center;
+      padding: 0.45rem;
+      color: hsl(var(--muted-foreground));
+      font-size: 0.65rem;
+      font-weight: 600;
+      cursor: pointer;
+      border-radius: 12px;
+    }
+
+    .mobile-nav button.active {
+      color: hsl(var(--primary));
+      background: hsl(var(--primary) / 0.1);
+    }
+
+    .pagination {
+      display: flex;
+      gap: 0.35rem;
+      flex-wrap: wrap;
+    }
+
+    .page-btn {
+      min-width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      border: 1px solid hsl(var(--border));
+      background: hsl(var(--card));
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .page-btn.active {
+      background: hsl(var(--primary));
+      color: white;
+      border-color: hsl(var(--primary));
+    }
+
+    .breadcrumb {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.4rem;
+      align-items: center;
+      font-size: 0.875rem;
+      color: hsl(var(--muted-foreground));
+    }
+
+    .breadcrumb a { color: hsl(var(--primary)); font-weight: 500; }
+    .breadcrumb span[aria-hidden] { opacity: 0.5; }
+
+    .ds-mobile-toggle {
+      display: none;
+      margin-bottom: 1rem;
+    }
+
+    @media (max-width: 900px) {
+      .ds-shell { grid-template-columns: 1fr; }
+      .ds-sidebar {
+        position: static;
+        height: auto;
+        border-right: none;
+        border-bottom: 1px solid hsl(var(--border));
+        display: none;
+      }
+      .ds-sidebar.open { display: block; }
+      .ds-mobile-toggle { display: inline-flex; }
+      .demo-grid-2,
+      .demo-grid-3,
+      .demo-grid-4 { grid-template-columns: 1fr; }
+    }
+
+    @media (min-width: 701px) and (max-width: 1100px) {
+      .demo-grid-4 { grid-template-columns: repeat(2, 1fr); }
+      .demo-grid-3 { grid-template-columns: repeat(2, 1fr); }
+    }
+  </style>
+</head>
+<body>
+  <div class="ds-shell">
+    <aside class="ds-sidebar" id="dsSidebar">
+      <a class="ds-brand" href="./home.html">
+        <img src="../../public/LOGO.png" alt="" />
+        Meritum DS 3D
+      </a>
+      <nav class="ds-nav" aria-label="Seções do design system">
+        <a href="#plastic">Plástico</a>
+        <a href="#cores">Cores</a>
+        <a href="#tipografia">Tipografia</a>
+        <a href="#espacos">Espaço &amp; raio</a>
+        <a href="#botoes">Botões</a>
+        <a href="#badges">Badges</a>
+        <a href="#forms">Formulários</a>
+        <a href="#cards">Cards</a>
+        <a href="#metricas">Métricas</a>
+        <a href="#alertas">Alertas &amp; toast</a>
+        <a href="#tabs">Tabs</a>
+        <a href="#avatar">Avatar</a>
+        <a href="#progresso">Progresso</a>
+        <a href="#tabela">Tabela</a>
+        <a href="#sidebar">Sidebar</a>
+        <a href="#navegacao">Navegação</a>
+        <a href="#loja-ui">Loja / produto</a>
+        <a href="#ranking">Ranking / pódio</a>
+        <a href="#dialogo">Diálogo</a>
+        <a href="#estados">Estados vazios</a>
+        <a href="#skeleton">Skeleton</a>
+        <a href="#paginacao">Paginação</a>
+      </nav>
+    </aside>
+
+    <main class="ds-main">
+      <button class="btn btn-secondary btn-sm ds-mobile-toggle" id="dsMenu" type="button">Menu do design system</button>
+
+      <div class="ds-top">
+        <div>
+          <h1>Design System Meritum · 3D</h1>
+          <p>
+            Variante plastificada: <strong>botões sem sombra externa</strong>,
+            relevo inset + efeito de clique. Fonte Inter e cores do app.
+            Tokens em <code>tokens-3d.css</code>.
+          </p>
+        </div>
+        <div class="demo-row">
+          <a class="btn btn-outline btn-sm" href="./home.html">Ver home</a>
+          <a class="btn btn-secondary btn-sm" href="./design-system.html">DS flat</a>
+          <span class="badge badge-primary">3D · plástico</span>
+        </div>
+      </div>
+
+      <!-- PLASTIC VARS -->
+      <section class="ds-section" id="plastic">
+        <h2>Variáveis plástico</h2>
+        <p class="lead">Definidas em <code>tokens-3d.css</code>. Sem drop-shadow / glow externo. Volume só com inset + gradiente.</p>
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Variável</th>
+                <th>Uso</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td><code>--shadow / --glow-*</code></td><td><code>none</code> (sombra/glow externo zero)</td></tr>
+              <tr><td><code>--plastic-raised</code></td><td>Relevo do botão (inset claro/escuro)</td></tr>
+              <tr><td><code>--plastic-pressed</code></td><td>Estado pressionado (afundado)</td></tr>
+              <tr><td><code>--plastic-raised-light</code></td><td>Secondary / outline / ghost</td></tr>
+              <tr><td><code>--plastic-pressed-light</code></td><td>Press desses botões claros</td></tr>
+              <tr><td><code>--btn-3d-*</code></td><td>Gradientes plastificados</td></tr>
+              <tr><td><code>--depth-y</code></td><td>Deslocamento no clique</td></tr>
+              <tr><td><code>data-state="clicked"</code></td><td>Press animado via JS (~180ms)</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- CORES -->
+      <section class="ds-section" id="cores">
+        <h2>Cores</h2>
+        <p class="lead">Paleta do Direito: bordô (rubi) como primária, azul-marinho institucional, dourado de destaque e fundo marfim. Tokens em <code>tokens-direito.css</code>.</p>
+        <div class="swatch-grid">
+          <div class="swatch"><div class="swatch-color" style="background:#8b1e2d"></div><div class="swatch-meta"><strong>Primary · Bordô</strong><span>#8B1E2D</span></div></div>
+          <div class="swatch"><div class="swatch-color" style="background:#14213d"></div><div class="swatch-meta"><strong>Accent · Azul-marinho</strong><span>#14213D</span></div></div>
+          <div class="swatch"><div class="swatch-color" style="background:#c9a227"></div><div class="swatch-meta"><strong>Dourado</strong><span>#C9A227</span></div></div>
+          <div class="swatch"><div class="swatch-color" style="background:#f8f5ef"></div><div class="swatch-meta"><strong>Background · Marfim</strong><span>#F8F5EF</span></div></div>
+          <div class="swatch"><div class="swatch-color" style="background:#ffffff;border-bottom:1px solid #e6dfd3"></div><div class="swatch-meta"><strong>Card</strong><span>#FFFFFF</span></div></div>
+          <div class="swatch"><div class="swatch-color" style="background:#191f2e"></div><div class="swatch-meta"><strong>Foreground</strong><span>#191F2E</span></div></div>
+          <div class="swatch"><div class="swatch-color" style="background:#6b6157"></div><div class="swatch-meta"><strong>Muted</strong><span>#6B6157</span></div></div>
+          <div class="swatch"><div class="swatch-color" style="background:#2e7d4f"></div><div class="swatch-meta"><strong>Success</strong><span>#2E7D4F</span></div></div>
+          <div class="swatch"><div class="swatch-color" style="background:#b7791f"></div><div class="swatch-meta"><strong>Warning</strong><span>#B7791F</span></div></div>
+          <div class="swatch"><div class="swatch-color" style="background:#c62828"></div><div class="swatch-meta"><strong>Destructive</strong><span>#C62828</span></div></div>
+          <div class="swatch"><div class="swatch-color" style="background:#e6dfd3"></div><div class="swatch-meta"><strong>Border</strong><span>#E6DFD3</span></div></div>
+        </div>
+      </section>
+
+      <!-- TIPOGRAFIA -->
+      <section class="ds-section" id="tipografia">
+        <h2>Tipografia</h2>
+        <p class="lead">Família única: Inter (mesma da aplicação).</p>
+        <div class="panel type-sample">
+          <div>
+            <div class="type-meta">Display · 800 · 36/40</div>
+            <div style="font-size:2.25rem;font-weight:800;letter-spacing:-0.03em;line-height:1.1">Economia que engaja</div>
+          </div>
+          <div>
+            <div class="type-meta">H1 · 800 · 30/36</div>
+            <div style="font-size:1.875rem;font-weight:800;letter-spacing:-0.025em">Dashboard do aluno</div>
+          </div>
+          <div>
+            <div class="type-meta">H2 · 700 · 24/32</div>
+            <div style="font-size:1.5rem;font-weight:700;letter-spacing:-0.02em">Loja escolar</div>
+          </div>
+          <div>
+            <div class="type-meta">H3 · 700 · 18/28</div>
+            <div style="font-size:1.125rem;font-weight:700">Histórico de transações</div>
+          </div>
+          <div>
+            <div class="type-meta">Body · 400 · 16/24</div>
+            <div>O estudante acumula Meritum Coins e acompanha o ranking da turma.</div>
+          </div>
+          <div>
+            <div class="type-meta">Small / muted · 500 · 14/20</div>
+            <div class="text-muted" style="font-size:0.875rem;font-weight:500">Atualizado há 2 minutos</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ESPAÇOS -->
+      <section class="ds-section" id="espacos">
+        <h2>Espaço &amp; raio</h2>
+        <p class="lead">Raio padrão da app: <code>1rem</code>. Escala de espaçamento prática.</p>
+        <div class="demo-row">
+          <div class="panel" style="width:64px;height:64px;border-radius:calc(var(--radius) - 4px)"></div>
+          <div class="panel" style="width:64px;height:64px;border-radius:var(--radius)"></div>
+          <div class="panel" style="width:64px;height:64px;border-radius:999px"></div>
+          <span class="hint">sm · md (default) · full</span>
+        </div>
+        <div class="demo-row" style="margin-top:1rem">
+          <div style="height:12px;width:8px;background:hsl(var(--primary));border-radius:2px" title="2"></div>
+          <div style="height:12px;width:16px;background:hsl(var(--primary));border-radius:2px" title="4"></div>
+          <div style="height:12px;width:24px;background:hsl(var(--primary));border-radius:2px" title="6"></div>
+          <div style="height:12px;width:32px;background:hsl(var(--primary));border-radius:2px" title="8"></div>
+          <div style="height:12px;width:48px;background:hsl(var(--primary));border-radius:2px" title="12"></div>
+          <div style="height:12px;width:64px;background:hsl(var(--primary));border-radius:2px" title="16"></div>
+          <span class="hint">8 · 16 · 24 · 32 · 48 · 64 px</span>
+        </div>
+      </section>
+
+      <!-- BOTÕES -->
+      <section class="ds-section" id="botoes">
+        <h2>Botões</h2>
+        <p class="lead">Plastificados, sem sombra externa. Clique para ver o afundar (todos os botões da página).</p>
+        <div class="panel demo-stack">
+          <div class="demo-row">
+            <button class="btn btn-primary" type="button">Primary</button>
+            <button class="btn btn-secondary" type="button">Secondary</button>
+            <button class="btn btn-outline" type="button">Outline</button>
+            <button class="btn btn-ghost" type="button">Ghost</button>
+            <button class="btn btn-destructive" type="button">Destructive</button>
+          </div>
+          <div class="demo-row">
+            <button class="btn btn-coin" type="button">Ganhar recompensa</button>
+            <button class="btn btn-glow" type="button">Glow primary</button>
+            <button class="btn btn-primary" type="button" disabled>Disabled</button>
+          </div>
+          <div class="demo-row">
+            <button class="btn btn-primary btn-sm" type="button">Small</button>
+            <button class="btn btn-primary" type="button">Default</button>
+            <button class="btn btn-primary btn-lg" type="button">Large</button>
+            <button class="btn btn-secondary btn-icon" type="button" aria-label="Mais opções">⋯</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- BADGES -->
+      <section class="ds-section" id="badges">
+        <h2>Badges</h2>
+        <p class="lead">Status, planos e indicadores de moeda.</p>
+        <div class="demo-row">
+          <span class="badge badge-primary">Primary</span>
+          <span class="badge badge-secondary">Secondary</span>
+          <span class="badge badge-success">Ativo</span>
+          <span class="badge badge-warning">Pendente</span>
+          <span class="badge badge-destructive">Bloqueado</span>
+          <span class="badge badge-coin">+50 coins</span>
+          <span class="badge badge-primary">Plano Pro</span>
+        </div>
+      </section>
+
+      <!-- FORMS -->
+      <section class="ds-section" id="forms">
+        <h2>Formulários</h2>
+        <p class="lead">Inputs, selects, textarea, checkbox, radio e switch.</p>
+        <div class="demo-grid-2">
+          <div class="panel demo-stack">
+            <div class="field">
+              <label class="label" for="nome">Nome do aluno</label>
+              <input class="input" id="nome" type="text" placeholder="Ex.: Ana Souza" />
+              <span class="hint">Como aparece no ranking</span>
+            </div>
+            <div class="field">
+              <label class="label" for="turma">Turma</label>
+              <select class="select" id="turma">
+                <option>8º Ano A</option>
+                <option>8º Ano B</option>
+                <option>9º Ano A</option>
+              </select>
+            </div>
+            <div class="field">
+              <label class="label" for="obs">Observação</label>
+              <textarea class="textarea" id="obs" placeholder="Motivo da recompensa"></textarea>
+            </div>
+            <div class="field">
+              <label class="label" for="erro">Campo com erro</label>
+              <input class="input input-error" id="erro" type="email" value="email-invalido" />
+              <span class="hint text-destructive">Informe um e-mail válido</span>
+            </div>
+          </div>
+          <div class="panel demo-stack">
+            <label class="demo-row" style="justify-content:flex-start">
+              <input class="checkbox" type="checkbox" checked />
+              <span>Receber notificações de ranking</span>
+            </label>
+            <label class="demo-row" style="justify-content:flex-start">
+              <input class="radio" type="radio" name="tipo" checked />
+              <span>Recompensa individual</span>
+            </label>
+            <label class="demo-row" style="justify-content:flex-start">
+              <input class="radio" type="radio" name="tipo" />
+              <span>Recompensa em massa</span>
+            </label>
+            <div class="demo-row" style="justify-content:space-between">
+              <span class="label" style="margin:0">Loja aberta</span>
+              <button class="switch" type="button" role="switch" aria-checked="true" id="switchDemo" aria-label="Loja aberta"></button>
+            </div>
+            <div class="wallet-chip">
+              <span class="coin">M</span>
+              Saldo: 1.050 coins
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- CARDS -->
+      <section class="ds-section" id="cards">
+        <h2>Cards</h2>
+        <p class="lead">Passe o mouse: elevação sutil, sem sombra.</p>
+        <div class="demo-grid-3">
+          <div class="card card-pad">
+            <h3 class="card-title">Card 3D</h3>
+            <p class="card-desc">Volume por gradiente — sombra zero.</p>
+          </div>
+          <div class="card card-pad neu-flat" style="border:none">
+            <h3 class="card-title">Neu flat → flat</h3>
+            <p class="card-desc">Token neu anulado nesta variante.</p>
+          </div>
+          <div class="card card-pad neu-pressed" style="border:none">
+            <h3 class="card-title">Neu pressed → flat</h3>
+            <p class="card-desc">Sem inset shadow cinza.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- MÉTRICAS -->
+      <section class="ds-section" id="metricas">
+        <h2>Métricas</h2>
+        <p class="lead">KPIs de admin e resumos de aluno/professor.</p>
+        <div class="demo-grid-4">
+          <div class="metric">
+            <div class="label">Moedas em circulação</div>
+            <div class="value">48.320</div>
+          </div>
+          <div class="metric">
+            <div class="label">Emitidas hoje</div>
+            <div class="value text-success">+1.240</div>
+          </div>
+          <div class="metric">
+            <div class="label">Queimadas na loja</div>
+            <div class="value text-warning">860</div>
+          </div>
+          <div class="metric">
+            <div class="label">Taxa de uso</div>
+            <div class="value">76%</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ALERTAS -->
+      <section class="ds-section" id="alertas">
+        <h2>Alertas &amp; toast</h2>
+        <p class="lead">Alertas com brilho percorrendo a borda para chamar atenção. O toast permanece estático.</p>
+        <div class="demo-stack">
+          <div class="alert alert-info"><strong>Info.</strong> Orçamento do professor renovado neste mês.</div>
+          <div class="alert alert-success"><strong>Sucesso.</strong> 20 coins enviados para Ana Souza.</div>
+          <div class="alert alert-warning"><strong>Atenção.</strong> Estoque baixo no item “Kit caderno”.</div>
+          <div class="alert alert-destructive"><strong>Erro.</strong> Não foi possível confirmar o pedido.</div>
+          <div class="toast-demo">
+            <span aria-hidden="true">✓</span>
+            <div>
+              <strong style="display:block;font-size:0.9rem">Pedido confirmado</strong>
+              <span style="font-size:0.8rem;opacity:0.85">Retire na loja até sexta-feira.</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TABS -->
+      <section class="ds-section" id="tabs">
+        <h2>Tabs</h2>
+        <p class="lead">Navegação local em páginas de detalhe.</p>
+        <div class="tabs" role="tablist" aria-label="Exemplo de abas">
+          <button class="tab" type="button" role="tab" aria-selected="true">Visão geral</button>
+          <button class="tab" type="button" role="tab" aria-selected="false">Transações</button>
+          <button class="tab" type="button" role="tab" aria-selected="false">Turmas</button>
+        </div>
+      </section>
+
+      <!-- AVATAR -->
+      <section class="ds-section" id="avatar">
+        <h2>Avatar</h2>
+        <p class="lead">Iniciais ou foto de perfil.</p>
+        <div class="demo-row">
+          <div class="avatar">AS</div>
+          <div class="avatar avatar-lg">PL</div>
+          <div class="avatar" style="background:#e3e7f0;color:#14213d">JS</div>
+          <div class="wallet-chip"><span class="coin">M</span> Ana · 1.050</div>
+        </div>
+      </section>
+
+      <!-- PROGRESSO -->
+      <section class="ds-section" id="progresso">
+        <h2>Progresso</h2>
+        <div class="section-head-row">
+          <p class="lead">Barra plastificada com preenchimento animado e listras de carregamento.</p>
+          <button class="btn btn-secondary btn-sm" type="button" data-replay="progresso">Repetir animação</button>
+        </div>
+        <div class="panel demo-stack">
+          <div>
+            <div class="demo-row" style="justify-content:space-between;margin-bottom:0.4rem">
+              <span class="label" style="margin:0">Orçamento mensal</span>
+              <span class="hint">720 / 1000</span>
+            </div>
+            <div class="progress" role="progressbar" aria-label="Orçamento mensal" aria-valuemin="0" aria-valuemax="100" aria-valuenow="72"><span style="width:72%"></span></div>
+          </div>
+          <div>
+            <div class="demo-row" style="justify-content:space-between;margin-bottom:0.4rem">
+              <span class="label" style="margin:0">Nível 4</span>
+              <span class="hint">180 XP para o próximo</span>
+            </div>
+            <div class="progress progress-coin" role="progressbar" aria-label="Nível 4" aria-valuemin="0" aria-valuemax="100" aria-valuenow="45"><span style="width:45%"></span></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TABELA -->
+      <section class="ds-section" id="tabela">
+        <h2>Tabela</h2>
+        <p class="lead">Auditoria, usuários e pedidos.</p>
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Aluno</th>
+                <th>Tipo</th>
+                <th>Valor</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Ana Souza</td>
+                <td>Recompensa</td>
+                <td>+50</td>
+                <td><span class="badge badge-success">OK</span></td>
+              </tr>
+              <tr>
+                <td>Pedro Lima</td>
+                <td>Compra loja</td>
+                <td>-120</td>
+                <td><span class="badge badge-warning">Pendente</span></td>
+              </tr>
+              <tr>
+                <td>Julia Costa</td>
+                <td>Digital</td>
+                <td>-30</td>
+                <td><span class="badge badge-success">Liberado</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- SIDEBAR -->
+      <section class="ds-section" id="sidebar">
+        <h2>Sidebar</h2>
+        <p class="lead">Menu lateral da aplicação por perfil. Clique nos itens, recolha pelo botão de seta e troque o perfil abaixo. Itens com cadeado dependem do plano.</p>
+        <div class="demo-row" style="margin-bottom:1rem">
+          <div class="tabs" role="tablist" aria-label="Perfil do sidebar" id="sbRoleTabs">
+            <button class="tab" type="button" role="tab" aria-selected="false" data-role="student">Aluno</button>
+            <button class="tab" type="button" role="tab" aria-selected="false" data-role="teacher">Professor</button>
+            <button class="tab" type="button" role="tab" aria-selected="false" data-role="store">Loja</button>
+            <button class="tab" type="button" role="tab" aria-selected="true" data-role="admin">Admin</button>
+            <button class="tab" type="button" role="tab" aria-selected="false" data-role="dashi">Dashi</button>
+          </div>
+        </div>
+
+        <div class="app-frame">
+          <aside class="app-sidebar" id="appSidebar" aria-label="Menu lateral">
+            <div class="sb-head">
+              <div class="sb-brand">
+                <img src="../../public/LOGO.png" alt="Logo Meritum" width="40" height="40" />
+                <div class="sb-brand-text">
+                  <strong>Meritum</strong>
+                  <span id="sbRoleName">Administrador</span>
+                </div>
+              </div>
+              <button class="sb-toggle" id="sbToggle" type="button" aria-label="Recolher menu" aria-expanded="true">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m15 18-6-6 6-6"/></svg>
+              </button>
+            </div>
+
+            <nav class="sb-nav" id="sbNav"></nav>
+
+            <div class="sb-foot">
+              <div class="sb-user">
+                <div class="avatar" id="sbUserAvatar">M</div>
+                <div class="sb-user-text">
+                  <strong id="sbUserName">Marina Alves</strong>
+                  <span id="sbUserEmail">admin@escola.com</span>
+                </div>
+              </div>
+              <button class="sb-logout" type="button" title="Sair">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>
+                <span>Sair</span>
+              </button>
+            </div>
+          </aside>
+
+          <div class="app-main">
+            <div class="app-main-inner" id="appMainInner">
+              <div class="app-page-head">
+                <div>
+                  <h3 id="appPageTitle">Painel</h3>
+                  <p id="appPageDesc">Visão geral da escola</p>
+                </div>
+                <div class="wallet-chip"><span class="coin">M</span> 1.050 coins</div>
+              </div>
+              <div class="app-metrics">
+                <div class="metric"><div class="label">Alunos ativos</div><div class="value">412</div></div>
+                <div class="metric"><div class="label">Coins emitidos (mês)</div><div class="value text-success">+8.240</div></div>
+                <div class="metric"><div class="label">Pedidos na loja</div><div class="value">37</div></div>
+              </div>
+              <div class="card card-pad demo-stack">
+                <div class="skeleton" style="height:14px;width:35%"></div>
+                <div class="skeleton" style="height:12px;width:90%"></div>
+                <div class="skeleton" style="height:12px;width:75%"></div>
+                <div class="skeleton" style="height:120px;width:100%;border-radius:12px"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- NAVEGAÇÃO -->
+      <section class="ds-section" id="navegacao">
+        <h2>Navegação</h2>
+        <p class="lead">Breadcrumb, itens de sidebar e menu mobile.</p>
+        <div class="demo-stack">
+          <nav class="breadcrumb" aria-label="Breadcrumb">
+            <a href="#">Admin</a>
+            <span aria-hidden="true">/</span>
+            <a href="#">Loja</a>
+            <span aria-hidden="true">/</span>
+            <span aria-current="page">Pedidos</span>
+          </nav>
+          <div class="demo-grid-2">
+            <div class="panel" style="padding:0.5rem">
+              <a class="sidebar-item active" href="#">Dashboard</a>
+              <a class="sidebar-item" href="#">Alunos</a>
+              <a class="sidebar-item" href="#">Loja</a>
+              <a class="sidebar-item" href="#">Métricas</a>
+            </div>
+            <div>
+              <div class="mobile-nav" role="navigation" aria-label="Menu inferior">
+                <button type="button" class="active">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 10.5 12 3l9 7.5V21a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z"/></svg>
+                  Início
+                </button>
+                <button type="button">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/></svg>
+                  Loja
+                </button>
+                <button type="button">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>
+                  Ranking
+                </button>
+                <button type="button">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>
+                  Perfil
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- LOJA -->
+      <section class="ds-section" id="loja-ui">
+        <h2>Loja / produto</h2>
+        <p class="lead">Card de produto com preço em coins e estoque. Badges sólidos, raio menor.</p>
+        <div class="demo-grid-3">
+          <article class="card product-card">
+            <div class="thumb">
+              <img src="https://images.unsplash.com/photo-1498654896293-37aacf113fd9?auto=format&fit=crop&q=80&w=600" alt="Kit lanche" width="600" height="375" />
+              <span class="badge badge-success" style="position:absolute;top:0.75rem;left:0.75rem">Em estoque</span>
+            </div>
+            <div class="body">
+              <h3 class="card-title">Kit lanche especial</h3>
+              <p class="card-desc">Retirada na loja escolar até sexta.</p>
+              <div class="price">
+                <span class="badge badge-coin">120 coins</span>
+                <button class="btn btn-primary btn-sm" type="button">Comprar</button>
+              </div>
+            </div>
+          </article>
+          <article class="card product-card">
+            <div class="thumb">
+              <img src="https://images.unsplash.com/photo-1456513080880-7d93aaa2ba98?auto=format&fit=crop&q=80&w=600" alt="Experiência" width="600" height="375" />
+              <span class="badge badge-primary" style="position:absolute;top:0.75rem;left:0.75rem">Experiência</span>
+            </div>
+            <div class="body">
+              <h3 class="card-title">Dia sem uniforme</h3>
+              <p class="card-desc">Válido no próximo mês letivo.</p>
+              <div class="price">
+                <span class="badge badge-coin">300 coins</span>
+                <button class="btn btn-primary btn-sm" type="button">Comprar</button>
+              </div>
+            </div>
+          </article>
+          <article class="card product-card">
+            <div class="thumb">
+              <img src="https://images.unsplash.com/photo-1513475382585-d06e58bcb0e0?auto=format&fit=crop&q=80&w=600" alt="Digital" width="600" height="375" />
+              <span class="badge badge-secondary" style="position:absolute;top:0.75rem;left:0.75rem">Digital</span>
+            </div>
+            <div class="body">
+              <h3 class="card-title">Avatar Meritum</h3>
+              <p class="card-desc">Liberação automática na compra.</p>
+              <div class="price">
+                <span class="badge badge-coin">80 coins</span>
+                <button class="btn btn-coin btn-sm" type="button">Resgatar</button>
+              </div>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <!-- RANKING -->
+      <section class="ds-section" id="ranking">
+        <h2>Ranking / pódio</h2>
+        <div class="section-head-row">
+          <p class="lead">Top 3 com degraus plastificados, subida animada e brilho contínuo.</p>
+          <button class="btn btn-secondary btn-sm" type="button" data-replay="ranking">Repetir animação</button>
+        </div>
+        <div class="podium-stage">
+          <div class="podium">
+            <div class="podium-col second">
+              <img class="podium-icon" src="../../public/icons/num-2.png" alt="2º lugar" width="56" height="56" />
+              <div class="avatar">PL</div>
+              <div class="podium-name">Pedro</div>
+              <span class="podium-score">1.180</span>
+              <div class="podium-step">2º</div>
+            </div>
+            <div class="podium-col first">
+              <img class="podium-icon" src="../../public/icons/trofeu-card.png" alt="1º lugar" width="72" height="72" />
+              <div class="avatar avatar-lg">AS</div>
+              <div class="podium-name">Ana</div>
+              <span class="podium-score">1.240</span>
+              <div class="podium-step">1º</div>
+            </div>
+            <div class="podium-col third">
+              <img class="podium-icon" src="../../public/icons/num-3.png" alt="3º lugar" width="56" height="56" />
+              <div class="avatar">JC</div>
+              <div class="podium-name">Julia</div>
+              <span class="podium-score">1.050</span>
+              <div class="podium-step">3º</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- DIÁLOGO -->
+      <section class="ds-section" id="dialogo">
+        <h2>Diálogo &amp; pop-up</h2>
+        <p class="lead">Mesmo efeito de surgimento da aplicação: overlay em fade e conteúdo entrando com blur, giro em perspectiva e escala.</p>
+        <div class="demo-row" style="margin-bottom:1rem">
+          <button class="btn btn-primary" type="button" data-dialog-open="dialogConfirm">Abrir diálogo</button>
+          <button class="btn btn-coin" type="button" data-dialog-open="dialogReward">Abrir pop-up</button>
+        </div>
+        <p class="hint" style="margin:0 0 0.75rem">Pré-visualização estática:</p>
+        <div class="dialog-mock">
+          <h3>Enviar 20 coins?</h3>
+          <p>Para Ana Souza · motivo: participação em aula.</p>
+          <div class="dialog-actions">
+            <button class="btn btn-ghost btn-sm" type="button">Cancelar</button>
+            <button class="btn btn-coin btn-sm" type="button">Confirmar</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- EMPTY -->
+      <section class="ds-section" id="estados">
+        <h2>Estados vazios</h2>
+        <p class="lead">Quando não há dados ainda.</p>
+        <div class="empty">
+          <div class="avatar avatar-lg" style="margin:0 auto">∅</div>
+          <h3>Nenhuma transação</h3>
+          <p>Assim que houver recompensas ou compras, elas aparecem aqui.</p>
+          <button class="btn btn-primary btn-sm" type="button">Ver loja</button>
+        </div>
+      </section>
+
+      <!-- SKELETON -->
+      <section class="ds-section" id="skeleton">
+        <h2>Skeleton</h2>
+        <p class="lead">Loading de listas e cards.</p>
+        <div class="demo-grid-3">
+          <div class="card card-pad demo-stack">
+            <div class="skeleton" style="height:16px;width:40%"></div>
+            <div class="skeleton" style="height:12px;width:80%"></div>
+            <div class="skeleton" style="height:12px;width:65%"></div>
+          </div>
+          <div class="card card-pad demo-stack">
+            <div class="skeleton" style="height:96px;width:100%;border-radius:12px"></div>
+            <div class="skeleton" style="height:14px;width:50%"></div>
+          </div>
+          <div class="card card-pad demo-stack">
+            <div class="demo-row">
+              <div class="skeleton" style="width:40px;height:40px;border-radius:50%"></div>
+              <div style="flex:1" class="demo-stack">
+                <div class="skeleton" style="height:12px;width:60%"></div>
+                <div class="skeleton" style="height:10px;width:40%"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- PAGINAÇÃO -->
+      <section class="ds-section" id="paginacao">
+        <h2>Paginação</h2>
+        <p class="lead">Listas longas de auditoria e usuários.</p>
+        <div class="pagination" role="navigation" aria-label="Paginação">
+          <button class="page-btn" type="button" aria-label="Anterior">‹</button>
+          <button class="page-btn active" type="button" aria-current="page">1</button>
+          <button class="page-btn" type="button">2</button>
+          <button class="page-btn" type="button">3</button>
+          <button class="page-btn" type="button" aria-label="Próxima">›</button>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div class="m-dialog" id="dialogConfirm" role="dialog" aria-modal="true" aria-labelledby="dialogConfirmTitle" aria-describedby="dialogConfirmDesc" hidden>
+    <div class="m-dialog-overlay" data-dialog-close></div>
+    <div class="m-dialog-content">
+      <button class="m-dialog-close" type="button" data-dialog-close aria-label="Fechar">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+      <h3 id="dialogConfirmTitle">Enviar 20 coins?</h3>
+      <p id="dialogConfirmDesc">Para Ana Souza · motivo: participação em aula. O valor será descontado do seu orçamento mensal.</p>
+      <div class="m-dialog-footer">
+        <button class="btn btn-ghost btn-sm" type="button" data-dialog-close>Cancelar</button>
+        <button class="btn btn-coin btn-sm" type="button" data-dialog-close data-autofocus>Confirmar envio</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="m-dialog" id="dialogReward" role="dialog" aria-modal="true" aria-labelledby="dialogRewardTitle" aria-describedby="dialogRewardDesc" hidden>
+    <div class="m-dialog-overlay" data-dialog-close></div>
+    <div class="m-dialog-content m-popup">
+      <button class="m-dialog-close" type="button" data-dialog-close aria-label="Fechar">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+      <img src="../../public/icons/coins.png" alt="" width="72" height="72" />
+      <h3 id="dialogRewardTitle" style="padding-right:0">Você ganhou 50 coins!</h3>
+      <p id="dialogRewardDesc">Prof. Julia reconheceu sua nota 10 em Geometria.</p>
+      <div class="m-dialog-footer">
+        <button class="btn btn-coin" type="button" data-dialog-close data-autofocus>Resgatar recompensa</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      var PRESS_MS = 180;
+
+      function bindPress(el) {
+        if (!el || el.getAttribute('data-press-bound') === '1') return;
+        if (el.disabled || el.getAttribute('aria-disabled') === 'true') return;
+        el.setAttribute('data-press-bound', '1');
+
+        function press() {
+          el.setAttribute('data-state', 'clicked');
+          window.clearTimeout(el._pressTimer);
+          el._pressTimer = window.setTimeout(function () {
+            el.removeAttribute('data-state');
+          }, PRESS_MS);
+        }
+
+        el.addEventListener('pointerdown', function (e) {
+          if (e.button != null && e.button !== 0) return;
+          press();
+        });
+
+        el.addEventListener('keydown', function (e) {
+          if (e.key === 'Enter' || e.key === ' ') {
+            press();
+          }
+        });
+      }
+
+      function bindAllPressables() {
+        document.querySelectorAll('.btn, .page-btn, .tab').forEach(bindPress);
+      }
+
+      bindAllPressables();
+
+      var menu = document.getElementById('dsMenu');
+      var sidebar = document.getElementById('dsSidebar');
+      if (menu && sidebar) {
+        menu.addEventListener('click', function () {
+          sidebar.classList.toggle('open');
+        });
+        sidebar.querySelectorAll('a').forEach(function (a) {
+          a.addEventListener('click', function () {
+            if (window.matchMedia('(max-width: 900px)').matches) {
+              sidebar.classList.remove('open');
+            }
+          });
+        });
+      }
+
+      var sw = document.getElementById('switchDemo');
+      if (sw) {
+        sw.addEventListener('click', function () {
+          var on = sw.getAttribute('aria-checked') === 'true';
+          sw.setAttribute('aria-checked', on ? 'false' : 'true');
+        });
+      }
+
+      document.querySelectorAll('.tabs').forEach(function (tabs) {
+        tabs.querySelectorAll('.tab').forEach(function (tab) {
+          tab.addEventListener('click', function () {
+            tabs.querySelectorAll('.tab').forEach(function (t) {
+              t.setAttribute('aria-selected', 'false');
+            });
+            tab.setAttribute('aria-selected', 'true');
+          });
+        });
+      });
+
+      /* ---- Repetir animações de carregamento ---- */
+      document.querySelectorAll('[data-replay]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var section = document.getElementById(btn.getAttribute('data-replay'));
+          if (!section) return;
+          var targets = section.querySelectorAll('.progress > span, .podium-step, .podium-icon');
+          targets.forEach(function (el) {
+            el.style.animation = 'none';
+          });
+          void section.offsetWidth;
+          targets.forEach(function (el) {
+            el.style.animation = '';
+          });
+        });
+      });
+
+      /* ---- Diálogos / pop-ups (efeito da app) ---- */
+      var CLOSE_MS = 450;
+      var FOCUSABLE = 'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+      var openStack = [];
+
+      function getOpenDialog() {
+        return openStack.length ? openStack[openStack.length - 1] : null;
+      }
+
+      function openDialog(dialog, trigger) {
+        if (!dialog || dialog.getAttribute('data-state') === 'open') return;
+        window.clearTimeout(dialog._closeTimer);
+        dialog._returnFocus = trigger || document.activeElement;
+        dialog.hidden = false;
+        dialog.setAttribute('data-state', 'closed');
+        void dialog.offsetWidth;
+        dialog.setAttribute('data-state', 'open');
+        openStack.push(dialog);
+        document.body.style.overflow = 'hidden';
+
+        var focusTarget = dialog.querySelector('[data-autofocus]') || dialog.querySelector(FOCUSABLE);
+        if (focusTarget) {
+          window.setTimeout(function () {
+            focusTarget.focus({ preventScroll: true });
+          }, 60);
+        }
+      }
+
+      function closeDialog(dialog) {
+        if (!dialog || dialog.getAttribute('data-state') !== 'open') return;
+        dialog.setAttribute('data-state', 'closed');
+        openStack = openStack.filter(function (d) { return d !== dialog; });
+
+        window.clearTimeout(dialog._closeTimer);
+        dialog._closeTimer = window.setTimeout(function () {
+          dialog.hidden = true;
+          if (!openStack.length) {
+            document.body.style.overflow = '';
+          }
+          var back = dialog._returnFocus;
+          if (back && typeof back.focus === 'function') {
+            back.focus({ preventScroll: true });
+          }
+        }, CLOSE_MS);
+      }
+
+      document.querySelectorAll('[data-dialog-open]').forEach(function (trigger) {
+        trigger.addEventListener('click', function () {
+          openDialog(document.getElementById(trigger.getAttribute('data-dialog-open')), trigger);
+        });
+      });
+
+      document.querySelectorAll('.m-dialog').forEach(function (dialog) {
+        dialog.querySelectorAll('[data-dialog-close]').forEach(function (closer) {
+          closer.addEventListener('click', function () {
+            closeDialog(dialog);
+          });
+        });
+      });
+
+      document.addEventListener('keydown', function (e) {
+        var dialog = getOpenDialog();
+        if (!dialog) return;
+
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          closeDialog(dialog);
+          return;
+        }
+
+        if (e.key === 'Tab') {
+          var items = Array.prototype.slice.call(dialog.querySelectorAll(FOCUSABLE));
+          if (!items.length) return;
+          var first = items[0];
+          var last = items[items.length - 1];
+          if (e.shiftKey && document.activeElement === first) {
+            e.preventDefault();
+            last.focus();
+          } else if (!e.shiftKey && document.activeElement === last) {
+            e.preventDefault();
+            first.focus();
+          } else if (!dialog.contains(document.activeElement)) {
+            e.preventDefault();
+            first.focus();
+          }
+        }
+      });
+
+      /* ---- Sidebar da aplicação (espelha DashboardLayout.tsx) ---- */
+      var ICON_BASE = '../../public/icons/';
+      var SVG = {
+        bag: '<path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/>',
+        cart: '<circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/>',
+        dollar: '<line x1="12" x2="12" y1="2" y2="22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>',
+        wallet: '<path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/>',
+        report: '<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M8 18v-2"/><path d="M12 18v-4"/><path d="M16 18v-6"/>',
+        settings: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>',
+        shield: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/>',
+        chart: '<path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/>',
+        card: '<rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/>',
+        lock: '<rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>'
+      };
+
+      var CURRENT_PLAN = 'pro';
+      var PLAN_LEVEL = { basic: 1, pro: 2, enterprise: 3 };
+      var PLAN_TAG = { pro: 'Pro', enterprise: 'Ent' };
+
+      var SB_ROLES = {
+        student: {
+          name: 'Aluno', user: 'Ana Souza', email: 'ana@escola.com',
+          items: [
+            { label: 'Painel', png: 'painel.png' },
+            { label: 'Histórico', png: 'historico.png' },
+            { label: 'Ranking', png: 'ranking.png' },
+            { label: 'Lojinha', svg: 'bag' },
+            { label: 'Perfil', png: 'perfil.png' }
+          ]
+        },
+        teacher: {
+          name: 'Professor', user: 'Julia Costa', email: 'julia@escola.com',
+          items: [
+            { label: 'Painel', png: 'painel.png' },
+            { label: 'Turmas', png: 'alunos2.png' },
+            { label: 'Alunos', png: 'alunos.png' },
+            { label: 'Histórico', png: 'historico.png' },
+            { label: 'Perfil', png: 'perfil.png' }
+          ]
+        },
+        store: {
+          name: 'Loja', user: 'Carlos Lima', email: 'loja@escola.com',
+          items: [
+            { label: 'Painel', png: 'painel.png' },
+            { label: 'Produtos', svg: 'bag' },
+            { label: 'Ativar Meritum', svg: 'cart' },
+            { label: 'Pedidos', svg: 'cart' },
+            { label: 'Relatórios', svg: 'report' },
+            { label: 'Perfil', png: 'perfil.png' }
+          ]
+        },
+        admin: {
+          name: 'Administrador', user: 'Marina Alves', email: 'admin@escola.com',
+          items: [
+            { label: 'Painel', png: 'painel.png' },
+            { label: 'Usuários', png: 'users.png' },
+            { label: 'Ger. Alunos', png: 'alunos.png' },
+            { label: 'Dashboard Econômico', svg: 'dollar', plan: 'enterprise' },
+            { label: 'Orçamentos', svg: 'wallet', plan: 'pro' },
+            { label: 'Lojinha', svg: 'bag' },
+            { label: 'Ativar Meritum', svg: 'cart' },
+            { label: 'Relatórios', svg: 'report', plan: 'pro' },
+            { label: 'Config. Economia', svg: 'settings', plan: 'enterprise' },
+            { label: 'Auditoria', svg: 'shield', plan: 'enterprise' },
+            { label: 'Métricas', svg: 'chart', plan: 'pro' },
+            { label: 'Meu Plano', svg: 'card' },
+            { label: 'Perfil', png: 'perfil.png' }
+          ]
+        },
+        dashi: {
+          name: 'Dashi', user: 'Equipe Dashi', email: 'dashi@meritum.com',
+          items: [
+            { label: 'Catálogo-mestre', svg: 'bag' },
+            { label: 'Usuários', png: 'users.png' },
+            { label: 'Ger. Alunos', png: 'alunos.png' },
+            { label: 'Dashboard Econômico', svg: 'dollar' },
+            { label: 'Orçamentos', svg: 'wallet' },
+            { label: 'Lojinha', svg: 'bag' },
+            { label: 'Ativar Meritum', svg: 'cart' },
+            { label: 'Relatórios', svg: 'report' },
+            { label: 'Config. Economia', svg: 'settings' },
+            { label: 'Auditoria', svg: 'shield' },
+            { label: 'Métricas', svg: 'chart' },
+            { label: 'Docs', svg: 'report' },
+            { label: 'Perfil', png: 'perfil.png' }
+          ]
+        }
+      };
+
+      var sbAside = document.getElementById('appSidebar');
+      var sbNav = document.getElementById('sbNav');
+      var sbToggle = document.getElementById('sbToggle');
+      var sbMainInner = document.getElementById('appMainInner');
+      var sbTitle = document.getElementById('appPageTitle');
+      var sbDesc = document.getElementById('appPageDesc');
+
+      function svgIcon(key) {
+        return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + SVG[key] + '</svg>';
+      }
+
+      function replayContent() {
+        if (!sbMainInner) return;
+        sbMainInner.style.animation = 'none';
+        void sbMainInner.offsetWidth;
+        sbMainInner.style.animation = '';
+      }
+
+      function setActive(button, roleName) {
+        sbNav.querySelectorAll('.sb-item').forEach(function (b) {
+          b.classList.remove('is-active');
+          b.removeAttribute('aria-current');
+        });
+        button.classList.add('is-active');
+        button.setAttribute('aria-current', 'page');
+        sbTitle.textContent = button.getAttribute('data-label');
+        sbDesc.textContent = roleName + ' · ' + button.getAttribute('data-label');
+        replayContent();
+      }
+
+      function renderSidebar(roleKey) {
+        var role = SB_ROLES[roleKey];
+        if (!role || !sbNav) return;
+
+        document.getElementById('sbRoleName').textContent = role.name;
+        document.getElementById('sbUserName').textContent = role.user;
+        document.getElementById('sbUserEmail').textContent = role.email;
+        document.getElementById('sbUserAvatar').textContent = role.user.charAt(0);
+
+        sbNav.innerHTML = '';
+        role.items.forEach(function (item, index) {
+          var locked = item.plan ? PLAN_LEVEL[item.plan] > PLAN_LEVEL[CURRENT_PLAN] : false;
+          var btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'sb-item' + (locked ? ' is-locked' : '');
+          btn.setAttribute('data-label', item.label);
+          btn.title = locked ? item.label + ' · requer plano ' + PLAN_TAG[item.plan] : item.label;
+          if (locked) btn.setAttribute('aria-disabled', 'true');
+
+          var icon = item.png
+            ? '<img src="' + ICON_BASE + item.png + '" alt="" width="20" height="20" />'
+            : svgIcon(item.svg);
+
+          btn.innerHTML =
+            '<span class="sb-icon">' + icon + '</span>' +
+            '<span class="sb-label">' + item.label + '</span>' +
+            (locked ? '<span class="sb-lock">' + svgIcon('lock') + PLAN_TAG[item.plan] + '</span>' : '');
+
+          btn.addEventListener('click', function () {
+            if (locked) {
+              btn.classList.remove('is-shake');
+              void btn.offsetWidth;
+              btn.classList.add('is-shake');
+              return;
+            }
+            setActive(btn, role.name);
+          });
+
+          btn.addEventListener('animationend', function () {
+            btn.classList.remove('is-shake');
+          });
+
+          sbNav.appendChild(btn);
+          if (!locked) bindPress(btn);
+          if (index === 0) setActive(btn, role.name);
+        });
+      }
+
+      if (sbToggle && sbAside) {
+        sbToggle.addEventListener('click', function () {
+          var collapsed = sbAside.classList.toggle('is-collapsed');
+          sbToggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+          sbToggle.setAttribute('aria-label', collapsed ? 'Expandir menu' : 'Recolher menu');
+        });
+      }
+
+      var sbTabs = document.getElementById('sbRoleTabs');
+      if (sbTabs) {
+        sbTabs.querySelectorAll('.tab').forEach(function (tab) {
+          tab.addEventListener('click', function () {
+            renderSidebar(tab.getAttribute('data-role'));
+          });
+        });
+      }
+
+      renderSidebar('admin');
+    })();
+  </script>
+</body>
+</html>

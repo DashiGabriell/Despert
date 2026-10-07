@@ -1,0 +1,92 @@
+/* =========================================================
+   Paleta "Direito" — sobrepõe só as cores de tokens.css + tokens-3d.css
+   Bordô (rubi do Direito) · azul-marinho · dourado · marfim
+   ========================================================= */
+
+:root {
+  --background: 40 33% 96%;          /* #F8F5EF marfim */
+  --foreground: 222 30% 14%;         /* #191F2E tinta */
+  --card: 0 0% 100%;
+  --card-foreground: 222 30% 14%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 222 30% 14%;
+  --primary: 352 64% 33%;            /* #8B1E2D bordô */
+  --primary-foreground: 0 0% 100%;
+  --secondary: 40 25% 93%;           /* #F1EDE6 */
+  --secondary-foreground: 222 30% 14%;
+  --muted: 40 25% 93%;
+  --muted-foreground: 30 10% 38%;    /* #6B6157 */
+  --accent: 221 51% 16%;             /* #14213D azul-marinho */
+  --accent-foreground: 0 0% 100%;
+  --destructive: 0 66% 47%;          /* #C62828 */
+  --destructive-foreground: 0 0% 100%;
+  --success: 145 46% 34%;            /* #2E7D4F */
+  --success-foreground: 0 0% 100%;
+  --warning: 36 71% 42%;             /* #B7791F */
+  --warning-foreground: 222 30% 14%;
+  --coin: 46 68% 47%;                /* #C9A227 dourado */
+  --coin-foreground: 40 60% 10%;
+  --border: 38 28% 86%;              /* #E6DFD3 */
+  --input: 38 28% 86%;
+  --ring: 352 64% 33%;
+
+  --btn-3d-primary: linear-gradient(180deg, #b03a4a 0%, #8b1e2d 42%, #6b1421 100%);
+  --btn-3d-secondary: linear-gradient(180deg, #ffffff 0%, #efeae1 100%);
+  --btn-3d-outline: linear-gradient(180deg, #ffffff 0%, #f6f2eb 100%);
+  --btn-3d-ghost: linear-gradient(180deg, #faf8f4 0%, #f0ebe2 100%);
+  --btn-3d-coin: linear-gradient(180deg, #e9d27a 0%, #c9a227 45%, #a88418 100%);
+  --btn-3d-destructive: linear-gradient(180deg, #e05252 0%, #c62828 48%, #a31f1f 100%);
+  --btn-3d-glow: linear-gradient(180deg, #3a4a75 0%, #14213d 45%, #0b1428 100%);
+  --surface-3d: linear-gradient(180deg, #ffffff 0%, #fbf9f5 100%);
+}
+
+/* Cores fixas dos botões (fallback do gradiente) */
+.btn-primary { background-color: #8b1e2d; }
+.btn-glow { background-color: #14213d; }
+.btn-secondary { background-color: #efeae1; }
+.btn-ghost { background-color: #f0ebe2; }
+.btn-destructive { background-color: #c62828; }
+.btn-coin { background-color: #c9a227; color: #2b2006; }
+
+.card:hover {
+  background: linear-gradient(180deg, #ffffff 0%, #fbf4f5 100%);
+}
+
+/* Moeda / destaque dourado */
+.wallet-chip .coin {
+  background: linear-gradient(135deg, #e9d27a, #c9a227);
+  color: #2b2006;
+}
+
+/* Badges sólidos da vitrine */
+.product-card .badge-success { background: #2e7d4f; color: #ffffff; }
+.product-card .badge-primary { background: #8b1e2d; color: #ffffff; }
+.product-card .badge-secondary { background: #14213d; color: #ffffff; }
+.product-card .badge-coin { background: #c9a227; color: #2b2006; }
+
+/* Progresso */
+.progress {
+  background: linear-gradient(180deg, #e8e2d6 0%, #f3efe8 100%);
+}
+.progress > span { background-color: #8b1e2d; }
+.progress-coin > span { background-color: #c9a227; }
+
+/* Pódio: palco azul-marinho com brilho dourado */
+.podium-stage {
+  background:
+    radial-gradient(600px 240px at 50% 0%, rgba(201, 162, 39, 0.28), transparent 70%),
+    linear-gradient(180deg, #0b1428 0%, #14213d 55%, #22325a 100%);
+}
+.podium-col .avatar { color: #14213d; }
+.podium-score { background: #c9a227; color: #2b2006; }
+
+.podium-col.first {
+  --podium-ring: #c9a227;
+  --podium-text: #2b2006;
+  --podium-grad: linear-gradient(180deg, #f0dc8c 0%, #d9b84a 35%, #c9a227 70%, #a88418 100%);
+}
+.podium-col.third {
+  --podium-ring: #b87333;
+  --podium-text: #ffffff;
+  --podium-grad: linear-gradient(180deg, #e8c2a0 0%, #b87333 45%, #8c5523 100%);
+}
