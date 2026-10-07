@@ -3,10 +3,10 @@ import GuiaInicio from '../components/GuiaInicio'
 import Indicadores from '../components/Indicadores'
 import TabelaPrazos from '../components/TabelaPrazos'
 import { alertaErro, botaoPequeno, campo } from '../components/ui'
-import { useAtualizarPrazo, useConfiguracao, useMonitoramentos, usePrazos } from '../data/queries'
+import { useAtualizarPrazo, useConfiguracaoSistema, useMonitoramentos, usePrazos } from '../data/queries'
 import { filtrarPrazos, type FiltroRapido, type FiltroStatus } from '../domain/filtros'
 import { contarIndicadores } from '../domain/indicadores'
-import { useAuth, useUserId } from '../lib/auth-context'
+import { useUserId } from '../lib/auth-context'
 import type { Prazo } from '../lib/database.types'
 import { useLayout } from '../lib/layout-context'
 import { mensagemDeErro, useToast } from '../lib/toast-context'
@@ -22,12 +22,11 @@ const OPCOES_STATUS: { valor: FiltroStatus; rotulo: string }[] = [
 
 export default function Prazos() {
   const userId = useUserId()
-  const { sessao } = useAuth()
   const { hoje, abrirPrazo, novoPrazo } = useLayout()
   const avisar = useToast()
   const prazos = usePrazos(userId)
   const monitoramentos = useMonitoramentos(userId)
-  const config = useConfiguracao(userId, sessao?.user.email)
+  const sistema = useConfiguracaoSistema()
   const atualizar = useAtualizarPrazo(userId)
 
   const [busca, setBusca] = useState('')
@@ -141,7 +140,7 @@ export default function Prazos() {
             todos.length === 0 ? (
               <GuiaInicio
                 temMonitoramento={(monitoramentos.data ?? []).length > 0}
-                temWebhook={Boolean(config.data?.n8n_webhook_url)}
+                temWebhook={Boolean(sistema.data?.n8n_webhook_url.trim())}
                 onPrazoManual={() => novoPrazo()}
               />
             ) : (

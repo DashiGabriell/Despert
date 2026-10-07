@@ -14,13 +14,12 @@ const mutate = vi.fn()
 
 vi.mock('../lib/auth-context', () => ({
   useUserId: () => 'advogada-1',
-  useAuth: () => ({ sessao: { user: { id: 'advogada-1', email: 'ana@exemplo.com' } }, sair: vi.fn() }),
 }))
 
 vi.mock('../data/queries', () => ({
   usePrazos: () => ({ data: prazos, isPending: false, isError: false, isSuccess: true }),
   useMonitoramentos: () => ({ data: [], isPending: false, isSuccess: true }),
-  useConfiguracao: () => ({ data: { n8n_webhook_url: '' }, isPending: false }),
+  useConfiguracaoSistema: () => ({ data: { n8n_webhook_url: '' }, isPending: false }),
   useAtualizarPrazo: () => ({ mutate, isPending: false }),
 }))
 
@@ -108,6 +107,7 @@ describe('tela de Prazos', () => {
     renderizar()
     expect(screen.getByText('Nenhuma publicação capturada ainda')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Monitoramento' })).toHaveAttribute('href', '/monitoramento')
+    expect(screen.getByText(/Aguarde o administrador do sistema conectar o robô/)).toBeInTheDocument()
   })
 
   it('marcar cumprido pela lista grava status e data', async () => {

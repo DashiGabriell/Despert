@@ -39,11 +39,9 @@ export default function GuiaInicio({ temMonitoramento, temWebhook, onPrazoManual
           .
         </Passo>
         <Passo numero={2} feito={temWebhook}>
-          Informe a URL do webhook do n8n em{' '}
-          <Link className="font-semibold text-primary underline underline-offset-2" to="/configuracoes">
-            Configurações
-          </Link>
-          .
+          {temWebhook
+            ? 'Robô conectado ao Diário pelo administrador do sistema.'
+            : 'Aguarde o administrador do sistema conectar o robô ao Diário.'}
         </Passo>
         <Passo numero={3} feito={false}>
           Clique em <strong>Buscar agora</strong>. Depois disso o robô roda sozinho todo dia útil às 07:00.

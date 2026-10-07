@@ -3,8 +3,12 @@ import {
   validarConfiguracao,
   validarFeriado,
   validarMonitoramento,
+  validarNovaConta,
+  validarNovaSenha,
   validarPrazoManual,
+  validarUrlWebhook,
   type FormConfiguracao,
+  type FormNovaConta,
   type FormPrazoManual,
 } from './validacao'
 
@@ -113,11 +117,10 @@ describe('validarConfiguracao', () => {
     prazo_padrao_dias: '15',
     dias_alerta: '7',
     considerar_recesso: true,
-    n8n_webhook_url: '',
     webhook_token: 'a1b2c3d4e5f6a7b8c9d0',
   }
 
-  it('converte os números e aceita webhook vazio', () => {
+  it('converte os números', () => {
     const resultado = validarConfiguracao(form)
     expect(resultado.ok && resultado.valor.dias_alerta).toBe(7)
   })
@@ -130,6 +133,41 @@ describe('validarConfiguracao', () => {
     expect(validarConfiguracao({ ...form, dias_retroativos: '31' }).ok).toBe(false)
     expect(validarConfiguracao({ ...form, prazo_padrao_dias: '0' }).ok).toBe(false)
     expect(validarConfiguracao({ ...form, dias_alerta: 'x' }).ok).toBe(false)
-    expect(validarConfiguracao({ ...form, n8n_webhook_url: 'n8n.vps/webhook' }).ok).toBe(false)
+    expect(validarConfiguracao({ ...form, webhook_token: 'curto' }).ok).toBe(false)
+  })
+})
+
+describe('validarUrlWebhook', () => {
+  it('aceita vazio (desliga o botão) e exige http(s)', () => {
+    expect(validarUrlWebhook('  ')).toEqual({ ok: true, valor: '' })
+    expect(validarUrlWebhook(' https://n8n.vps/webhook/monitor-prazos ')).toEqual({
+      ok: true,
+      valor: 'https://n8n.vps/webhook/monitor-prazos',
+    })
+    expect(validarUrlWebhook('n8n.vps/webhook').ok).toBe(false)
+  })
+})
+
+describe('validarNovaConta', () => {
+  const form: FormNovaConta = { email: ' Nova@Exemplo.com ', senha: 'senhaforte1', papel: 'advogado' }
+
+  it('normaliza o e-mail e mantém senha e papel', () => {
+    expect(validarNovaConta(form, [])).toEqual({
+      ok: true,
+      valor: { email: 'nova@exemplo.com', senha: 'senhaforte1', papel: 'advogado' },
+    })
+  })
+
+  it('recusa e-mail inválido, repetido e senha curta', () => {
+    expect(validarNovaConta({ ...form, email: 'nova' }, []).ok).toBe(false)
+    expect(validarNovaConta(form, ['NOVA@exemplo.com'])).toEqual({
+      ok: false,
+      erro: 'Já existe uma conta com esse e-mail.',
+    })
+    expect(validarNovaConta({ ...form, senha: '1234567' }, [])).toEqual({
+      ok: false,
+      erro: 'A senha precisa ter pelo menos 8 caracteres.',
+    })
+    expect(validarNovaSenha('12345678').ok).toBe(true)
   })
 })

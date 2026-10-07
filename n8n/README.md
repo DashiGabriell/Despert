@@ -60,11 +60,11 @@ Enquanto o valor de exemplo estiver lá, o aviso ao suporte é pulado (o advogad
 
 1. Salve e **ative** o workflow (chave *Active* no topo). Isso liga o agendamento das 07:00 e a Production URL do webhook.
 2. Abra o nó **Disparo pelo Site** e copie a **Production URL** (algo como `https://seu-n8n.com/webhook/monitor-prazos`). Não use a *Test URL*.
-3. Cada advogado cola essa URL em **Configurações → Integração com o n8n** no site e salva. O token de segurança já vem gerado por conta.
+3. Entre no site com a conta dev, abra `/dashitecnology/n8n`, cole essa URL, salve e clique em **Testar conexão**. A URL vale para todos os advogados e só o dev a vê ou altera; o token de segurança continua por advogado e já vem gerado.
 
 ## 5. Teste ponta a ponta
 
-1. No site, crie uma conta, cadastre uma OAB em **Monitoramento** e cole a Production URL em **Configurações**.
+1. No site, entre como advogado (ou use **Usuários → Entrar como** no painel dev) e cadastre uma OAB em **Monitoramento**.
 2. Clique em **Buscar agora**. O botão mostra "Buscando…" e, em até um minuto:
    - **Histórico** ganha uma linha "Buscar agora" com encontradas/novas;
    - os prazos capturados aparecem em **Prazos** sem recarregar a página;
@@ -77,7 +77,8 @@ Enquanto o valor de exemplo estiver lá, o aviso ao suporte é pulado (o advogad
 
 | Sintoma | Causa provável |
 | --- | --- |
-| "Buscar agora" fica em "Buscando…" e expira em 3 min | URL errada (Test URL em vez de Production URL), workflow inativo ou advogado sem monitoramento ativo |
+| "Buscar agora" fica em "Buscando…" e expira em 3 min | URL errada em `/dashitecnology/n8n` (Test URL em vez de Production URL), workflow inativo ou advogado sem monitoramento ativo |
+| Site diz que o robô não foi ativado pelo administrador | A URL do webhook está vazia em `/dashitecnology/n8n` |
 | Execução para em um nó Supabase com 401 | Credencial com a chave `anon`/publishable em vez da `service_role` |
 | Resumo não chega | Credencial Gmail expirada; reautorize. A execução continua registrada no Histórico |
 | Execução com status `falha` | DJEN fora do ar ou lento; o detalhe aparece no Histórico e no e-mail ao suporte |

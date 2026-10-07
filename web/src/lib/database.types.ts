@@ -7,6 +7,9 @@
 export type StatusPrazo = 'pendente' | 'conferir' | 'cumprido' | 'arquivado'
 export type TipoMonitoramento = 'oab' | 'processo'
 export type StatusExecucao = 'ok' | 'falha'
+export type Papel = 'dev' | 'advogado'
+
+export type Json = string | number | boolean | null | { [chave: string]: Json | undefined } | Json[]
 
 export type Configuracao = {
   user_id: string
@@ -15,7 +18,6 @@ export type Configuracao = {
   prazo_padrao_dias: number
   dias_alerta: number
   considerar_recesso: boolean
-  n8n_webhook_url: string
   webhook_token: string
   ultima_busca_em: string | null
   updated_at: string
@@ -75,6 +77,58 @@ export type Execucao = {
   detalhe: string | null
 }
 
+/** Linha única com o que vale para todos os advogados; só o dev altera. */
+export type ConfiguracaoSistema = {
+  id: number
+  n8n_webhook_url: string
+  updated_at: string
+  updated_by: string | null
+}
+
+export type RegistroAuditoria = {
+  id: number
+  criado_em: string
+  dev_id: string | null
+  dev_email: string | null
+  acao: string
+  alvo_user_id: string | null
+  alvo_email: string | null
+  detalhe: Json
+}
+
+/** Retorno de `admin_listar_contas()`. */
+export type ContaAdmin = {
+  id: string
+  email: string
+  criado_em: string
+  ultimo_acesso: string | null
+  confirmado: boolean
+  bloqueado: boolean
+  app_role: string
+  monitoramentos_ativos: number
+  prazos_abertos: number
+  prazos_vencidos: number
+  ultima_execucao: string | null
+  ultima_execucao_status: StatusExecucao | null
+}
+
+/** Retorno de `admin_metricas()`. */
+export type MetricasAdmin = {
+  contas: number
+  devs: number
+  contas_bloqueadas: number
+  advogados_ativos: number
+  monitoramentos_ativos: number
+  prazos_total: number
+  prazos_abertos: number
+  prazos_vencidos: number
+  prazos_conferir: number
+  execucoes_24h: number
+  falhas_24h: number
+  ultima_execucao: string | null
+  ultima_execucao_status: StatusExecucao | null
+}
+
 export type Database = {
   public: {
     Tables: {
@@ -108,9 +162,25 @@ export type Database = {
         Update: Partial<Omit<Execucao, 'id'>>
         Relationships: []
       }
+      configuracao_sistema: {
+        Row: ConfiguracaoSistema
+        Insert: Partial<ConfiguracaoSistema>
+        Update: Partial<Pick<ConfiguracaoSistema, 'n8n_webhook_url'>>
+        Relationships: []
+      }
+      auditoria: {
+        Row: RegistroAuditoria
+        Insert: Partial<Omit<RegistroAuditoria, 'id' | 'criado_em'>> & Pick<RegistroAuditoria, 'acao'>
+        Update: Record<string, never>
+        Relationships: []
+      }
     }
     Views: Record<string, never>
-    Functions: Record<string, never>
+    Functions: {
+      is_dev: { Args: Record<string, never>; Returns: boolean }
+      admin_listar_contas: { Args: Record<string, never>; Returns: ContaAdmin[] }
+      admin_metricas: { Args: Record<string, never>; Returns: MetricasAdmin }
+    }
     Enums: Record<string, never>
     CompositeTypes: Record<string, never>
   }

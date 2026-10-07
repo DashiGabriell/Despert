@@ -9,12 +9,15 @@ const TOLERANCIA_RELOGIO_MS = 30 * 1000
 
 export type PendenciaBusca = 'webhook' | 'monitoramento' | null
 
-/** O que falta configurar antes de o botão poder disparar o robô. */
+/**
+ * O que falta antes de o botão poder disparar o robô. A URL do webhook é da configuração do
+ * sistema (só o dev define); o monitoramento ativo é do advogado.
+ */
 export function pendenciaBusca(
-  config: { n8n_webhook_url: string } | null | undefined,
+  webhookUrl: string | null | undefined,
   monitoramentos: readonly { ativo: boolean }[],
 ): PendenciaBusca {
-  if (!config?.n8n_webhook_url.trim()) return 'webhook'
+  if (!webhookUrl?.trim()) return 'webhook'
   if (!monitoramentos.some((m) => m.ativo)) return 'monitoramento'
   return null
 }

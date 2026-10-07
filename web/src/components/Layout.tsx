@@ -1,9 +1,9 @@
-import type { Session } from '@supabase/supabase-js'
 import { useCallback, useMemo, useState } from 'react'
-import { Navigate, NavLink, Outlet, useLocation } from 'react-router-dom'
+import { Navigate, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import {
   useAtualizarPrazo,
   useConfiguracao,
+  useConfiguracaoSistema,
   useCriarPrazo,
   useExcluirPrazo,
   useExecucoes,
@@ -13,10 +13,11 @@ import {
   useTempoReal,
 } from '../data/queries'
 import { useHoje } from '../data/relogio'
+import { rotaDev, type Atuacao } from '../domain/acesso'
 import { formatarDataHora } from '../domain/datas'
 import type { DataISO, OpcoesDias } from '../domain/dias'
 import { contarIndicadores } from '../domain/indicadores'
-import { useAuth } from '../lib/auth-context'
+import { useAuth, useEmailEfetivo, useUserId } from '../lib/auth-context'
 import type { Prazo } from '../lib/database.types'
 import type { ContextoLayout } from '../lib/layout-context'
 import { ausenciaConfiguracao } from '../lib/supabase'
@@ -76,7 +77,7 @@ const ITENS = [
 type ModalAberto = { tipo: 'prazo'; id: string } | { tipo: 'novo'; data?: DataISO } | null
 
 export default function Layout() {
-  const { sessao } = useAuth()
+  const { sessao, papel, atuacao } = useAuth()
   if (sessao === undefined) {
     return (
       <main className="grid min-h-dvh place-items-center text-sm text-muted">
@@ -85,12 +86,38 @@ export default function Layout() {
     )
   }
   if (!sessao) return <Navigate to="/login" replace />
-  return <AreaLogada sessao={sessao} />
+  // O dev não é advogado: só usa estas telas quando está atuando como um.
+  if (papel === 'dev' && !atuacao) return <Navigate to={rotaDev()} replace />
+  return <AreaLogada />
 }
 
-function AreaLogada({ sessao }: { sessao: Session }) {
-  const userId = sessao.user.id
-  const { sair } = useAuth()
+function FaixaAtuacao({ atuacao }: { atuacao: Atuacao }) {
+  const { encerrarAtuacao } = useAuth()
+  const navigate = useNavigate()
+  return (
+    <div role="status" className={`${alertaAviso} mb-5 flex flex-wrap items-center justify-between gap-3`}>
+      <span>
+        <strong>Modo dev:</strong> você está atuando como <strong>{atuacao.email}</strong>. Tudo o que fizer
+        aqui é gravado na conta dele e registrado na auditoria.
+      </span>
+      <button
+        type="button"
+        className={botaoPequeno}
+        onClick={() => {
+          encerrarAtuacao()
+          navigate(rotaDev('usuarios'))
+        }}
+      >
+        Voltar ao painel dev
+      </button>
+    </div>
+  )
+}
+
+function AreaLogada() {
+  const userId = useUserId()
+  const email = useEmailEfetivo() ?? ''
+  const { sair, atuacao } = useAuth()
   const { pathname } = useLocation()
   const avisar = useToast()
   const hoje = useHoje()
@@ -98,7 +125,8 @@ function AreaLogada({ sessao }: { sessao: Session }) {
 
   const prazos = usePrazos(userId)
   const execucoes = useExecucoes(userId)
-  const config = useConfiguracao(userId, sessao.user.email)
+  const config = useConfiguracao(userId, email)
+  const sistema = useConfiguracaoSistema()
   const monitoramentos = useMonitoramentos(userId)
   const feriados = useFeriados(userId)
   const atualizar = useAtualizarPrazo(userId)
@@ -137,14 +165,12 @@ function AreaLogada({ sessao }: { sessao: Session }) {
   const prazoAberto =
     modal?.tipo === 'prazo' ? (prazos.data ?? []).find((p) => p.id === modal.id) : undefined
 
-  const email = sessao.user.email ?? ''
-
   return (
     <div className="grid min-h-dvh grid-cols-1 md:grid-cols-[auto_minmax(0,1fr)]">
       <aside className="ds-sidebar" data-recolhida={recolhida}>
         <div className="ds-sb-cabeca flex items-center gap-2.5">
-          <span className="ds-marca">D</span>
-          <span className="ds-sb-texto leading-tight">
+          <img src="/logo-despert-256.png" alt="Despert" className="size-11 shrink-0 object-contain" />
+          <span className="ds-sb-texto leading-tight" aria-hidden>
             <span className="block font-display text-2xl font-bold text-navy">Despert</span>
             <span className="block text-[11px] tracking-wider text-muted uppercase">DJEN · CNJ</span>
           </span>
@@ -196,6 +222,7 @@ function AreaLogada({ sessao }: { sessao: Session }) {
 
       <main className="min-w-0 px-4 py-5 md:px-8 md:py-8">
         {ausenciaConfiguracao && <div className={`${alertaAviso} mb-5`}>{ausenciaConfiguracao}</div>}
+        {atuacao && <FaixaAtuacao atuacao={atuacao} />}
 
         <header className="mb-7 flex flex-wrap items-end justify-between gap-3">
           <div>
@@ -224,7 +251,12 @@ function AreaLogada({ sessao }: { sessao: Session }) {
               </svg>
               Prazo manual
             </button>
-            <BuscaAgora userId={userId} config={config.data} monitoramentos={monitoramentos.data ?? []} />
+            <BuscaAgora
+              userId={userId}
+              config={config.data}
+              webhookUrl={sistema.data?.n8n_webhook_url}
+              monitoramentos={monitoramentos.data ?? []}
+            />
           </div>
         </header>
 

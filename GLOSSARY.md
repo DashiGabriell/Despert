@@ -84,5 +84,21 @@ _Avoid_: Google Agenda, calendário do advogado, evento
 Quem usa a aplicação: uma conta com e-mail e senha, dona exclusiva dos seus monitoramentos, prazos, feriados e configurações.
 _Avoid_: usuário, cliente, tenant
 
+**Dev**:
+A conta que administra a aplicação inteira pelo painel `/dashitecnology`: contas, dados de todos os advogados, execuções, integração com o n8n e auditoria. Não é advogado e não tem prazos próprios.
+_Avoid_: root, admin, superusuário
+
+**Entrar como advogado**:
+O dev usando as telas de um advogado, com os dados dele, para conferir ou corrigir algo. Vale só na aba aberta e cada alteração vai para a auditoria.
+_Avoid_: impersonar, logar como, personificar
+
+**Configuração do sistema**:
+O que vale para todos os advogados ao mesmo tempo — hoje, a URL do webhook do n8n. Só o dev vê e altera.
+_Avoid_: configuração global, settings
+
+**Auditoria**:
+O registro de tudo o que um dev fez em contas, dados de advogados e na configuração do sistema: quem, quando, o quê e em qual conta.
+_Avoid_: log, histórico (histórico é das execuções)
+
 **Janela de alerta do resumo**:
 _Ver_: Janela de alerta

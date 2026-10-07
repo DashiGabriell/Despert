@@ -7,8 +7,11 @@ import App from './App'
 import AuthProvider from './components/AuthProvider'
 import ToastProvider from './components/ToastProvider'
 
+type SessaoTeste = { user: { id: string; email: string; app_metadata?: Record<string, unknown> } }
+
 const auth = vi.hoisted(() => ({
-  session: null as null | { user: { id: string; email: string } },
+  session: null as null | SessaoTeste,
+  devNoBanco: undefined as boolean | undefined,
   signInWithPassword: vi.fn(),
   signUp: vi.fn(),
   signOut: vi.fn(),
@@ -18,6 +21,7 @@ vi.mock('./lib/supabase', () => ({
   supabaseConfigurado: true,
   ausenciaConfiguracao: null,
   supabase: {
+    rpc: async () => ({ data: auth.devNoBanco ?? auth.session?.user.app_metadata?.app_role === 'dev', error: null }),
     auth: {
       getSession: async () => ({ data: { session: auth.session } }),
       onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
@@ -40,7 +44,33 @@ vi.mock('./data/queries', () => ({
   useCriarPrazo: () => ({ mutateAsync: vi.fn() }),
   useSalvarConfiguracao: () => ({ mutate: vi.fn() }),
   useTempoReal: () => {},
+  useCriarFeriado: () => ({ mutate: vi.fn() }),
+  useRemoverFeriado: () => ({ mutate: vi.fn() }),
+  useConfiguracaoSistema: () => ({
+    data: { id: 1, n8n_webhook_url: '', updated_at: '2026-10-01T10:00:00Z', updated_by: null },
+    isPending: false,
+    isError: false,
+    isSuccess: true,
+  }),
 }))
+
+const mutacao = { mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false }
+vi.mock('./data/admin', () => ({
+  useContasAdmin: () => vazio,
+  useExecucoesGlobais: () => vazio,
+  useAuditoria: () => vazio,
+  useMetricasAdmin: () => ({ data: undefined, isPending: true, isError: false }),
+  useConfiguracaoDaConta: () => ({ data: null, isPending: false, isError: false }),
+  useAcaoAdmin: () => mutacao,
+  useGerarTokenAdvogado: () => mutacao,
+  useDispararBusca: () => mutacao,
+  useSalvarWebhookSistema: () => mutacao,
+  useRegistrarAuditoria: () => mutacao,
+  chamarWebhook: vi.fn(),
+}))
+
+const DEV: SessaoTeste = { user: { id: 'dev-1', email: 'root@exemplo.com', app_metadata: { app_role: 'dev' } } }
+const ADVOGADA: SessaoTeste = { user: { id: 'advogada-1', email: 'ana@exemplo.com' } }
 
 function renderizar(rota = '/prazos') {
   return render(
@@ -59,6 +89,7 @@ function renderizar(rota = '/prazos') {
 describe('acesso à aplicação', () => {
   beforeEach(() => {
     auth.session = null
+    sessionStorage.clear()
     auth.signInWithPassword.mockReset()
     auth.signUp.mockReset()
     auth.signOut.mockReset()
@@ -105,5 +136,86 @@ describe('acesso à aplicação', () => {
     auth.session = { user: { id: 'advogada-1', email: 'ana@exemplo.com' } }
     renderizar('/nao-existe')
     expect(await screen.findByRole('heading', { name: 'Prazos' })).toBeInTheDocument()
+  })
+})
+
+describe('acesso dev', () => {
+  beforeEach(() => {
+    auth.session = null
+    auth.devNoBanco = undefined
+    sessionStorage.clear()
+  })
+
+  it('conta promovida com sessão antiga (sem app_role) já abre o painel', async () => {
+    auth.session = { user: { id: 'dev-1', email: 'root@exemplo.com', app_metadata: {} } }
+    auth.devNoBanco = true
+    renderizar('/prazos')
+    expect(await screen.findByRole('heading', { name: 'Visão geral' })).toBeInTheDocument()
+  })
+
+  it('dev rebaixado no banco perde o painel mesmo com sessão antiga de dev', async () => {
+    auth.session = DEV
+    auth.devNoBanco = false
+    renderizar('/dashitecnology/usuarios')
+    expect(await screen.findByRole('heading', { name: 'Prazos' })).toBeInTheDocument()
+  })
+
+  it('dev cai no painel e vê as ferramentas, inclusive o n8n', async () => {
+    auth.session = DEV
+    renderizar('/dashitecnology')
+    expect(await screen.findByRole('heading', { name: 'Visão geral' })).toBeInTheDocument()
+    for (const modo of ['Visão geral', 'Usuários', 'Dados', 'Execuções', 'n8n', 'Auditoria']) {
+      expect(screen.getByRole('link', { name: modo })).toBeInTheDocument()
+    }
+    expect(screen.getByText(/O robô não está conectado/)).toBeInTheDocument()
+  })
+
+  it('dev sem atuação em rota de advogado volta ao painel', async () => {
+    auth.session = DEV
+    renderizar('/prazos')
+    expect(await screen.findByRole('heading', { name: 'Visão geral' })).toBeInTheDocument()
+  })
+
+  it('modo inexistente do painel leva à visão geral', async () => {
+    auth.session = DEV
+    renderizar('/dashitecnology/nao-existe')
+    expect(await screen.findByRole('heading', { name: 'Visão geral' })).toBeInTheDocument()
+  })
+
+  it('página do n8n é exclusiva do dev', async () => {
+    auth.session = DEV
+    renderizar('/dashitecnology/n8n')
+    expect(await screen.findByLabelText('URL do webhook')).toBeInTheDocument()
+  })
+
+  it('advogado que tenta abrir o painel dev cai nos prazos', async () => {
+    auth.session = ADVOGADA
+    renderizar('/dashitecnology/usuarios')
+    expect(await screen.findByRole('heading', { name: 'Prazos' })).toBeInTheDocument()
+    expect(screen.queryByText('Usuários')).not.toBeInTheDocument()
+  })
+
+  it('advogado não vê o campo de URL do n8n nas configurações', async () => {
+    auth.session = ADVOGADA
+    renderizar('/configuracoes')
+    expect(await screen.findByRole('heading', { name: 'Configurações' })).toBeInTheDocument()
+    expect(screen.queryByLabelText(/URL do webhook/)).not.toBeInTheDocument()
+  })
+
+  it('dev atuando como advogado usa as telas dele com a faixa de aviso', async () => {
+    auth.session = DEV
+    sessionStorage.setItem('despert:atuacao', JSON.stringify({ userId: 'advogada-1', email: 'ana@exemplo.com' }))
+    renderizar('/prazos')
+    expect(await screen.findByRole('heading', { name: 'Prazos' })).toBeInTheDocument()
+    expect(screen.getByText(/você está atuando como/)).toHaveTextContent('ana@exemplo.com')
+    expect(screen.getByRole('button', { name: 'Voltar ao painel dev' })).toBeInTheDocument()
+  })
+
+  it('atuação salva é ignorada para quem não é dev', async () => {
+    auth.session = ADVOGADA
+    sessionStorage.setItem('despert:atuacao', JSON.stringify({ userId: 'outra', email: 'outra@exemplo.com' }))
+    renderizar('/prazos')
+    expect(await screen.findByRole('heading', { name: 'Prazos' })).toBeInTheDocument()
+    expect(screen.queryByText(/você está atuando como/)).not.toBeInTheDocument()
   })
 })

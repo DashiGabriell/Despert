@@ -22,19 +22,15 @@ import {
 } from '../data/queries'
 import { formatarData } from '../domain/datas'
 import { validarConfiguracao, validarFeriado, type FormConfiguracao } from '../domain/validacao'
-import { useAuth, useUserId } from '../lib/auth-context'
+import { useEmailEfetivo, useUserId } from '../lib/auth-context'
 import type { Configuracao } from '../lib/database.types'
 import { mensagemDeErro, useToast } from '../lib/toast-context'
-
-function novoToken(): string {
-  const bytes = crypto.getRandomValues(new Uint8Array(16))
-  return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('')
-}
+import { novoToken } from '../domain/token'
 
 export default function Configuracoes() {
   const userId = useUserId()
-  const { sessao } = useAuth()
-  const config = useConfiguracao(userId, sessao?.user.email)
+  const email = useEmailEfetivo()
+  const config = useConfiguracao(userId, email)
 
   return (
     <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-2">
@@ -69,7 +65,6 @@ function FormularioConfiguracao({ userId, config }: { userId: string; config: Co
     prazo_padrao_dias: String(config.prazo_padrao_dias),
     dias_alerta: String(config.dias_alerta),
     considerar_recesso: config.considerar_recesso,
-    n8n_webhook_url: config.n8n_webhook_url,
     webhook_token: config.webhook_token,
   })
   const [erro, setErro] = useState<string | null>(null)
@@ -166,20 +161,7 @@ function FormularioConfiguracao({ userId, config }: { userId: string; config: Co
         Considerar recesso forense (20/12 a 20/01, CPC art. 220)
       </label>
 
-      <div className={`${separador} pt-2`}>Integração com o n8n</div>
-      <div>
-        <label className={rotulo} htmlFor="c-webhook">
-          URL do webhook (Production URL do nó "Disparo pelo Site")
-        </label>
-        <input
-          id="c-webhook"
-          type="url"
-          placeholder="https://seu-n8n.com/webhook/monitor-prazos"
-          className={campo}
-          value={form.n8n_webhook_url}
-          onChange={(e) => alterar('n8n_webhook_url', e.target.value)}
-        />
-      </div>
+      <div className={`${separador} pt-2`}>Botão Buscar agora</div>
       <div>
         <label className={rotulo} htmlFor="c-token">
           Token de segurança
@@ -201,7 +183,8 @@ function FormularioConfiguracao({ userId, config }: { userId: string; config: Co
           </div>
         ) : (
           <p className={dica}>
-            O n8n só aceita o disparo do botão Buscar agora se este token conferir com o banco.
+            O robô só aceita o disparo do botão Buscar agora se este token conferir com o banco. Gere um
+            novo se suspeitar que ele vazou.
           </p>
         )}
       </div>

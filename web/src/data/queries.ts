@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect } from 'react'
 import type {
   Configuracao,
+  ConfiguracaoSistema,
   Database,
   Execucao,
   Feriado,
@@ -12,7 +13,7 @@ import { ausenciaConfiguracao, supabase } from '../lib/supabase'
 
 type Tabelas = Database['public']['Tables']
 
-function cliente() {
+export function cliente() {
   if (!supabase) throw new Error(ausenciaConfiguracao ?? 'Supabase não configurado.')
   return supabase
 }
@@ -23,6 +24,19 @@ export const chaves = {
   feriados: (userId: string) => ['feriados', userId] as const,
   execucoes: (userId: string) => ['execucoes', userId] as const,
   configuracao: (userId: string) => ['configuracao', userId] as const,
+  configuracaoSistema: ['configuracao-sistema'] as const,
+}
+
+/** Configuração global (URL do webhook do n8n): todos leem, só o dev altera. */
+export function useConfiguracaoSistema() {
+  return useQuery({
+    queryKey: chaves.configuracaoSistema,
+    queryFn: async (): Promise<ConfiguracaoSistema | null> => {
+      const { data, error } = await cliente().from('configuracao_sistema').select('*').eq('id', 1).maybeSingle()
+      if (error) throw error
+      return data
+    },
+  })
 }
 
 // ------------------------------------------------------------------ leitura

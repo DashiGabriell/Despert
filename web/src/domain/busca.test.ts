@@ -11,12 +11,11 @@ import {
 
 describe('pendenciaBusca', () => {
   it('exige webhook antes de monitoramento ativo', () => {
-    expect(pendenciaBusca({ n8n_webhook_url: '' }, [{ ativo: true }])).toBe('webhook')
+    expect(pendenciaBusca('', [{ ativo: true }])).toBe('webhook')
+    expect(pendenciaBusca('   ', [{ ativo: true }])).toBe('webhook')
     expect(pendenciaBusca(null, [])).toBe('webhook')
-    expect(pendenciaBusca({ n8n_webhook_url: 'https://n8n/x' }, [{ ativo: false }])).toBe(
-      'monitoramento',
-    )
-    expect(pendenciaBusca({ n8n_webhook_url: 'https://n8n/x' }, [{ ativo: true }])).toBeNull()
+    expect(pendenciaBusca('https://n8n/x', [{ ativo: false }])).toBe('monitoramento')
+    expect(pendenciaBusca('https://n8n/x', [{ ativo: true }])).toBeNull()
   })
 })
 

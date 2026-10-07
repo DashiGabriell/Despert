@@ -2,6 +2,7 @@ import type { AuthError } from '@supabase/supabase-js'
 import { useState, type FormEvent } from 'react'
 import { Navigate } from 'react-router-dom'
 import { alertaAviso, alertaErro, alertaOk, botaoPrimario, campo, rotulo } from '../components/ui'
+import { rotaInicial } from '../domain/acesso'
 import { useAuth } from '../lib/auth-context'
 import { ausenciaConfiguracao, supabase } from '../lib/supabase'
 
@@ -18,7 +19,7 @@ function mensagemDeLogin(erro: AuthError): string {
 }
 
 export default function Login() {
-  const { sessao } = useAuth()
+  const { sessao, papel, atuacao } = useAuth()
   const [modo, setModo] = useState<Modo>('entrar')
   const [email, setEmail] = useState('')
   const [senha, setSenha] = useState('')
@@ -26,7 +27,7 @@ export default function Login() {
   const [erro, setErro] = useState<string | null>(null)
   const [aviso, setAviso] = useState<string | null>(null)
 
-  if (sessao) return <Navigate to="/prazos" replace />
+  if (sessao) return <Navigate to={rotaInicial(papel, atuacao !== null)} replace />
 
   async function enviar(e: FormEvent) {
     e.preventDefault()
@@ -64,15 +65,20 @@ export default function Login() {
   }
 
   return (
-    <main className="grid min-h-dvh place-items-center p-5">
+    <main className="relative isolate grid min-h-dvh place-items-center overflow-hidden p-5">
+      {/* scale-105 esconde as bordas claras que o blur cria nas extremidades da imagem */}
+      <div
+        aria-hidden
+        className="absolute inset-0 -z-10 scale-105 bg-[url(/bg-login-mobile.webp)] bg-cover bg-center blur-[3px] md:bg-[url(/bg-login-desktop.webp)]"
+      />
       <form
         onSubmit={enviar}
-        className="ds-card ds-entrar w-full max-w-sm p-8"
+        className="ds-card ds-entrar w-full max-w-sm p-8 shadow-2xl"
         aria-label={modo === 'entrar' ? 'Entrar' : 'Criar conta'}
       >
         <div className="mb-7 flex items-center gap-3">
-          <span className="ds-marca size-10 text-2xl">D</span>
-          <span>
+          <img src="/logo-despert-256.png" alt="Despert" className="size-16 shrink-0 object-contain" />
+          <span aria-hidden>
             <span className="block font-display text-3xl leading-tight font-bold text-navy">Despert</span>
             <span className="block text-[11px] tracking-wider text-muted uppercase">Monitor de prazos · DJEN</span>
           </span>

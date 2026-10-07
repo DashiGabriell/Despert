@@ -42,4 +42,21 @@ Antes de entregar: `npm run lint && npm run typecheck && npm run test` (e `npm r
 1. Supabase: aplique o schema e configure a autenticação ([guia](./supabase/README.md)).
 2. Vercel: publique o site com as duas variáveis acima.
 3. n8n: importe o workflow, configure as credenciais e ative ([guia](./n8n/README.md)).
-4. No site: crie a conta, cadastre a OAB em **Monitoramento**, cole a Production URL do webhook em **Configurações** e clique em **Buscar agora**.
+4. Supabase: publique a Edge Function `admin` e promova a conta dev ([guia](./supabase/README.md#acesso-dev)).
+5. Como dev, em `/dashitecnology/n8n`: cole a Production URL do webhook, salve e clique em **Testar conexão**.
+6. Como advogado: cadastre a OAB em **Monitoramento** e clique em **Buscar agora**.
+
+## Acesso dev (`/dashitecnology`)
+
+A conta dev controla a aplicação inteira e não é advogado: ao entrar, cai no painel `/dashitecnology/{modo}`.
+
+| Modo | Para quê |
+| --- | --- |
+| `visao-geral` | métricas de todas as contas, estado do robô e últimas falhas |
+| `usuarios` | criar contas, redefinir senha, promover/rebaixar dev, bloquear, excluir, trocar token, **entrar como** advogado |
+| `dados` | ler prazos, monitoramentos, feriados, configuração e execuções de qualquer advogado |
+| `execucoes` | todas as rodadas do robô, com filtros por status e conta |
+| `n8n` | URL do webhook (exclusiva do dev), teste de conexão e disparo de busca por advogado |
+| `auditoria` | tudo o que os devs fizeram em dados de advogados e na configuração do sistema |
+
+Decisões em [ADR-0005](./docs/adr/0005-papel-dev-no-app-metadata.md) e [ADR-0006](./docs/adr/0006-url-do-webhook-global-e-exclusiva-do-dev.md).

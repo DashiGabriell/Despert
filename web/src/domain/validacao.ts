@@ -148,7 +148,6 @@ export interface FormConfiguracao {
   prazo_padrao_dias: string
   dias_alerta: string
   considerar_recesso: boolean
-  n8n_webhook_url: string
   webhook_token: string
 }
 
@@ -158,9 +157,10 @@ export interface ConfiguracaoValida {
   prazo_padrao_dias: number
   dias_alerta: number
   considerar_recesso: boolean
-  n8n_webhook_url: string
   webhook_token: string
 }
+
+const EMAIL_VALIDO = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 function inteiroEntre(valor: string, minimo: number, maximo: number): number | null {
   const numero = Number(valor.trim())
@@ -170,17 +170,13 @@ function inteiroEntre(valor: string, minimo: number, maximo: number): number | n
 
 export function validarConfiguracao(form: FormConfiguracao): Resultado<ConfiguracaoValida> {
   const email = form.email_destino.trim()
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return falha('Informe um e-mail válido para os alertas.')
+  if (!EMAIL_VALIDO.test(email)) return falha('Informe um e-mail válido para os alertas.')
   const retroativos = inteiroEntre(form.dias_retroativos, 1, 30)
   if (retroativos === null) return falha('Dias para trás: use um número entre 1 e 30.')
   const padrao = inteiroEntre(form.prazo_padrao_dias, 1, 365)
   if (padrao === null) return falha('Prazo padrão: use um número entre 1 e 365.')
   const alerta = inteiroEntre(form.dias_alerta, 1, 60)
   if (alerta === null) return falha('Janela de alerta: use um número entre 1 e 60.')
-  const webhook = form.n8n_webhook_url.trim()
-  if (webhook && !/^https?:\/\/\S+$/i.test(webhook)) {
-    return falha('A URL do webhook deve começar com http:// ou https://.')
-  }
   if (!/^[A-Za-z0-9]{16,}$/.test(form.webhook_token)) {
     return falha('Gere um novo token de segurança.')
   }
@@ -192,8 +188,43 @@ export function validarConfiguracao(form: FormConfiguracao): Resultado<Configura
       prazo_padrao_dias: padrao,
       dias_alerta: alerta,
       considerar_recesso: form.considerar_recesso,
-      n8n_webhook_url: webhook,
       webhook_token: form.webhook_token,
     },
   }
+}
+
+// ---------------------------------------------------------------- painel dev
+
+/** URL do webhook do n8n (configuração do sistema). Vazia desliga o "Buscar agora". */
+export function validarUrlWebhook(url: string): Resultado<string> {
+  const valor = url.trim()
+  if (valor && !/^https?:\/\/\S+$/i.test(valor)) {
+    return falha('A URL do webhook deve começar com http:// ou https://.')
+  }
+  return { ok: true, valor }
+}
+
+export function validarNovaSenha(senha: string): Resultado<string> {
+  if (senha.length < 8) return falha('A senha precisa ter pelo menos 8 caracteres.')
+  return { ok: true, valor: senha }
+}
+
+export interface FormNovaConta {
+  email: string
+  senha: string
+  papel: 'dev' | 'advogado'
+}
+
+export function validarNovaConta(
+  form: FormNovaConta,
+  emailsExistentes: readonly string[],
+): Resultado<FormNovaConta> {
+  const email = form.email.trim().toLowerCase()
+  if (!EMAIL_VALIDO.test(email)) return falha('Informe um e-mail válido.')
+  if (emailsExistentes.some((e) => e.toLowerCase() === email)) {
+    return falha('Já existe uma conta com esse e-mail.')
+  }
+  const senha = validarNovaSenha(form.senha)
+  if (!senha.ok) return senha
+  return { ok: true, valor: { email, senha: form.senha, papel: form.papel } }
 }

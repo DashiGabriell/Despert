@@ -21,6 +21,28 @@ O script é idempotente: rodar de novo não quebra nada. Ele cria as tabelas **j
 - `prazos`, `execucoes` ficam na publicação de tempo real (a aplicação assina).
 - O n8n entra com a chave **service_role**, que ignora o RLS e grava com o `user_id` certo.
 
+## Acesso dev
+
+O papel fica em `auth.users.raw_app_meta_data.app_role = 'dev'` (só a `service_role` altera; o usuário não consegue se promover). O `schema.sql` já promove a conta `b09286ec-03fb-4025-a934-7dcb455e56c7` e cria:
+
+- `public.is_dev()`, que lê o papel em `auth.users` (rebaixar ou bloquear vale na hora, sem esperar o token expirar);
+- a policy `dev_acesso_total` em todas as tabelas dos advogados;
+- `configuracao_sistema` (linha única com a URL do webhook do n8n: todos leem, só o dev altera);
+- `auditoria` e o gatilho `auditar_dev()`, que registra toda escrita de um dev em dados de advogados;
+- as funções `admin_listar_contas()` e `admin_metricas()` do painel.
+
+Depois de rodar o `schema.sql`:
+
+1. Publique a Edge Function que cria contas, redefine senhas, bloqueia, exclui e troca papéis:
+   ```bash
+   supabase functions deploy admin --project-ref <seu-projeto>
+   ```
+   Sem a CLI: **Edge Functions → Deploy a new function → Via Editor**, nome `admin`, cole [`functions/admin/index.ts`](./functions/admin/index.ts). Deixe **Verify JWT** ligado. `SUPABASE_URL` e `SUPABASE_SERVICE_ROLE_KEY` já vêm nos segredos padrão da função.
+2. Recarregue o site com a conta dev: ele confere o papel no banco e abre `/dashitecnology`.
+3. Para promover outra conta depois: painel dev → **Usuários → Gerenciar → Promover a dev** (ou o mesmo `update` do fim do `schema.sql` com outro id).
+
+Se a URL do webhook estava salva por advogado (versão anterior), o `schema.sql` copia a mais recente para `configuracao_sistema` antes de remover a coluna antiga.
+
 ## Verificar o isolamento (2 contas)
 
 1. Em **Authentication → Users → Add user**, crie `advogada1@exemplo.com` e `advogada2@exemplo.com` (com e-mail confirmado).

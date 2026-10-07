@@ -17,6 +17,8 @@ import BotaoBuscarAgora from './BotaoBuscarAgora'
 interface Props {
   userId: string
   config: Configuracao | undefined
+  /** URL do webhook da configuração do sistema (definida pelo dev). */
+  webhookUrl: string | undefined
   monitoramentos: readonly Monitoramento[]
 }
 
@@ -30,7 +32,7 @@ function maisRecente(a: string | null | undefined, b: string | null): string | n
  * Dispara o robô pela Production URL do webhook (ADR-0004). A resposta do fetch não é lida:
  * o resultado chega pela tabela de execuções, que a aplicação acompanha em tempo real.
  */
-export default function BuscaAgora({ userId, config, monitoramentos }: Props) {
+export default function BuscaAgora({ userId, config, webhookUrl, monitoramentos }: Props) {
   const avisar = useToast()
   const navigate = useNavigate()
   const salvarConfig = useSalvarConfiguracao(userId)
@@ -61,17 +63,20 @@ export default function BuscaAgora({ userId, config, monitoramentos }: Props) {
     } else if (!acompanhando) {
       avisadoPara.current = disparadoEm
       avisar(
-        'O robô não registrou a execução em 3 minutos. Confira se o fluxo do n8n está ativo e se o token confere.',
+        'O robô não registrou a execução em 3 minutos. Se continuar, avise o administrador do sistema.',
         'erro',
       )
     }
   }, [disparadoEm, execucao, acompanhando, avisar])
 
   async function buscar() {
-    const pendencia = pendenciaBusca(config, monitoramentos)
-    if (pendencia === 'webhook' || !config) {
-      navigate('/configuracoes')
-      avisar('Informe a URL do webhook do n8n em Configurações e salve antes de buscar.', 'erro')
+    const pendencia = pendenciaBusca(webhookUrl, monitoramentos)
+    if (pendencia === 'webhook' || !webhookUrl) {
+      avisar('O robô ainda não foi ativado pelo administrador do sistema. Tente mais tarde.', 'erro')
+      return
+    }
+    if (!config) {
+      avisar('Suas configurações ainda estão carregando. Tente de novo em instantes.', 'erro')
       return
     }
     if (pendencia === 'monitoramento') {
@@ -94,12 +99,12 @@ export default function BuscaAgora({ userId, config, monitoramentos }: Props) {
       avisar(mensagem, 'erro')
     }
 
-    const url = urlDisparo(config.n8n_webhook_url, config.webhook_token)
+    const url = urlDisparo(webhookUrl, config.webhook_token)
     try {
       const resposta = await fetch(url, { method: 'GET' })
       if (!resposta.ok) {
         desfazer(
-          `O n8n recusou o disparo (HTTP ${resposta.status}). Confira se o fluxo está ativo e a URL é a Production URL.`,
+          `O robô recusou o disparo (HTTP ${resposta.status}). Avise o administrador do sistema.`,
         )
         return
       }
@@ -108,7 +113,7 @@ export default function BuscaAgora({ userId, config, monitoramentos }: Props) {
       try {
         await fetch(url, { method: 'GET', mode: 'no-cors' })
       } catch {
-        desfazer('Não foi possível acessar o n8n. Confira a URL do webhook em Configurações.')
+        desfazer('Não foi possível acessar o robô. Avise o administrador do sistema.')
         return
       }
     }
