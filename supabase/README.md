@@ -23,10 +23,10 @@ O script é idempotente: rodar de novo não quebra nada. Ele cria as tabelas **j
 
 ## O que nasce junto
 
-- Toda conta nova recebe uma linha em `configuracoes` com o e-mail já como destino do resumo diário e um token de webhook gerado.
-- `webhook_token` é único: o n8n identifica o advogado do "Buscar agora" por ele.
+- Toda conta nova recebe uma linha em `configuracoes` com o e-mail já como destino do resumo diário.
+- Toda organização nova recebe `configuracoes_organizacao` com um token de webhook gerado. O token é único: o n8n identifica por ele a organização do "Buscar agora".
 - `prazos`, `execucoes` ficam na publicação de tempo real (a aplicação assina).
-- O n8n entra com a chave **service_role**, que ignora o RLS e grava com o `user_id` certo.
+- O n8n entra com a chave **service_role**, que ignora o RLS, e só chama as funções `robo_*`.
 
 ## Acesso dev
 
@@ -66,13 +66,25 @@ Veja [ADR-0008](../docs/adr/0008-planos-limites-e-cobranca-manual.md). Só o dev
 ## Equipe, papéis e convites
 
 - As policies de `prazos`, `monitoramentos`, `feriados_organizacao` e `configuracoes_organizacao` usam `public.tem_papel(org, papeis)` conforme a matriz da [#18](https://github.com/DashiGabriell/Despert/issues/18): todos leem; Assistente cria, edita, cumpre e troca o responsável; só Administrador e Advogado excluem prazo e mexem em monitoramentos; feriados e configurações da organização são do Administrador. Leitura só lê.
-- `configuracoes_organizacao` (dias retroativos, prazo padrão, recesso, token do Buscar agora) é copiada para a `configuracoes` de cada membro por `sincronizar_configuracao`, porque o robô ainda lê por advogado (até a fase do robô). O gatilho `proteger_configuracao_pessoal` impede alterar essas colunas pela configuração pessoal. `feriados` virou uma visão sobre `feriados_organizacao`.
+- `configuracoes_organizacao` guarda dias retroativos, prazo padrão, recesso e token do Buscar agora; `configuracoes` (pessoal) só e-mail, janela de alerta e escopo do resumo.
 - Cada OAB pertence a um Administrador ou Advogado (`reforcar_papeis_monitoramentos`); no plano "por advogado", no máximo uma ativa por pessoa. Advogados só alteram a própria OAB.
 - O responsável de um prazo precisa ser da equipe (`validar_responsavel`).
-- Convites: `convidar`, `reenviar_convite` (renova 7 dias), `cancelar_convite`, `ver_convite` e `aceitar_convite`. Membros mais convites pendentes contam no limite de usuários (`vagas_ocupadas`). O convite vale só para o e-mail convidado, confirmado. O link é copiado ou aberto no cliente de e-mail do Administrador (não há envio pelo servidor).
+- Convites: `convidar`, `reenviar_convite` (renova 7 dias e põe o e-mail de novo na fila), `cancelar_convite`, `ver_convite` e `aceitar_convite`. Membros mais convites pendentes contam no limite de usuários (`vagas_ocupadas`). O convite vale só para o e-mail convidado, confirmado. O e-mail sai pelo n8n (fluxo de convites); o Administrador também pode copiar o link.
 - `alterar_papel` e `remover_membro` são do Administrador; sempre sobra um Administrador (`proteger_administrador`). Ao sair ou deixar de ser Advogado, a OAB da pessoa é pausada; na saída, os prazos em aberto e os processos avulsos dela passam para um Administrador (`ao_mudar_membro`).
 
 [`tests/permissoes_papeis.sql`](./tests/permissoes_papeis.sql) monta uma equipe temporária com os quatro papéis e confere cada linha da matriz, os convites acima do limite e a saída de um membro; rode-o numa transação desfeita, como os outros.
+
+## Robô por organização
+
+O n8n (chave `service_role`) só chama funções do banco; as regras ficam aqui — veja [`n8n/README.md`](../n8n/README.md).
+
+- `robo_lote(origem, turno, token)`: organizações a buscar, com configurações, feriados e monitoramentos ativos. Turno `'12'` só traz quem tem 2 buscas automáticas no plano; organização suspensa nunca entra. Com `origem = 'site'`, só a dona do token e só se houver um registro em `buscas_agora` dos últimos 5 minutos ainda não processado (`processada_em`): cada registro libera uma busca.
+- `robo_gravar_prazos(org, publicacoes)`: um prazo por publicação na organização (índice único `organizacao_id, djen_id`). Responsável: dono da primeira OAB da casa listada na publicação, com as demais em `tambem_intimados`; sem OAB, quem cadastrou o processo avulso; sem nenhum, o Administrador.
+- `robo_concluir(...)`: registra a execução da organização e devolve o resumo de cada membro (janela de alerta e escopo "meus"/"todos" de cada um), mais a etapa e as datas da carência para o aviso ao Administrador.
+- `robo_convites_pendentes()` e `robo_marcar_convite_enviado(convite)`: fila dos e-mails de convite (`convites.enviado_em`).
+- Saíram na fase 4: a cópia das configurações da organização em cada membro, a visão `feriados` e a trava de monitoramentos ativos em uma organização só por pessoa.
+
+[`tests/robo_organizacao.sql`](./tests/robo_organizacao.sql) monta um Escritório e um Solo descartáveis e confere prazo único e responsável, turnos, etapas, Buscar agora, resumo por membro e a fila de convites; rode-o numa transação desfeita.
 
 ## Verificar o isolamento (teste automatizado)
 

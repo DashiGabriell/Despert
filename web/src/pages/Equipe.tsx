@@ -181,8 +181,9 @@ function TelaEquipe() {
         {criado && (
           <div className={`${alertaOk} mt-4 space-y-2`}>
             <p>
-              Convite criado para <strong>{criado.email}</strong>. Envie o link para a pessoa: ela entra (ou cria a conta
-              na hora) com esse e-mail. Vale por 7 dias.
+              Convite criado para <strong>{criado.email}</strong>. O e-mail com o link sai em alguns minutos; se
+              preferir, envie o link você mesmo. A pessoa entra (ou cria a conta na hora) com esse e-mail. Vale por 7
+              dias.
             </p>
             <div className="flex flex-wrap gap-2">
               <AcoesDoLink convite={criado} organizacao={organizacao.nome} />
@@ -331,6 +332,11 @@ function TelaEquipe() {
                       <td>{ROTULO_PAPEL[c.papel]}</td>
                       <td className="whitespace-nowrap">
                         {expirado ? 'Expirado' : `Vale até ${formatarDataHora(c.expira_em)}`}
+                        {!expirado && (
+                          <span className="block text-sm text-muted">
+                            {c.enviado_em ? `E-mail enviado em ${formatarDataHora(c.enviado_em)}` : 'E-mail na fila'}
+                          </span>
+                        )}
                       </td>
                       <td>
                         <div className="flex flex-wrap justify-end gap-1.5">
@@ -341,7 +347,8 @@ function TelaEquipe() {
                             disabled={!escrita || reenviar.isPending}
                             onClick={() =>
                               reenviar.mutate(c.id, {
-                                onSuccess: () => avisar('Convite renovado por mais 7 dias. Envie o link de novo.', 'ok'),
+                                onSuccess: () =>
+                                  avisar('Convite renovado por mais 7 dias. O e-mail sai de novo em alguns minutos.', 'ok'),
                                 onError: (falha) => avisar(mensagemDeErro(falha), 'erro'),
                               })
                             }

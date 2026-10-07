@@ -153,6 +153,11 @@ describe('ModalPrazo por papel', () => {
     expect(onSalvar.mock.calls[0][0]).not.toHaveProperty('responsavel_id')
   })
 
+  it('mostra quem mais a publicação intimou', () => {
+    abrir(fabricarPrazo({ tambem_intimados: ['bruno-1', 'saiu-1'] }), { membros: EQUIPE, eu: 'advogada-1' })
+    expect(screen.getByText(/^Também intimados:/)).toHaveTextContent('Também intimados: bruno, ex-membro da equipe')
+  })
+
   it('no Solo não mostra o responsável', () => {
     abrir()
     expect(screen.queryByLabelText('Responsável')).not.toBeInTheDocument()

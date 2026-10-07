@@ -241,6 +241,17 @@ export default function ModalPrazo({
               </option>
             ))}
           </select>
+          {prazo.tambem_intimados.length > 0 && (
+            <p className="mt-1.5 text-sm text-muted">
+              Também intimados:{' '}
+              {prazo.tambem_intimados
+                .map((id) => {
+                  const membro = membros.find((m) => m.user_id === id)
+                  return membro ? nomeDoMembro(membro, eu) : 'ex-membro da equipe'
+                })
+                .join(', ')}
+            </p>
+          )}
         </div>
       )}
       <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-4">

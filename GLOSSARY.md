@@ -29,7 +29,7 @@ O intervalo concedido para uma manifestação processual, expresso em dias, com 
 _Avoid_: tarefa, compromisso, deadline
 
 **Responsável**:
-O membro que responde por um prazo: o dono da OAB intimada ou quem cadastrou o processo avulso. Pode ser trocado; quando a publicação intima mais de um membro, os demais são "também intimados".
+O membro que responde por um prazo: o dono da OAB intimada ou quem cadastrou o processo avulso; sem nenhum dos dois, o Administrador. Pode ser trocado. Quando a publicação intima mais de uma OAB da organização, gera um prazo só: o responsável é o dono da primeira OAB listada na publicação e os demais são "também intimados".
 _Avoid_: dono do prazo, atribuído
 
 **Origem do prazo**:
@@ -71,7 +71,7 @@ Disparo manual de uma execução pelo botão da aplicação, com intervalo míni
 _Avoid_: refresh, sincronizar
 
 **Resumo diário**:
-E-mail enviado a cada membro depois de toda execução, listando os vencimentos dentro da janela de alerta dele — só os prazos em que é responsável ou todos da organização, conforme a preferência. Sai sempre, mesmo quando não há nada na janela.
+E-mail enviado a cada membro depois da execução das 07:00 (e da manual), listando os vencimentos dentro da janela de alerta dele e as publicações novas — só os prazos em que é responsável ou também intimado, ou todos da organização, conforme a preferência. Sai sempre, mesmo quando não há nada na janela. Na execução das 12:00 só recebe quem tem publicação nova; no Busca agora, só quem clicou. Para o Administrador, avisa também quando o pagamento venceu (carência).
 _Avoid_: newsletter, alerta diário
 
 **Janela de alerta**:

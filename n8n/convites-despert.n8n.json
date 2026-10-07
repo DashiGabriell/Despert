@@ -1,0 +1,267 @@
+{
+  "name": "Despert - E-mails de convite",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Despert - E-mails de convite\n\nA cada 5 minutos manda o e-mail dos convites criados (ou reenviados) na tela Equipe e marca como enviado.\n\n1. Credencial **Supabase** (service_role) nos nós HTTP e **Gmail** em \"Enviar Convite\".\n2. No nó **Configurar**, troque `URL_SITE` pelo endereço do site (enquanto não trocar, nada é enviado).\n3. Ative o fluxo.",
+        "height": 300,
+        "width": 560,
+        "color": 4
+      },
+      "id": "0c1a6961-c6f1-4309-a78e-341750df2d63",
+      "name": "Notas",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -320,
+        -420
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "8291ba8e-d547-406c-9cd9-08cd10e94da1",
+      "name": "Executar manualmente",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 5
+            }
+          ]
+        }
+      },
+      "id": "d5ef9be9-1492-49a3-9a78-9aaf52093280",
+      "name": "A cada 5 minutos",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Endereços desta instalação (detalhes em n8n/README.md).\nconst SUPABASE_URL = 'https://pcjyqwiuqphuiqgfvxqj.supabase.co';\n// Endereço público do site, de onde sai o link do convite:\nconst URL_SITE = 'https://troque-pelo-endereco-do-site.com';\n\nif (URL_SITE.includes('troque-pelo-endereco')) return [];\nreturn [{ json: { supabase_url: SUPABASE_URL.replace(/\\/+$/, ''), site: URL_SITE.replace(/\\/+$/, '') } }];"
+      },
+      "id": "dc71f426-8a24-4380-9098-843d3834dab8",
+      "name": "Configurar",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Configurar').first().json.supabase_url }}/rest/v1/rpc/robo_convites_pendentes",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({}) }}",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "id": "c765f258-5e67-4da0-950b-78b6f5f91930",
+      "name": "Ler Convites",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        480,
+        100
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    },
+    {
+      "parameters": {
+        "jsCode": "const { site } = $('Configurar').first().json;\nconst PAPEL = { administrador: 'Administrador', advogado: 'Advogado', assistente: 'Assistente', leitura: 'Leitura' };\nconst esc = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\"/g, '&quot;');\nconst saida = [];\nfor (const item of $input.all()) {\n  const lista = Array.isArray(item.json) ? item.json : [item.json];\n  for (const c of lista) {\n    if (!c || !c.id || !c.email || !c.token) continue;\n    const link = site + '/convite/' + c.token;\n    const validade = DateTime.fromISO(String(c.expira_em)).setZone('America/Sao_Paulo').toFormat('dd/MM/yyyy');\n    const html = '<div style=\"font-family:Arial,sans-serif;font-size:14px;color:#222\">'\n      + '<h2>Convite para o Despert</h2>'\n      + '<p>' + (c.convidado_por ? esc(c.convidado_por) + ' convidou você' : 'Você foi convidado(a)')\n      + ' para a equipe <b>' + esc(c.organizacao) + '</b> no Despert, como <b>' + esc(PAPEL[c.papel] || c.papel) + '</b>.</p>'\n      + '<p><a href=\"' + esc(link) + '\" style=\"display:inline-block;padding:10px 16px;background:#0b2545;color:#fff;text-decoration:none;border-radius:6px\">Aceitar o convite</a></p>'\n      + '<p>Se ainda não tem conta, crie uma com este e-mail (' + esc(c.email) + ') pelo próprio link. O convite vale até ' + esc(validade) + '.</p>'\n      + '<p style=\"color:#777;font-size:12px\">Não esperava este convite? Pode ignorar este e-mail.</p></div>';\n    saida.push({ json: { id: c.id, email: c.email, assunto: 'Convite para a equipe ' + c.organizacao + ' no Despert', html } });\n  }\n}\nreturn saida;"
+      },
+      "id": "c3058685-4ff2-4626-a982-83e0e2998d2d",
+      "name": "Montar Convites",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        720,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.email }}",
+        "subject": "={{ $json.assunto }}",
+        "emailType": "html",
+        "message": "={{ $json.html }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "id": "c896d49a-1c11-45d5-bb20-de88ae103374",
+      "name": "Enviar Convite",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        960,
+        100
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Só marca como enviado o que o Gmail aceitou; o resto tenta de novo na próxima rodada.\nconst convites = $('Montar Convites').all();\nreturn $input.all()\n  .map((item, i) => (item.json.error || !convites[i] ? null : { json: { convite: convites[i].json.id } }))\n  .filter(Boolean);"
+      },
+      "id": "cf6f0ad5-8263-4145-81c3-c2a53598a31c",
+      "name": "Enviados",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Configurar').first().json.supabase_url }}/rest/v1/rpc/robo_marcar_convite_enviado",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ convite: $json.convite }) }}",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "id": "46238321-46dc-47c3-8857-58b2a28382d3",
+      "name": "Marcar Enviado",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1440,
+        100
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000,
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "connections": {
+    "Executar manualmente": {
+      "main": [
+        [
+          {
+            "node": "Configurar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "A cada 5 minutos": {
+      "main": [
+        [
+          {
+            "node": "Configurar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Configurar": {
+      "main": [
+        [
+          {
+            "node": "Ler Convites",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ler Convites": {
+      "main": [
+        [
+          {
+            "node": "Montar Convites",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Montar Convites": {
+      "main": [
+        [
+          {
+            "node": "Enviar Convite",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar Convite": {
+      "main": [
+        [
+          {
+            "node": "Enviados",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviados": {
+      "main": [
+        [
+          {
+            "node": "Marcar Enviado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/Sao_Paulo",
+    "saveManualExecutions": true,
+    "saveDataSuccessExecution": "none"
+  }
+}

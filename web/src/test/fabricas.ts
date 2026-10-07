@@ -9,6 +9,7 @@ export function fabricarPrazo(parcial: Partial<Prazo> = {}): Prazo {
     organizacao_id: 'org-1',
     user_id: 'advogada-1',
     responsavel_id: 'advogada-1',
+    tambem_intimados: [],
     djen_id: `djen-${sequencia}`,
     processo: '0801234-56.2026.8.26.0100',
     tribunal: 'TJSP',

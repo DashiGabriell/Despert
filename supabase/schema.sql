@@ -4,22 +4,14 @@
 -- Aplique este arquivo inteiro no SQL Editor do Supabase (idempotente: pode rodar de novo).
 
 -- ============================ configurações ============================
--- Uma linha por advogado (não existe configuração global).
+-- Uma linha por pessoa, só com o que é pessoal: o que vale para a organização inteira fica
+-- em public.configuracoes_organizacao.
 create table if not exists public.configuracoes (
   user_id            uuid primary key references auth.users (id) on delete cascade,
   email_destino      text    not null default '',
-  dias_retroativos   int     not null default 5  check (dias_retroativos between 1 and 30),
-  prazo_padrao_dias  int     not null default 15 check (prazo_padrao_dias between 1 and 365),
   dias_alerta        int     not null default 7  check (dias_alerta between 1 and 60),
-  considerar_recesso boolean not null default true,
-  webhook_token      text    not null default replace(gen_random_uuid()::text, '-', ''),
-  ultima_busca_em    timestamptz,
   updated_at         timestamptz not null default now()
 );
--- Legado: o "Buscar agora" passou a ser contado por organização em public.buscas_agora.
-alter table public.configuracoes add column if not exists ultima_busca_em timestamptz;
--- O token do Buscar agora é da organização (configuracoes_organizacao), copiado para cada
--- membro: o robô aceita o disparo de qualquer um e busca para todos os advogados dela.
 drop index if exists public.configuracoes_webhook_token_idx;
 -- Resumo diário só com os prazos da pessoa ou com todos; nulo = padrão do papel.
 alter table public.configuracoes add column if not exists resumo_escopo text
@@ -71,8 +63,7 @@ create table if not exists public.prazos (
   observacoes           text,
   cumprido_em           timestamptz,
   created_at            timestamptz not null default now(),
-  updated_at            timestamptz not null default now(),
-  unique (user_id, djen_id)
+  updated_at            timestamptz not null default now()
 );
 create index if not exists prazos_user_vencimento_idx on public.prazos (user_id, vencimento);
 create index if not exists prazos_status_idx on public.prazos (status);
@@ -149,6 +140,8 @@ create table if not exists public.buscas_agora (
   criado_em      timestamptz not null default now()
 );
 create index if not exists buscas_agora_org_idx on public.buscas_agora (organizacao_id, criado_em desc);
+-- Quando o robô aceitou o disparo: cada registro libera uma única busca.
+alter table public.buscas_agora add column if not exists processada_em timestamptz;
 
 -- Feriados locais da organização: uma linha por data, só o Administrador altera.
 create table if not exists public.feriados_organizacao (
@@ -183,8 +176,10 @@ create table if not exists public.convites (
 );
 create unique index if not exists convites_pendente_idx on public.convites (organizacao_id, email)
   where aceito_em is null;
+-- Quando o robô mandou o e-mail do convite (nulo = falta mandar; reenviar zera).
+alter table public.convites add column if not exists enviado_em timestamptz;
 
--- user_id continua: o n8n ainda grava por advogado e é o autor do registro.
+-- user_id é o autor do registro (no robô, o responsável).
 alter table public.monitoramentos add column if not exists organizacao_id uuid references public.organizacoes (id) on delete cascade;
 alter table public.prazos         add column if not exists organizacao_id uuid references public.organizacoes (id) on delete cascade;
 alter table public.prazos         add column if not exists responsavel_id uuid references auth.users (id) on delete set null;
@@ -222,25 +217,12 @@ $$;
 revoke all on function public.tem_papel(uuid, text[]) from public, anon;
 grant execute on function public.tem_papel(uuid, text[]) to authenticated, service_role;
 
--- Organização onde o robô grava o que encontra para a pessoa: a dos monitoramentos ativos
--- dela (uma só enquanto o robô roda por advogado); sem nenhum, a mais antiga.
-create or replace function public.organizacao_do_robo(uid uuid) returns uuid
-language sql stable security definer set search_path = '' as $$
-  select coalesce(
-    (select x.organizacao_id from public.monitoramentos x
-      where x.user_id = uid and x.ativo order by x.created_at desc, x.id desc limit 1),
-    public.organizacao_de(uid)
-  )
-$$;
-revoke all on function public.organizacao_do_robo(uuid) from public, anon, authenticated;
-grant execute on function public.organizacao_do_robo(uuid) to service_role;
-
--- O n8n (service_role) grava só o user_id: a organização vem do membro.
+-- Insert só com user_id (scripts antigos, dados de teste): a organização mais antiga da pessoa.
 create or replace function public.preencher_organizacao() returns trigger
 language plpgsql security definer set search_path = '' as $$
 begin
   if new.organizacao_id is null and new.user_id is not null then
-    new.organizacao_id := public.organizacao_do_robo(new.user_id);
+    new.organizacao_id := public.organizacao_de(new.user_id);
   end if;
   if tg_table_name = 'prazos' then
     if new.responsavel_id is null then
@@ -306,6 +288,12 @@ update public.execucoes      set organizacao_id = public.organizacao_de(user_id)
 alter table public.monitoramentos alter column organizacao_id set not null;
 alter table public.prazos         alter column organizacao_id set not null;
 
+-- Uma publicação vira um prazo só por organização, mesmo intimando duas OABs da casa (#19).
+alter table public.prazos drop constraint if exists prazos_user_id_djen_id_key;
+create unique index if not exists prazos_org_djen_idx on public.prazos (organizacao_id, djen_id);
+-- Outros membros cujas OABs a mesma publicação intimou (o primeiro listado é o responsável).
+alter table public.prazos add column if not exists tambem_intimados uuid[] not null default '{}';
+
 -- Migração: a tabela antiga de feriados tinha uma linha por advogado; vira uma por data
 -- da organização. Depois de convertida, o nome passa a ser a visão do robô.
 do $$
@@ -324,15 +312,8 @@ begin
   end if;
 end $$;
 
--- O robô (n8n) lê os feriados por advogado: cada membro recebe os da organização onde o robô
--- grava para ele. Só a service_role lê; a aplicação usa feriados_organizacao.
-create or replace view public.feriados with (security_invoker = true) as
-  select m.user_id, f.organizacao_id, f.data, f.descricao
-  from public.feriados_organizacao f
-  join public.membros m on m.organizacao_id = f.organizacao_id
-  where public.organizacao_do_robo(m.user_id) = f.organizacao_id;
-revoke all on public.feriados from public, anon, authenticated;
-grant select on public.feriados to service_role;
+-- A visão por advogado que o robô lia até a fase 4: agora ele recebe os feriados em robo_lote().
+drop view if exists public.feriados;
 
 -- ============================ nova conta ============================
 -- Toda conta nova nasce com uma configuração padrão, o e-mail já como destino do resumo,
@@ -809,11 +790,13 @@ begin
   return novo;
 end $$;
 
--- Desfaz o registro quando o robô recusa o disparo (só o próprio autor, logo em seguida).
+-- Desfaz o registro quando o robô recusa o disparo (só o próprio autor, logo em seguida, e
+-- só se o robô ainda não o aceitou).
 create or replace function public.cancelar_busca_agora(busca bigint) returns void
 language sql security definer set search_path = '' as $$
   delete from public.buscas_agora
   where id = busca and user_id = auth.uid() and criado_em > now() - interval '5 minutes'
+    and processada_em is null
 $$;
 
 revoke all on function public.registrar_busca_agora(uuid) from public, anon;
@@ -862,8 +845,7 @@ revoke all on function public.admin_listar_organizacoes() from public, anon;
 grant execute on function public.admin_listar_organizacoes() to authenticated;
 
 -- ============================ equipe e papéis ============================
--- Fase 3 (#18). Enquanto o robô roda por advogado (até a fase 4), o banco entrega a ele o
--- que é da organização: configurações copiadas para cada membro e feriados pela visão.
+-- Fase 3 (#18): configurações da organização, permissões por papel, convites e saída de membro.
 
 -- Toda organização nova nasce com as configurações padrão do robô.
 create or replace function public.criar_configuracao_organizacao() returns trigger
@@ -878,97 +860,60 @@ drop trigger if exists criar_configuracao_organizacao on public.organizacoes;
 create trigger criar_configuracao_organizacao after insert on public.organizacoes
   for each row execute function public.criar_configuracao_organizacao();
 
--- Migração: herda as configurações do Administrador mais antigo (o token dele continua valendo).
-insert into public.configuracoes_organizacao
-  (organizacao_id, dias_retroativos, prazo_padrao_dias, considerar_recesso, webhook_token)
-select
-  x.id, x.dias_retroativos, x.prazo_padrao_dias, x.considerar_recesso,
-  case when x.webhook_token is null or x.repeticao > 1
-    then replace(gen_random_uuid()::text, '-', '') else x.webhook_token end
-from (
-  select o.id,
-    coalesce(c.dias_retroativos, 5) as dias_retroativos,
-    coalesce(c.prazo_padrao_dias, 15) as prazo_padrao_dias,
-    coalesce(c.considerar_recesso, true) as considerar_recesso,
-    c.webhook_token,
-    row_number() over (partition by c.webhook_token order by o.criado_em, o.id) as repeticao
-  from public.organizacoes o
-  left join lateral (
-    select cfg.* from public.membros m join public.configuracoes cfg on cfg.user_id = m.user_id
-    where m.organizacao_id = o.id
-    order by (m.papel = 'administrador') desc, m.criado_em, m.user_id limit 1
-  ) c on true
-  where not exists (select 1 from public.configuracoes_organizacao co where co.organizacao_id = o.id)
-) x
+-- Migração (fase 3): cada organização herda as configurações do Administrador mais antigo,
+-- inclusive o token. Na fase 4 essas colunas saem da configuração pessoal.
+do $$
+begin
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'configuracoes' and column_name = 'webhook_token'
+  ) then
+    execute $m$
+      insert into public.configuracoes_organizacao
+        (organizacao_id, dias_retroativos, prazo_padrao_dias, considerar_recesso, webhook_token)
+      select
+        x.id, x.dias_retroativos, x.prazo_padrao_dias, x.considerar_recesso,
+        case when x.webhook_token is null or x.repeticao > 1
+          then replace(gen_random_uuid()::text, '-', '') else x.webhook_token end
+      from (
+        select o.id,
+          coalesce(c.dias_retroativos, 5) as dias_retroativos,
+          coalesce(c.prazo_padrao_dias, 15) as prazo_padrao_dias,
+          coalesce(c.considerar_recesso, true) as considerar_recesso,
+          c.webhook_token,
+          row_number() over (partition by c.webhook_token order by o.criado_em, o.id) as repeticao
+        from public.organizacoes o
+        left join lateral (
+          select cfg.* from public.membros m join public.configuracoes cfg on cfg.user_id = m.user_id
+          where m.organizacao_id = o.id
+          order by (m.papel = 'administrador') desc, m.criado_em, m.user_id limit 1
+        ) c on true
+        where not exists (select 1 from public.configuracoes_organizacao co where co.organizacao_id = o.id)
+      ) x
+      on conflict (organizacao_id) do nothing
+    $m$;
+  end if;
+end $$;
+insert into public.configuracoes_organizacao (organizacao_id)
+select o.id from public.organizacoes o
 on conflict (organizacao_id) do nothing;
 
--- Copia para a configuração da pessoa o que vale na organização onde o robô grava para ela.
-create or replace function public.sincronizar_configuracao(uid uuid) returns void
-language sql security definer set search_path = '' as $$
-  update public.configuracoes c set
-    dias_retroativos   = o.dias_retroativos,
-    prazo_padrao_dias  = o.prazo_padrao_dias,
-    considerar_recesso = o.considerar_recesso,
-    webhook_token      = o.webhook_token
-  from public.configuracoes_organizacao o
-  where c.user_id = uid
-    and o.organizacao_id = public.organizacao_do_robo(uid)
-    and (c.dias_retroativos, c.prazo_padrao_dias, c.considerar_recesso, c.webhook_token)
-        is distinct from (o.dias_retroativos, o.prazo_padrao_dias, o.considerar_recesso, o.webhook_token)
-$$;
-revoke all on function public.sincronizar_configuracao(uuid) from public, anon, authenticated;
-grant execute on function public.sincronizar_configuracao(uuid) to service_role;
-
-create or replace function public.sincronizar_por_gatilho() returns trigger
-language plpgsql security definer set search_path = '' as $$
-begin
-  if tg_table_name = 'configuracoes_organizacao' then
-    perform public.sincronizar_configuracao(m.user_id)
-    from public.membros m where m.organizacao_id = new.organizacao_id;
-  elsif tg_op = 'DELETE' then
-    perform public.sincronizar_configuracao(old.user_id);
-  else
-    perform public.sincronizar_configuracao(new.user_id);
-    if tg_op = 'UPDATE' then
-      if old.user_id is distinct from new.user_id then
-        perform public.sincronizar_configuracao(old.user_id);
-      end if;
-    end if;
-  end if;
-  return null;
-end $$;
-
+-- Fase 4 (#19): o robô lê a organização direto; a cópia em cada membro deixa de existir.
 drop trigger if exists sincronizar_configuracao on public.configuracoes_organizacao;
-create trigger sincronizar_configuracao after insert or update on public.configuracoes_organizacao
-  for each row execute function public.sincronizar_por_gatilho();
 drop trigger if exists sincronizar_configuracao on public.membros;
-create trigger sincronizar_configuracao after insert or delete on public.membros
-  for each row execute function public.sincronizar_por_gatilho();
 drop trigger if exists sincronizar_configuracao on public.monitoramentos;
-create trigger sincronizar_configuracao after insert or delete or update of ativo, user_id on public.monitoramentos
-  for each row execute function public.sincronizar_por_gatilho();
 drop trigger if exists sincronizar_configuracao on public.configuracoes;
-create trigger sincronizar_configuracao after insert on public.configuracoes
-  for each row execute function public.sincronizar_por_gatilho();
-
--- O que vem da organização não se altera pela configuração pessoal (só pela da organização).
-create or replace function public.proteger_configuracao_pessoal() returns trigger
-language plpgsql security definer set search_path = '' as $$
-begin
-  if pg_trigger_depth() = 1 and auth.uid() is not null and not public.is_dev()
-     and (new.dias_retroativos, new.prazo_padrao_dias, new.considerar_recesso, new.webhook_token)
-         is distinct from (old.dias_retroativos, old.prazo_padrao_dias, old.considerar_recesso, old.webhook_token) then
-    raise exception 'Essas configurações são da organização: só o Administrador altera, em Configurações.'
-      using errcode = '42501';
-  end if;
-  return new;
-end $$;
-
 drop trigger if exists proteger_configuracao_pessoal on public.configuracoes;
-create trigger proteger_configuracao_pessoal before update on public.configuracoes
-  for each row execute function public.proteger_configuracao_pessoal();
-
-select public.sincronizar_configuracao(c.user_id) from public.configuracoes c;
+drop function if exists public.sincronizar_por_gatilho();
+drop function if exists public.sincronizar_configuracao(uuid);
+drop function if exists public.proteger_configuracao_pessoal();
+drop function if exists public.organizacao_do_robo(uuid);
+alter table public.configuracoes
+  drop column if exists dias_retroativos,
+  drop column if exists prazo_padrao_dias,
+  drop column if exists considerar_recesso,
+  drop column if exists webhook_token,
+  drop column if exists ultima_busca_em;
 
 -- Monitoramentos por papel. Vale para o que a pessoa faz direto (os ajustes automáticos,
 -- feitos dentro de outros gatilhos, seguem as próprias regras).
@@ -1032,13 +977,6 @@ begin
     ) then
       raise exception 'Cada advogado pode ter uma OAB monitorada ativa neste plano.' using errcode = 'P0001';
     end if;
-  end if;
-  if exists (
-    select 1 from public.monitoramentos x
-    where x.user_id = new.user_id and x.ativo and x.organizacao_id <> org
-  ) then
-    raise exception 'Essa pessoa já tem monitoramentos ativos em outra organização. Por enquanto o robô busca para uma organização por pessoa: pause-os lá primeiro.'
-      using errcode = 'P0001';
   end if;
   return new;
 end $$;
@@ -1125,16 +1063,8 @@ begin
   where organizacao_id = old.organizacao_id and responsavel_id = old.user_id
     and status in ('pendente', 'conferir');
 
-  if exists (
-    select 1 from public.monitoramentos x
-    where x.user_id = admin and x.ativo and x.organizacao_id <> old.organizacao_id
-  ) then
-    update public.monitoramentos set user_id = admin, ativo = false
-    where organizacao_id = old.organizacao_id and user_id = old.user_id and tipo = 'processo';
-  else
-    update public.monitoramentos set user_id = admin
-    where organizacao_id = old.organizacao_id and user_id = old.user_id and tipo = 'processo';
-  end if;
+  update public.monitoramentos set user_id = admin
+  where organizacao_id = old.organizacao_id and user_id = old.user_id and tipo = 'processo';
   return null;
 end $$;
 
@@ -1227,7 +1157,7 @@ begin
   return novo;
 end $$;
 
--- Reenviar renova a validade (o link continua o mesmo).
+-- Reenviar renova a validade e põe o e-mail de novo na fila do robô (o link continua o mesmo).
 create or replace function public.reenviar_convite(convite uuid) returns public.convites
 language plpgsql security definer set search_path = '' as $$
 declare
@@ -1247,7 +1177,8 @@ begin
     raise exception 'Limite de usuários atingido (%): equipe e convites pendentes já ocupam todas as vagas do plano.',
       public.limites_de(c.organizacao_id) ->> 'usuarios' using errcode = 'P0001';
   end if;
-  update public.convites set expira_em = now() + interval '7 days' where id = c.id returning * into c;
+  update public.convites set expira_em = now() + interval '7 days', enviado_em = null
+  where id = c.id returning * into c;
   return c;
 end $$;
 
@@ -1339,7 +1270,7 @@ begin
   end if;
 end $$;
 
--- Painel dev: novo token do Buscar agora para a organização onde o robô grava para a conta.
+-- Painel dev: novo token do Buscar agora para a organização (a mais antiga) da conta.
 create or replace function public.admin_trocar_token(conta uuid, token text) returns void
 language plpgsql security definer set search_path = '' as $$
 begin
@@ -1347,7 +1278,7 @@ begin
     raise exception 'Acesso restrito ao dev.' using errcode = '42501';
   end if;
   update public.configuracoes_organizacao set webhook_token = token, updated_at = now()
-  where organizacao_id = public.organizacao_do_robo(conta);
+  where organizacao_id = public.organizacao_de(conta);
   if not found then
     raise exception 'Esta conta não pertence a nenhuma organização.' using errcode = 'P0001';
   end if;
@@ -1374,6 +1305,280 @@ grant execute on function public.aceitar_convite(text) to authenticated;
 grant execute on function public.alterar_papel(uuid, uuid, text) to authenticated;
 grant execute on function public.remover_membro(uuid, uuid) to authenticated;
 grant execute on function public.admin_trocar_token(uuid, text) to authenticated;
+
+-- ============================ robô por organização ============================
+-- Fase 4 (#19). O n8n (service_role) só consulta o DJEN, calcula o vencimento e manda os
+-- e-mails; quem buscar, quem é o responsável e o que cada membro recebe é decidido aqui.
+
+-- OAB comparável entre o cadastro e o DJEN: só dígitos, sem zeros à esquerda, e a UF.
+create or replace function public.oab_normalizada(numero text, uf text) returns text
+language sql immutable set search_path = '' as $$
+  select nullif(ltrim(regexp_replace(coalesce(numero, ''), '\D', '', 'g'), '0'), '')
+    || '/' || nullif(upper(btrim(coalesce(uf, ''))), '')
+$$;
+
+-- Organizações a buscar agora, com configurações, feriados e monitoramentos ativos.
+--   agendado: todas (turno '12' = só as com 2 buscas automáticas no plano); manual: todas;
+--   site: só a dona do token, e só se houver um Buscar agora registrado (pelo site, que já
+--   conferiu intervalo e cota) nos últimos 5 minutos e ainda não aceito — cada um vale uma busca.
+-- Organização suspensa (depois da carência) não é buscada.
+create or replace function public.robo_lote(origem text, turno text default null, token text default null)
+returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare
+  alvo  uuid;
+  autor uuid;
+begin
+  if robo_lote.origem = 'site' then
+    select c.organizacao_id into alvo from public.configuracoes_organizacao c
+    where c.webhook_token = coalesce(robo_lote.token, '');
+    if alvo is null then
+      return '[]'::jsonb;
+    end if;
+    update public.buscas_agora b set processada_em = now()
+    where b.id = (
+      select x.id from public.buscas_agora x
+      where x.organizacao_id = alvo and x.processada_em is null and x.criado_em > now() - interval '5 minutes'
+      order by x.criado_em desc limit 1
+      for update skip locked
+    )
+    returning b.user_id into autor;
+    if not found then
+      return '[]'::jsonb;
+    end if;
+  elsif robo_lote.origem is null or robo_lote.origem not in ('agendado', 'manual') then
+    raise exception 'Origem inválida: %', robo_lote.origem using errcode = 'P0001';
+  end if;
+
+  return coalesce((
+    select jsonb_agg(jsonb_build_object(
+      'organizacao_id', o.id,
+      'nome', o.nome,
+      'etapa', o.etapa,
+      'origem', robo_lote.origem,
+      'autor', autor,
+      'dias_retroativos', c.dias_retroativos,
+      'prazo_padrao_dias', c.prazo_padrao_dias,
+      'considerar_recesso', c.considerar_recesso,
+      'feriados', coalesce((
+        select jsonb_agg(f.data order by f.data) from public.feriados_organizacao f where f.organizacao_id = o.id
+      ), '[]'::jsonb),
+      'monitoramentos', m.lista
+    ) order by o.criado_em, o.id)
+    from (
+      select x.id, x.nome, x.criado_em, public.etapa_de(x.id) as etapa
+      from public.organizacoes x
+      where alvo is null or x.id = alvo
+    ) o
+    join public.configuracoes_organizacao c on c.organizacao_id = o.id
+    cross join lateral (
+      select jsonb_agg(distinct case when mo.tipo = 'oab'
+        then jsonb_build_object('tipo', 'oab', 'numero', regexp_replace(mo.oab_numero, '\D', '', 'g'),
+                                'uf', upper(mo.oab_uf))
+        else jsonb_build_object('tipo', 'processo', 'numero', regexp_replace(mo.numero_processo, '\D', '', 'g'))
+      end) as lista
+      from public.monitoramentos mo
+      where mo.organizacao_id = o.id and mo.ativo
+        and case when mo.tipo = 'oab'
+          then regexp_replace(mo.oab_numero, '\D', '', 'g') <> '' and length(btrim(mo.oab_uf)) = 2
+          else length(regexp_replace(mo.numero_processo, '\D', '', 'g')) = 20
+        end
+    ) m
+    where o.etapa <> 'suspensa'
+      and m.lista is not null
+      and (robo_lote.origem <> 'agendado' or robo_lote.turno is distinct from '12'
+           or (public.limites_de(o.id) ->> 'buscas_automaticas')::int >= 2)
+  ), '[]'::jsonb);
+end $$;
+
+-- Grava as publicações da organização (um prazo por publicação) e devolve os ids novos.
+-- Responsável: o dono da primeira OAB da casa listada na publicação (as demais ficam em
+-- tambem_intimados); sem OAB, quem cadastrou o processo avulso; sem nenhum, o Administrador.
+create or replace function public.robo_gravar_prazos(org uuid, publicacoes jsonb) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare
+  p         jsonb;
+  adm       uuid;
+  intimados uuid[];
+  resp      uuid;
+  novo      uuid;
+  ids       uuid[] := '{}';
+begin
+  select m.user_id into adm from public.membros m
+  where m.organizacao_id = org and m.papel = 'administrador'
+  order by m.criado_em, m.user_id limit 1;
+  if adm is null then
+    raise exception 'Organização sem Administrador: %', org using errcode = 'P0001';
+  end if;
+
+  for p in select value from jsonb_array_elements(coalesce(publicacoes, '[]'::jsonb)) loop
+    continue when coalesce(p ->> 'djen_id', '') = '';
+
+    select coalesce(array_agg(x.user_id order by x.ordem), '{}') into intimados
+    from (
+      select distinct on (mo.user_id) mo.user_id, a.ordem
+      from jsonb_array_elements(coalesce(p -> 'advogados', '[]'::jsonb)) with ordinality as a (adv, ordem)
+      join public.monitoramentos mo
+        on mo.organizacao_id = org and mo.tipo = 'oab' and mo.ativo
+       and public.oab_normalizada(mo.oab_numero, mo.oab_uf) = public.oab_normalizada(a.adv ->> 'numero', a.adv ->> 'uf')
+      join public.membros me on me.organizacao_id = org and me.user_id = mo.user_id
+      order by mo.user_id, a.ordem
+    ) x;
+
+    resp := intimados[1];
+    if resp is null then
+      select mo.user_id into resp
+      from public.monitoramentos mo
+      join public.membros me on me.organizacao_id = org and me.user_id = mo.user_id
+      where mo.organizacao_id = org and mo.tipo = 'processo' and mo.ativo
+        and regexp_replace(mo.numero_processo, '\D', '', 'g')
+            = regexp_replace(coalesce(p ->> 'numero_processo', ''), '\D', '', 'g')
+      order by mo.created_at, mo.id limit 1;
+    end if;
+    resp := coalesce(resp, adm);
+
+    novo := null;
+    insert into public.prazos (
+      organizacao_id, user_id, responsavel_id, tambem_intimados, djen_id, processo, tribunal, orgao, tipo,
+      classe, partes, prazo_dias, origem_prazo, data_disponibilizacao, data_publicacao, inicio_prazo,
+      vencimento, status, link, teor
+    ) values (
+      org, resp, resp, coalesce(intimados[2:], '{}'), p ->> 'djen_id', p ->> 'processo', p ->> 'tribunal',
+      p ->> 'orgao', p ->> 'tipo', p ->> 'classe', p ->> 'partes', (p ->> 'prazo_dias')::int, p ->> 'origem_prazo',
+      (p ->> 'data_disponibilizacao')::date, (p ->> 'data_publicacao')::date, (p ->> 'inicio_prazo')::date,
+      (p ->> 'vencimento')::date,
+      case when p ->> 'status' = 'pendente' then 'pendente' else 'conferir' end,
+      p ->> 'link', p ->> 'teor'
+    )
+    on conflict (organizacao_id, djen_id) do nothing
+    returning id into novo;
+    if novo is not null then
+      ids := ids || novo;
+    end if;
+  end loop;
+
+  return jsonb_build_object('novas', cardinality(ids), 'ids', to_jsonb(ids));
+end $$;
+
+-- Prazo como aparece no e-mail do resumo.
+create or replace function public.robo_prazo_no_resumo(p public.prazos) returns jsonb
+language sql stable security definer set search_path = '' as $$
+  select jsonb_build_object(
+    'processo', p.processo, 'tribunal', p.tribunal, 'orgao', p.orgao, 'tipo', p.tipo,
+    'vencimento', p.vencimento, 'prazo_dias', p.prazo_dias, 'origem_prazo', p.origem_prazo,
+    'status', p.status, 'link', p.link, 'trecho', left(coalesce(p.teor, ''), 300),
+    'responsavel', (select u.email::text from auth.users u where u.id = p.responsavel_id)
+  )
+$$;
+
+-- Registra a execução e devolve o resumo de cada membro com e-mail válido: prazos em alerta
+-- (vencidos há até 30 dias e os da janela de cada um) e publicações novas, só os próprios
+-- ("meus": responsável ou também intimado) ou de todos, conforme a preferência (padrão: Advogado "meus", demais "todos").
+-- Inclui a etapa e as datas da carência para o aviso ao Administrador.
+create or replace function public.robo_concluir(
+  org uuid, origem text, autor uuid, encontradas int, novas jsonb, falhou boolean, detalhe text
+) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare
+  hoje  date := (now() at time zone 'America/Sao_Paulo')::date;
+  ids   uuid[];
+  o     public.organizacoes;
+  s     public.configuracao_sistema;
+  etapa text := public.etapa_de(org);
+  fim   date;
+begin
+  select * into o from public.organizacoes where id = org;
+  if not found then
+    raise exception 'Organização não encontrada: %', org using errcode = 'P0001';
+  end if;
+  select * into s from public.configuracao_sistema where id = 1;
+  select coalesce(array_agg(v::uuid), '{}') into ids
+  from jsonb_array_elements_text(coalesce(robo_concluir.novas, '[]'::jsonb)) as v;
+
+  insert into public.execucoes (organizacao_id, user_id, origem, encontradas, novas, status, detalhe)
+  values (
+    org, robo_concluir.autor, robo_concluir.origem, coalesce(robo_concluir.encontradas, 0), cardinality(ids),
+    case when robo_concluir.falhou then 'falha' else 'ok' end,
+    nullif(left(coalesce(robo_concluir.detalhe, ''), 2000), '')
+  );
+
+  if o.situacao = 'ativa' then
+    fim := o.pago_ate;
+  else
+    fim := (coalesce(o.teste_iniciado_em, o.criado_em) at time zone 'America/Sao_Paulo')::date + s.dias_teste - 1;
+  end if;
+
+  return jsonb_build_object(
+    'organizacao', o.nome,
+    'etapa', etapa,
+    'leitura_em', case when fim is null then null else fim + s.carencia_aviso_dias + 1 end,
+    'suspensa_em', case when fim is null then null else fim + s.carencia_total_dias + 1 end,
+    'destinatarios', coalesce((
+      select jsonb_agg(jsonb_build_object(
+        'user_id', d.user_id,
+        'email', d.email,
+        'papel', d.papel,
+        'escopo', d.escopo,
+        'dias_alerta', d.dias_alerta,
+        'alertas', coalesce((
+          select jsonb_agg(public.robo_prazo_no_resumo(p) order by p.vencimento, p.processo)
+          from public.prazos p
+          where p.organizacao_id = org and p.status in ('pendente', 'conferir')
+            and p.vencimento between hoje - 30 and hoje + d.dias_alerta
+            and (d.escopo = 'todos' or p.responsavel_id = d.user_id or d.user_id = any (p.tambem_intimados))
+        ), '[]'::jsonb),
+        'novas', coalesce((
+          select jsonb_agg(public.robo_prazo_no_resumo(p) order by p.vencimento nulls last, p.processo)
+          from public.prazos p
+          where p.organizacao_id = org and p.id = any (ids)
+            and (d.escopo = 'todos' or p.responsavel_id = d.user_id or d.user_id = any (p.tambem_intimados))
+        ), '[]'::jsonb)
+      ) order by d.criado_em, d.user_id)
+      from (
+        select m.user_id, m.papel, m.criado_em, btrim(c.email_destino) as email, c.dias_alerta,
+          coalesce(c.resumo_escopo, case when m.papel = 'advogado' then 'meus' else 'todos' end) as escopo
+        from public.membros m
+        join public.configuracoes c on c.user_id = m.user_id
+        where m.organizacao_id = org
+          and btrim(c.email_destino) ~ '^[^@[:space:]]+@[^@[:space:]]+\.[^@[:space:]]+$'
+      ) d
+    ), '[]'::jsonb)
+  );
+end $$;
+
+-- Convites cujo e-mail ainda não saiu (o robô manda e marca como enviado).
+create or replace function public.robo_convites_pendentes() returns jsonb
+language sql stable security definer set search_path = '' as $$
+  select coalesce(jsonb_agg(jsonb_build_object(
+    'id', c.id, 'email', c.email, 'papel', c.papel, 'token', c.token, 'expira_em', c.expira_em,
+    'organizacao', o.nome, 'convidado_por', u.email::text
+  ) order by c.criado_em), '[]'::jsonb)
+  from public.convites c
+  join public.organizacoes o on o.id = c.organizacao_id
+  left join auth.users u on u.id = c.criado_por
+  where c.aceito_em is null and c.expira_em > now() and c.enviado_em is null
+$$;
+
+create or replace function public.robo_marcar_convite_enviado(convite uuid) returns void
+language sql security definer set search_path = '' as $$
+  update public.convites set enviado_em = now()
+  where id = convite and aceito_em is null and enviado_em is null
+$$;
+
+revoke all on function public.oab_normalizada(text, text) from public, anon, authenticated;
+revoke all on function public.robo_lote(text, text, text) from public, anon, authenticated;
+revoke all on function public.robo_gravar_prazos(uuid, jsonb) from public, anon, authenticated;
+revoke all on function public.robo_prazo_no_resumo(public.prazos) from public, anon, authenticated;
+revoke all on function public.robo_concluir(uuid, text, uuid, int, jsonb, boolean, text) from public, anon, authenticated;
+revoke all on function public.robo_convites_pendentes() from public, anon, authenticated;
+revoke all on function public.robo_marcar_convite_enviado(uuid) from public, anon, authenticated;
+grant execute on function public.oab_normalizada(text, text) to service_role;
+grant execute on function public.robo_lote(text, text, text) to service_role;
+grant execute on function public.robo_gravar_prazos(uuid, jsonb) to service_role;
+grant execute on function public.robo_prazo_no_resumo(public.prazos) to service_role;
+grant execute on function public.robo_concluir(uuid, text, uuid, int, jsonb, boolean, text) to service_role;
+grant execute on function public.robo_convites_pendentes() to service_role;
+grant execute on function public.robo_marcar_convite_enviado(uuid) to service_role;
 
 -- ============================ auditoria ============================
 -- Tudo o que um dev faz: ações administrativas (Edge Function "admin") e qualquer escrita
@@ -1486,7 +1691,8 @@ begin
   from auth.users u
   left join lateral (
     select x.executado_em, x.status from public.execucoes x
-    where x.user_id = u.id order by x.executado_em desc limit 1
+    where x.organizacao_id in (select m.organizacao_id from public.membros m where m.user_id = u.id)
+    order by x.executado_em desc limit 1
   ) e on true
   order by u.created_at;
 end $$;

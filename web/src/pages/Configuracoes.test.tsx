@@ -13,13 +13,8 @@ const salvarOrganizacao = vi.fn()
 const CONFIG: Configuracao = {
   user_id: 'ana-1',
   email_destino: 'ana@exemplo.com',
-  dias_retroativos: 7,
-  prazo_padrao_dias: 15,
   dias_alerta: 5,
-  considerar_recesso: true,
-  webhook_token: 'TokenDaOrganizacao123',
   resumo_escopo: null,
-  ultima_busca_em: null,
   updated_at: '2026-10-01T10:00:00Z',
 }
 const CONFIG_ORG: ConfiguracaoOrganizacao = {

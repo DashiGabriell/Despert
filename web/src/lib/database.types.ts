@@ -43,6 +43,8 @@ export type BuscaAgora = {
   organizacao_id: string
   user_id: string | null
   criado_em: string
+  /** Quando o robô aceitou o disparo (nulo = ainda não). */
+  processada_em: string | null
 }
 
 export type Membro = {
@@ -73,6 +75,8 @@ export type Convite = {
   criado_em: string
   expira_em: string
   aceito_em: string | null
+  /** Quando o robô mandou o e-mail (nulo = na fila; reenviar zera). */
+  enviado_em: string | null
 }
 
 /** Retorno de `ver_convite()`, lido antes de a pessoa entrar. */
@@ -86,19 +90,14 @@ export type ResumoConvite = {
 export type EscopoResumo = 'meus' | 'todos'
 
 /**
- * Configuração pessoal. Dias para trás, prazo padrão, recesso e token vêm da organização
- * (copiados pelo banco); a pessoa altera só e-mail, janela de alerta e escopo do resumo.
+ * Configuração pessoal: e-mail, janela de alerta e escopo do resumo. Dias para trás, prazo
+ * padrão, recesso e token são da organização (`ConfiguracaoOrganizacao`).
  */
 export type Configuracao = {
   user_id: string
   email_destino: string
-  dias_retroativos: number
-  prazo_padrao_dias: number
   dias_alerta: number
-  considerar_recesso: boolean
-  webhook_token: string
   resumo_escopo: EscopoResumo | null
-  ultima_busca_em: string | null
   updated_at: string
 }
 
@@ -136,6 +135,8 @@ export type Prazo = {
   organizacao_id: string
   user_id: string
   responsavel_id: string | null
+  /** Outros membros cujas OABs a mesma publicação intimou. */
+  tambem_intimados: string[]
   djen_id: string
   processo: string | null
   tribunal: string | null

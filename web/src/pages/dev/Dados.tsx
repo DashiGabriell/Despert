@@ -259,12 +259,8 @@ function Configuracao({ userId }: { userId: string }) {
   if (!c) return <p className="p-5 text-muted">Esta conta ainda não tem configuração (nunca entrou no site).</p>
   const linhas: [string, string][] = [
     ['E-mail para alertas', c.email_destino || '—'],
-    ['Dias para trás', String(c.dias_retroativos)],
-    ['Prazo padrão', `${c.prazo_padrao_dias} dias`],
     ['Janela de alerta', `${c.dias_alerta} dias`],
-    ['Recesso forense', c.considerar_recesso ? 'Considera' : 'Não considera'],
-    ['Token do Buscar agora', c.webhook_token],
-    ['Última busca pelo site', c.ultima_busca_em ? formatarDataHora(c.ultima_busca_em) : '—'],
+    ['Resumo diário', c.resumo_escopo === 'meus' ? 'Só os prazos da pessoa' : c.resumo_escopo === 'todos' ? 'Todos os prazos' : 'Padrão do papel'],
     ['Atualizada em', formatarDataHora(c.updated_at)],
   ]
   return (

@@ -154,17 +154,16 @@ begin
     end if;
   end loop;
 
-  -- Configuração pessoal: o que é da organização não muda por ela.
+  -- Configuração pessoal: cada um altera a própria (as da organização são testadas acima).
   perform set_config('request.jwt.claims', json_build_object('sub', adv, 'role', 'authenticated')::text, true);
   perform set_config('role', 'authenticated', true);
   update public.configuracoes set email_destino = 'outro@teste.despert.dev', dias_alerta = 3, resumo_escopo = 'todos'
     where user_id = adv;
-  begin
-    update public.configuracoes set dias_retroativos = 20 where user_id = adv;
-    raise exception 'Membro alterou configuração da organização pela própria';
-  exception when insufficient_privilege then
-    if sqlerrm not like 'Essas configurações são da organização%' then raise; end if;
-  end;
+  get diagnostics n = row_count;
+  if n <> 1 then raise exception 'Membro não alterou a própria configuração'; end if;
+  update public.configuracoes set dias_alerta = 4 where user_id = adm;
+  get diagnostics n = row_count;
+  if n <> 0 then raise exception 'Membro alterou a configuração de outra pessoa'; end if;
 
   -- OAB: o Advogado só a própria, uma por advogado no plano; nunca de Assistente.
   insert into public.monitoramentos (organizacao_id, user_id, tipo, oab_numero, oab_uf) values (org, adv, 'oab', '901', 'SP');
@@ -190,16 +189,15 @@ begin
     if sqlerrm not like 'O monitoramento precisa pertencer%' then raise; end if;
   end;
 
-  -- O robô recebe as configurações e os feriados da organização em cada membro.
+  -- O robô recebe as configurações e os feriados da organização (robo_lote, fase 4).
   update public.configuracoes_organizacao set dias_retroativos = 9 where organizacao_id = org
     returning webhook_token into token_org;
   perform set_config('role', 'postgres', true);
   perform set_config('request.jwt.claims', '', true);
-  select count(*) into n from public.configuracoes
-    where user_id in (adm, adv, ass, lei, adv2) and dias_retroativos = 9 and webhook_token = token_org;
-  if n <> 5 then raise exception 'Configuração da organização chegou a % de 5 membros', n; end if;
-  select count(*) into n from public.feriados where data = '2031-02-01'::date + length('administrador');
-  if n <> 5 then raise exception 'Visão do robô entregou o feriado a % de 5 membros', n; end if;
+  select count(*) into n from jsonb_array_elements(public.robo_lote('manual')) l
+    where l ->> 'organizacao_id' = org::text and (l ->> 'dias_retroativos')::int = 9
+      and l -> 'feriados' ? (('2031-02-01'::date + length('administrador'))::text);
+  if n <> 1 then raise exception 'robo_lote não entregou as configurações e o feriado da organização'; end if;
   insert into public.prazos (djen_id, user_id) values ('teste-equipe-robo', adv);
   select count(*) into n from public.prazos where djen_id = 'teste-equipe-robo' and organizacao_id = org and responsavel_id = adv;
   if n <> 1 then raise exception 'Prazo do robô não foi para a organização da OAB'; end if;
@@ -211,8 +209,9 @@ begin
   insert into public.feriados_organizacao (organizacao_id, data) values (org2, '2031-03-01');
   select m.organizacao_id into solo from public.membros m where m.user_id = fora and m.organizacao_id <> org2;
   insert into public.prazos (djen_id, organizacao_id, user_id) values ('teste-equipe-solo', solo, fora);
-  select count(*) into n from public.feriados where user_id = adv2 and data = '2031-03-01';
-  if n <> 0 then raise exception 'Robô usou feriado de outra organização para adv2'; end if;
+  select count(*) into n from jsonb_array_elements(public.robo_lote('manual')) l
+    where l ->> 'organizacao_id' = org::text and l -> 'feriados' ? '2031-03-01';
+  if n <> 0 then raise exception 'Robô usou feriado de outra organização'; end if;
   perform set_config('request.jwt.claims', json_build_object('sub', adv2, 'role', 'authenticated')::text, true);
   perform set_config('role', 'authenticated', true);
   select count(*) into n from public.prazos where djen_id in ('teste-equipe-base', 'teste-equipe-org2');

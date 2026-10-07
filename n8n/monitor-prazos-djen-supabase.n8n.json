@@ -1,31 +1,31 @@
 {
-  "name": "Despert - Monitor de Prazos (DJEN) multitenant",
+  "name": "Despert - Monitor de Prazos (DJEN) por organização",
   "nodes": [
     {
       "parameters": {
-        "content": "## Despert - Monitor de Prazos (DJEN) multitenant\n\n**Antes de ativar** (detalhes em `n8n/README.md`):\n1. Credencial **Supabase** (Host = URL do projeto, Service Role Secret = chave `service_role`) em todos os nós verdes.\n2. Credencial **Gmail** (OAuth2) nos três nós de e-mail.\n3. No nó **Montar Lote**, troque `EMAIL_SUPORTE` pelo e-mail que recebe os avisos de falha.\n4. Ative o fluxo e cole a **Production URL** do nó \"Disparo pelo Site\" em Configurações no site de cada advogado.\n\nRoda seg. a sex. às 07:00 (Brasília) para todos os advogados, ou só para um quando ele clica \"Buscar agora\" (token conferido no banco).\n\n**Atenção:** vencimentos são ESTIMADOS (dias úteis do CPC). Sempre confira no processo.",
-        "height": 460,
-        "width": 620,
+        "content": "## Despert - Monitor de Prazos (DJEN) por organização\n\n**Antes de ativar** (detalhes em `n8n/README.md`):\n1. Credencial **Supabase** (Host = URL do projeto, Service Role Secret = chave `service_role`) nos nós HTTP do Supabase.\n2. Credencial **Gmail** (OAuth2) nos dois nós de e-mail.\n3. No nó **Configurar**, confira `SUPABASE_URL` e troque `EMAIL_SUPORTE`.\n4. Ative o fluxo e cole a **Production URL** do nó \"Disparo pelo Site\" em `/dashitecnology/n8n` no site.\n\nSeg. a sex. às 07:00 todas as organizações; às 12:00 só as com 2 buscas no plano. \"Buscar agora\" processa só a organização do token, se o site registrou o disparo.\n\n**Atenção:** vencimentos são ESTIMADOS (dias úteis do CPC). Sempre confira no processo.",
+        "height": 480,
+        "width": 640,
         "color": 4
       },
-      "id": "54b7361a-54a5-4ada-8cc9-79065a9e5799",
+      "id": "85348e23-1112-4417-a76f-4bd531441e3c",
       "name": "Notas",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
         -320,
-        -520
+        -560
       ]
     },
     {
       "parameters": {},
-      "id": "3d21d502-22b8-4d8a-b578-0db70dfe6be2",
+      "id": "57cdb37e-aa7a-44bb-829e-cfd58a5b1961",
       "name": "Executar manualmente",
       "type": "n8n-nodes-base.manualTrigger",
       "typeVersion": 1,
       "position": [
         0,
-        0
+        -100
       ]
     },
     {
@@ -39,13 +39,33 @@
           ]
         }
       },
-      "id": "2d50d02e-b9a8-45fe-bec6-8b6586423ffa",
-      "name": "Todo dia útil 07:00",
+      "id": "212f75df-810c-4cb3-87f3-fb50212775f3",
+      "name": "Dia útil 07:00",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
       "position": [
         0,
-        200
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 12 * * 1-5"
+            }
+          ]
+        }
+      },
+      "id": "5511bb3c-7d95-4c90-afd4-de18060e88ca",
+      "name": "Dia útil 12:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        300
       ]
     },
     {
@@ -56,98 +76,73 @@
           "allowedOrigins": "*"
         }
       },
-      "id": "cc194533-3921-437a-945b-40fe36755e7c",
+      "id": "0566cec5-3a10-4845-a68a-1b32020b2671",
       "name": "Disparo pelo Site",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
       "position": [
         0,
-        400
+        500
       ],
-      "webhookId": "7dfbf25c-1c94-4daa-b5f3-fc63a82e1f8f"
+      "webhookId": "4bf22eaa-c717-429f-863a-c385b6e8a542"
     },
     {
       "parameters": {
-        "operation": "getAll",
-        "tableId": "configuracoes",
-        "returnAll": true
+        "jsCode": "// Endereços desta instalação (detalhes em n8n/README.md). A URL do projeto não é segredo;\n// a chave service_role fica só na credencial \"Supabase\".\nconst SUPABASE_URL = 'https://pcjyqwiuqphuiqgfvxqj.supabase.co';\n// Quem recebe os avisos de falha de qualquer organização:\nconst EMAIL_SUPORTE = 'suporte@troque-este-endereco.com';\n\nfunction rodou(nome) {\n  try { return $(nome).isExecuted; } catch (e) { return false; }\n}\n\nlet origem = 'manual';\nlet turno = null;\nlet token = null;\nif (rodou('Disparo pelo Site')) {\n  origem = 'site';\n  token = String((($('Disparo pelo Site').first().json || {}).query || {}).token || '').replace(/[^A-Za-z0-9]/g, '');\n  if (!token) return [];\n} else if (rodou('Dia útil 12:00')) {\n  origem = 'agendado';\n  turno = '12';\n} else if (rodou('Dia útil 07:00')) {\n  origem = 'agendado';\n  turno = '07';\n}\nreturn [{ json: { supabase_url: SUPABASE_URL.replace(/\\/+$/, ''), suporte: EMAIL_SUPORTE, origem, turno, token } }];"
       },
-      "id": "ccc2c0c8-3627-4ae2-8681-8814291fd05f",
-      "name": "Ler Configurações",
-      "type": "n8n-nodes-base.supabase",
-      "typeVersion": 1,
+      "id": "b92de4e3-e83c-4335-b0f3-8cf45a5a85d9",
+      "name": "Configurar",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
       "position": [
         240,
-        100
-      ],
-      "executeOnce": true,
-      "alwaysOutputData": true
+        200
+      ]
     },
     {
       "parameters": {
-        "operation": "getAll",
-        "tableId": "configuracoes",
-        "returnAll": true,
-        "filterType": "string",
-        "filterString": "={{ 'webhook_token=eq.' + (String(($json.query || {}).token || '').replace(/[^A-Za-z0-9]/g, '') || 'sem-token') }}"
+        "method": "POST",
+        "url": "={{ $('Configurar').first().json.supabase_url }}/rest/v1/rpc/robo_lote",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ origem: $json.origem, turno: $json.turno, token: $json.token }) }}",
+        "options": {
+          "timeout": 60000
+        }
       },
-      "id": "6574b0be-81b9-4da9-bb33-4426581bf938",
-      "name": "Conferir Token",
-      "type": "n8n-nodes-base.supabase",
-      "typeVersion": 1,
-      "position": [
-        240,
-        400
-      ],
-      "executeOnce": true,
-      "alwaysOutputData": true
-    },
-    {
-      "parameters": {
-        "operation": "getAll",
-        "tableId": "monitoramentos",
-        "returnAll": true,
-        "filterType": "string",
-        "filterString": "ativo=is.true"
-      },
-      "id": "b3432845-abaa-474f-9080-0e553cf92e29",
-      "name": "Ler Monitoramentos",
-      "type": "n8n-nodes-base.supabase",
-      "typeVersion": 1,
+      "id": "4c9aaa65-d3a6-4887-a5a9-553adbcc3331",
+      "name": "Montar Lote",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
       "position": [
         480,
         200
       ],
-      "executeOnce": true,
-      "alwaysOutputData": true
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
     },
     {
       "parameters": {
-        "operation": "getAll",
-        "tableId": "feriados",
-        "returnAll": true
+        "jsCode": "// Uma linha por organização devolvida por robo_lote (o banco já decidiu quem entra).\nconst saida = [];\nfor (const item of $input.all()) {\n  const j = item.json;\n  const lista = Array.isArray(j) ? j : [j];\n  for (const o of lista) if (o && o.organizacao_id) saida.push({ json: o });\n}\nreturn saida;"
       },
-      "id": "6fd7ebdb-23c0-4311-92fe-f89a39d5a085",
-      "name": "Ler Feriados",
-      "type": "n8n-nodes-base.supabase",
-      "typeVersion": 1,
-      "position": [
-        720,
-        200
-      ],
-      "executeOnce": true,
-      "alwaysOutputData": true
-    },
-    {
-      "parameters": {
-        "jsCode": "// Um item por advogado com OAB/processo ativo. O user_id de cada item decide onde tudo é gravado.\n// Troque pelo endereço que deve receber os avisos de falha de qualquer advogado:\nconst EMAIL_SUPORTE = 'suporte@troque-este-endereco.com';\nconst TZ = 'America/Sao_Paulo';\n\nfunction rodou(nome) {\n  try { return $(nome).isExecuted; } catch (e) { return false; }\n}\nfunction linhas(nome) {\n  try { return $(nome).all().map(i => i.json).filter(j => j && j.user_id); } catch (e) { return []; }\n}\n\nlet origem = 'manual';\nlet configs;\nif (rodou('Disparo pelo Site')) {\n  origem = 'site';\n  const token = String((($('Disparo pelo Site').first().json || {}).query || {}).token || '');\n  configs = linhas('Conferir Token').filter(c => token && c.webhook_token === token);\n  if (!configs.length) return [];\n} else {\n  if (rodou('Todo dia útil 07:00')) origem = 'agendado';\n  configs = linhas('Ler Configurações');\n}\n\nconst monitoramentos = linhas('Ler Monitoramentos').filter(m => m.ativo !== false);\nconst feriados = linhas('Ler Feriados');\nconst hoje = DateTime.now().setZone(TZ);\n\nconst lote = [];\nfor (const cfg of configs) {\n  const retroativos = Math.min(30, Math.max(1, Number(cfg.dias_retroativos) || 5));\n  const base = {\n    dataDisponibilizacaoInicio: hoje.minus({ days: retroativos }).toISODate(),\n    dataDisponibilizacaoFim: hoje.toISODate(),\n    itensPorPagina: 100,\n  };\n  const consultas = [];\n  for (const m of monitoramentos.filter(x => x.user_id === cfg.user_id)) {\n    if (m.tipo === 'oab') {\n      const numero = String(m.oab_numero || '').replace(/\\D/g, '');\n      if (numero && m.oab_uf) consultas.push({ ...base, numeroOab: numero, ufOab: String(m.oab_uf).toUpperCase() });\n    } else if (m.tipo === 'processo') {\n      const numero = String(m.numero_processo || '').replace(/\\D/g, '');\n      if (numero.length === 20) consultas.push({ ...base, numeroProcesso: numero });\n    }\n  }\n  if (!consultas.length) continue;\n  lote.push({\n    json: {\n      user_id: cfg.user_id,\n      email: String(cfg.email_destino || '').trim(),\n      origem,\n      suporte: EMAIL_SUPORTE,\n      prazo_padrao_dias: Number(cfg.prazo_padrao_dias) || 15,\n      dias_alerta: Number(cfg.dias_alerta) || 7,\n      considerar_recesso: cfg.considerar_recesso !== false,\n      feriados: feriados.filter(f => f.user_id === cfg.user_id).map(f => String(f.data).slice(0, 10)),\n      consultas,\n    },\n  });\n}\nreturn lote;"
-      },
-      "id": "8b877a29-cc42-4fde-8fdf-e5e8860eb0f0",
-      "name": "Montar Lote",
+      "id": "7ed0e472-eeae-4cf7-b903-525ab5dd99a3",
+      "name": "Organizações",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        960,
+        720,
         200
       ]
     },
@@ -155,25 +150,25 @@
       "parameters": {
         "options": {}
       },
-      "id": "19747a23-8408-4fe6-a401-324544ce9998",
-      "name": "Um advogado por vez",
+      "id": "be345eb8-36c5-4ec7-a039-cf0c15b1ce92",
+      "name": "Uma organização por vez",
       "type": "n8n-nodes-base.splitInBatches",
       "typeVersion": 3,
       "position": [
-        1200,
+        960,
         200
       ]
     },
     {
       "parameters": {
-        "jsCode": "const advogado = $input.first().json;\nreturn advogado.consultas.map(query => ({ json: { query } }));"
+        "jsCode": "const org = $input.first().json;\nconst hoje = DateTime.now().setZone('America/Sao_Paulo');\nconst retroativos = Math.min(30, Math.max(1, Number(org.dias_retroativos) || 5));\nconst base = {\n  dataDisponibilizacaoInicio: hoje.minus({ days: retroativos }).toISODate(),\n  dataDisponibilizacaoFim: hoje.toISODate(),\n  itensPorPagina: 100,\n};\nconst consultas = [];\nfor (const m of org.monitoramentos || []) {\n  const numero = String(m.numero || '').replace(/\\D/g, '');\n  if (m.tipo === 'oab' && numero && m.uf) consultas.push({ ...base, numeroOab: numero, ufOab: String(m.uf).toUpperCase() });\n  else if (m.tipo === 'processo' && numero.length === 20) consultas.push({ ...base, numeroProcesso: numero });\n}\nreturn consultas.map(query => ({ json: { query } }));"
       },
-      "id": "2cb24046-e266-4828-aa81-d1cc6e7fbeac",
+      "id": "28b412da-8bbf-4ae2-8831-831ccfea8c92",
       "name": "Expandir Consultas",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1440,
+        1200,
         300
       ]
     },
@@ -219,12 +214,12 @@
           "timeout": 60000
         }
       },
-      "id": "a8814a06-a73e-4c6b-bd50-979dd33fcd88",
+      "id": "70d12243-8908-4431-abb8-bcd351d580a4",
       "name": "Consultar DJEN",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        1680,
+        1440,
         300
       ],
       "retryOnFail": true,
@@ -234,79 +229,108 @@
     },
     {
       "parameters": {
-        "jsCode": "const adv = $('Um advogado por vez').first().json;\nconst TZ = 'America/Sao_Paulo';\nconst PRAZO_PADRAO = adv.prazo_padrao_dias;\nconst extras = new Set(adv.feriados);\n\nfunction pascoa(y) {\n  const a = y % 19, b = Math.floor(y / 100), c = y % 100, d = Math.floor(b / 4), e = b % 4;\n  const f = Math.floor((b + 8) / 25), g = Math.floor((b - f + 1) / 3);\n  const h = (19 * a + b - d - g + 15) % 30, i = Math.floor(c / 4), k = c % 4;\n  const l = (32 + 2 * e + 2 * i - h - k) % 7, m = Math.floor((a + 11 * h + 22 * l) / 451);\n  const mes = Math.floor((h + l - 7 * m + 114) / 31), dia = ((h + l - 7 * m + 114) % 31) + 1;\n  return DateTime.fromObject({ year: y, month: mes, day: dia }, { zone: TZ });\n}\n\nconst cacheFeriados = {};\nfunction feriadosNacionais(y) {\n  if (cacheFeriados[y]) return cacheFeriados[y];\n  const s = new Set(['01-01', '04-21', '05-01', '09-07', '10-12', '11-02', '11-15', '11-20', '12-25'].map(md => y + '-' + md));\n  s.add(pascoa(y).minus({ days: 2 }).toISODate());\n  cacheFeriados[y] = s;\n  return s;\n}\n\nfunction ehDiaUtil(d) {\n  if (d.weekday > 5) return false;\n  const iso = d.toISODate();\n  if (feriadosNacionais(d.year).has(iso) || extras.has(iso)) return false;\n  if (adv.considerar_recesso) {\n    const md = d.toFormat('MM-dd');\n    if (md >= '12-20' || md <= '01-20') return false;\n  }\n  return true;\n}\nfunction proximoDiaUtil(d) {\n  let x = d.plus({ days: 1 });\n  while (!ehDiaUtil(x)) x = x.plus({ days: 1 });\n  return x;\n}\nfunction calcularVencimento(inicio, dias) {\n  let x = inicio;\n  for (let c = 1; c < dias; c++) x = proximoDiaUtil(x);\n  return x;\n}\n\nconst POR_EXTENSO = { um: 1, uma: 1, dois: 2, duas: 2, 'três': 3, tres: 3, quatro: 4, cinco: 5, seis: 6, sete: 7, oito: 8, nove: 9, dez: 10, onze: 11, doze: 12, quinze: 15, vinte: 20, trinta: 30, quarenta: 40, sessenta: 60, noventa: 90 };\n\nfunction detectarPrazo(texto) {\n  const t = texto.toLowerCase();\n  const achados = [];\n  for (const m of t.matchAll(/(?:prazo|em|dentro de)\\s+(?:\\S+\\s+){0,2}?(?:de\\s+)?(\\d{1,3})\\s*(?:\\([^)]{0,40}\\))?\\s*dias?\\b/g)) {\n    if (+m[1] >= 1 && +m[1] <= 365) achados.push(+m[1]);\n  }\n  for (const m of t.matchAll(/(?:prazo|em|dentro de)\\s+(?:\\S+\\s+){0,2}?(?:de\\s+)?(\\S+)\\s+dias?\\b/g)) {\n    if (POR_EXTENSO[m[1]]) achados.push(POR_EXTENSO[m[1]]);\n  }\n  const distintos = [...new Set(achados)].sort((a, b) => a - b);\n  if (distintos.length === 1) return { dias: distintos[0], origem: 'Identificado no texto' };\n  if (distintos.length > 1) {\n    return { dias: distintos[0], origem: 'Mais de um prazo no texto (' + distintos.join(', ') + ' dias) - usado o menor, CONFERIR' };\n  }\n  const m = t.match(/(\\d{1,3})\\s*(?:\\([^)]{0,40}\\))?\\s*horas/);\n  if (m) return { dias: Math.max(1, Math.ceil(+m[1] / 24)), origem: 'Prazo em horas (' + m[1] + 'h) - CONFERIR' };\n  return { dias: PRAZO_PADRAO, origem: 'Padrão (' + PRAZO_PADRAO + ' dias) - não identificado no texto' };\n}\n\nfunction parseData(v) {\n  if (!v) return null;\n  const s = String(v).slice(0, 10);\n  const d = /^\\d{4}-\\d{2}-\\d{2}$/.test(s) ? DateTime.fromISO(s, { zone: TZ }) : DateTime.fromFormat(s, 'dd/MM/yyyy', { zone: TZ });\n  return d.isValid ? d : null;\n}\nconst DIACRITICOS = { acute: '\\u0301', grave: '\\u0300', tilde: '\\u0303', circ: '\\u0302', cedil: '\\u0327', uml: '\\u0308' };\nconst ENTIDADES = { nbsp: ' ', amp: '&', lt: '<', gt: '>', quot: '\"', apos: \"'\", ordm: 'º', ordf: 'ª', sect: '§', deg: '°', ndash: '-', mdash: '-', laquo: '«', raquo: '»', ldquo: '\"', rdquo: '\"', lsquo: \"'\", rsquo: \"'\", hellip: '...' };\nfunction limparHtml(s) {\n  return String(s || '')\n    .replace(/<(style|script|head)[\\s\\S]*?<\\/\\1>/gi, ' ')\n    .replace(/<br\\s*\\/?>/gi, ' ')\n    .replace(/<[^>]+>/g, ' ')\n    .replace(/&([A-Za-z])(acute|grave|tilde|circ|cedil|uml);/g, (_, l, d) => (l + DIACRITICOS[d]).normalize('NFC'))\n    .replace(/&#x([0-9a-f]+);/gi, (_, h) => String.fromCodePoint(parseInt(h, 16)))\n    .replace(/&#(\\d+);/g, (_, n) => String.fromCodePoint(+n))\n    .replace(/&([a-z]+);/gi, (m, e) => ENTIDADES[e.toLowerCase()] ?? m)\n    .replace(/\\s+/g, ' ')\n    .trim();\n}\n\nconst falhas = [];\nconst porId = new Map();\nfor (const item of $input.all()) {\n  if (item.json.error) {\n    const e = item.json.error;\n    falhas.push(typeof e === 'string' ? e : (e.message || JSON.stringify(e)));\n    continue;\n  }\n  const lista = Array.isArray(item.json.items) ? item.json.items : [];\n  for (const c of lista) {\n    const id = String(c.id ?? c.hash ?? '');\n    if (id && !porId.has(id)) porId.set(id, c);\n  }\n}\n\nconst publicacoes = [];\nfor (const [id, c] of porId) {\n  const teor = limparHtml(c.texto);\n  const prazo = detectarPrazo(teor);\n  const disponibilizacao = parseData(c.data_disponibilizacao || c.datadisponibilizacao || c.dataDisponibilizacao);\n  const publicacao = disponibilizacao ? proximoDiaUtil(disponibilizacao) : null;\n  const inicio = publicacao ? proximoDiaUtil(publicacao) : null;\n  const vencimento = inicio ? calcularVencimento(inicio, prazo.dias) : null;\n  const partes = (c.destinatarios || []).map(x => x.nome + (x.polo ? ' (' + x.polo + ')' : '')).join('; ');\n  const precisaConferir = !vencimento || /CONFERIR|Padrão/.test(prazo.origem);\n\n  publicacoes.push({\n    user_id: adv.user_id,\n    djen_id: id,\n    processo: c.numeroprocessocommascara || c.numero_processo || '',\n    tribunal: c.siglaTribunal || '',\n    orgao: c.nomeOrgao || '',\n    tipo: [c.tipoComunicacao, c.tipoDocumento].filter(Boolean).join(' / '),\n    classe: String(c.nomeClasse || '').toUpperCase(),\n    partes,\n    prazo_dias: prazo.dias,\n    origem_prazo: prazo.origem,\n    data_disponibilizacao: disponibilizacao ? disponibilizacao.toISODate() : null,\n    data_publicacao: publicacao ? publicacao.toISODate() : null,\n    inicio_prazo: inicio ? inicio.toISODate() : null,\n    vencimento: vencimento ? vencimento.toISODate() : null,\n    status: precisaConferir ? 'conferir' : 'pendente',\n    link: c.link || 'https://comunica.pje.jus.br/',\n    teor: teor.slice(0, 20000),\n  });\n}\n\npublicacoes.sort((a, b) => String(a.vencimento || '9999').localeCompare(String(b.vencimento || '9999')));\nreturn [{ json: { user_id: adv.user_id, publicacoes, falhas } }];"
+        "jsCode": "const org = $('Uma organização por vez').first().json;\nconst PRAZO_PADRAO = Number(org.prazo_padrao_dias) || 15;\n\n// <regra-vencimento> Mesma regra de web/src/domain/dias.ts (ADR-0002). O teste de paridade\n// (web/src/domain/paridade-n8n.test.ts) lê este trecho: mude os dois lados juntos.\nfunction criarRegra(feriadosLocais, considerarRecesso) {\n  const locais = new Set(feriadosLocais);\n  const FIXOS = ['01-01', '04-21', '05-01', '09-07', '10-12', '11-02', '11-15', '11-20', '12-25'];\n  const santas = {};\n  const paraData = iso => { const [a, m, d] = iso.split('-').map(Number); return new Date(Date.UTC(a, m - 1, d)); };\n  const paraISO = data => data.toISOString().slice(0, 10);\n  const somaDias = (data, n) => { const c = new Date(data); c.setUTCDate(c.getUTCDate() + n); return c; };\n  function pascoa(y) {\n    const a = y % 19, b = Math.floor(y / 100), c = y % 100, d = Math.floor(b / 4), e = b % 4;\n    const f = Math.floor((b + 8) / 25), g = Math.floor((b - f + 1) / 3);\n    const h = (19 * a + b - d - g + 15) % 30, i = Math.floor(c / 4), k = c % 4;\n    const l = (32 + 2 * e + 2 * i - h - k) % 7, m = Math.floor((a + 11 * h + 22 * l) / 451);\n    const mes = Math.floor((h + l - 7 * m + 114) / 31), dia = ((h + l - 7 * m + 114) % 31) + 1;\n    return new Date(Date.UTC(y, mes - 1, dia));\n  }\n  function sextaSanta(y) {\n    if (!santas[y]) santas[y] = paraISO(somaDias(pascoa(y), -2));\n    return santas[y];\n  }\n  function ehDiaUtil(iso) {\n    const semana = paraData(iso).getUTCDay();\n    if (semana === 0 || semana === 6) return false;\n    if (iso === sextaSanta(Number(iso.slice(0, 4)))) return false;\n    if (locais.has(iso)) return false;\n    const md = iso.slice(5);\n    if (considerarRecesso && (md >= '12-20' || md <= '01-20')) return false;\n    return !FIXOS.includes(md);\n  }\n  function proximoDiaUtil(iso) {\n    let x = somaDias(paraData(iso), 1);\n    while (!ehDiaUtil(paraISO(x))) x = somaDias(x, 1);\n    return paraISO(x);\n  }\n  function calcularVencimento(inicio, dias) {\n    let x = ehDiaUtil(inicio) ? inicio : proximoDiaUtil(inicio);\n    for (let c = 1; c < dias; c++) x = proximoDiaUtil(x);\n    return x;\n  }\n  return { ehDiaUtil, proximoDiaUtil, calcularVencimento };\n}\n// </regra-vencimento>\n\nconst regra = criarRegra((org.feriados || []).map(f => String(f).slice(0, 10)), org.considerar_recesso !== false);\n\nconst POR_EXTENSO = { um: 1, uma: 1, dois: 2, duas: 2, 'três': 3, tres: 3, quatro: 4, cinco: 5, seis: 6, sete: 7, oito: 8, nove: 9, dez: 10, onze: 11, doze: 12, quinze: 15, vinte: 20, trinta: 30, quarenta: 40, sessenta: 60, noventa: 90 };\n\nfunction detectarPrazo(texto) {\n  const t = texto.toLowerCase();\n  const achados = [];\n  for (const m of t.matchAll(/(?:prazo|em|dentro de)\\s+(?:\\S+\\s+){0,2}?(?:de\\s+)?(\\d{1,3})\\s*(?:\\([^)]{0,40}\\))?\\s*dias?\\b/g)) {\n    if (+m[1] >= 1 && +m[1] <= 365) achados.push(+m[1]);\n  }\n  for (const m of t.matchAll(/(?:prazo|em|dentro de)\\s+(?:\\S+\\s+){0,2}?(?:de\\s+)?(\\S+)\\s+dias?\\b/g)) {\n    if (POR_EXTENSO[m[1]]) achados.push(POR_EXTENSO[m[1]]);\n  }\n  const distintos = [...new Set(achados)].sort((a, b) => a - b);\n  if (distintos.length === 1) return { dias: distintos[0], origem: 'Identificado no texto' };\n  if (distintos.length > 1) {\n    return { dias: distintos[0], origem: 'Mais de um prazo no texto (' + distintos.join(', ') + ' dias) - usado o menor, CONFERIR' };\n  }\n  const m = t.match(/(\\d{1,3})\\s*(?:\\([^)]{0,40}\\))?\\s*horas/);\n  if (m) return { dias: Math.max(1, Math.ceil(+m[1] / 24)), origem: 'Prazo em horas (' + m[1] + 'h) - CONFERIR' };\n  return { dias: PRAZO_PADRAO, origem: 'Padrão (' + PRAZO_PADRAO + ' dias) - não identificado no texto' };\n}\n\nfunction parseData(v) {\n  if (!v) return null;\n  const s = String(v).slice(0, 10);\n  if (/^\\d{4}-\\d{2}-\\d{2}$/.test(s)) return s;\n  const m = /^(\\d{2})\\/(\\d{2})\\/(\\d{4})$/.exec(s);\n  return m ? m[3] + '-' + m[2] + '-' + m[1] : null;\n}\nconst DIACRITICOS = { acute: '\\u0301', grave: '\\u0300', tilde: '\\u0303', circ: '\\u0302', cedil: '\\u0327', uml: '\\u0308' };\nconst ENTIDADES = { nbsp: ' ', amp: '&', lt: '<', gt: '>', quot: '\"', apos: \"'\", ordm: 'º', ordf: 'ª', sect: '§', deg: '°', ndash: '-', mdash: '-', laquo: '«', raquo: '»', ldquo: '\"', rdquo: '\"', lsquo: \"'\", rsquo: \"'\", hellip: '...' };\nfunction limparHtml(s) {\n  return String(s || '')\n    .replace(/<(style|script|head)[\\s\\S]*?<\\/\\1>/gi, ' ')\n    .replace(/<br\\s*\\/?>/gi, ' ')\n    .replace(/<[^>]+>/g, ' ')\n    .replace(/&([A-Za-z])(acute|grave|tilde|circ|cedil|uml);/g, (_, l, d) => (l + DIACRITICOS[d]).normalize('NFC'))\n    .replace(/&#x([0-9a-f]+);/gi, (_, h) => String.fromCodePoint(parseInt(h, 16)))\n    .replace(/&#(\\d+);/g, (_, n) => String.fromCodePoint(+n))\n    .replace(/&([a-z]+);/gi, (m, e) => ENTIDADES[e.toLowerCase()] ?? m)\n    .replace(/\\s+/g, ' ')\n    .trim();\n}\n\nconst falhas = [];\nconst porId = new Map();\nfor (const item of $input.all()) {\n  if (item.json.error) {\n    const e = item.json.error;\n    falhas.push(typeof e === 'string' ? e : (e.message || JSON.stringify(e)));\n    continue;\n  }\n  const lista = Array.isArray(item.json.items) ? item.json.items : [];\n  for (const c of lista) {\n    const id = String(c.id ?? c.hash ?? '');\n    if (id && !porId.has(id)) porId.set(id, c);\n  }\n}\n\nconst publicacoes = [];\nfor (const [id, c] of porId) {\n  const teor = limparHtml(c.texto);\n  const prazo = detectarPrazo(teor);\n  const disponibilizacao = parseData(c.data_disponibilizacao || c.datadisponibilizacao || c.dataDisponibilizacao);\n  const publicacao = disponibilizacao ? regra.proximoDiaUtil(disponibilizacao) : null;\n  const inicio = publicacao ? regra.proximoDiaUtil(publicacao) : null;\n  const vencimento = inicio ? regra.calcularVencimento(inicio, prazo.dias) : null;\n  const partes = (c.destinatarios || []).map(x => x.nome + (x.polo ? ' (' + x.polo + ')' : '')).join('; ');\n  // OABs intimadas, na ordem da publicação: o banco escolhe o responsável por elas.\n  const advogados = (c.destinatarioadvogados || [])\n    .map(d => (d && d.advogado) || d)\n    .filter(Boolean)\n    .map(a => ({ numero: String(a.numero_oab ?? a.numeroOab ?? ''), uf: String(a.uf_oab ?? a.ufOab ?? '') }));\n  const precisaConferir = !vencimento || /CONFERIR|Padrão/.test(prazo.origem);\n\n  publicacoes.push({\n    djen_id: id,\n    processo: c.numeroprocessocommascara || c.numero_processo || '',\n    numero_processo: String(c.numero_processo || c.numeroprocessocommascara || '').replace(/\\D/g, ''),\n    tribunal: c.siglaTribunal || '',\n    orgao: c.nomeOrgao || '',\n    tipo: [c.tipoComunicacao, c.tipoDocumento].filter(Boolean).join(' / '),\n    classe: String(c.nomeClasse || '').toUpperCase(),\n    partes,\n    advogados,\n    prazo_dias: prazo.dias,\n    origem_prazo: prazo.origem,\n    data_disponibilizacao: disponibilizacao,\n    data_publicacao: publicacao,\n    inicio_prazo: inicio,\n    vencimento,\n    status: precisaConferir ? 'conferir' : 'pendente',\n    link: c.link || 'https://comunica.pje.jus.br/',\n    teor: teor.slice(0, 20000),\n  });\n}\n\npublicacoes.sort((a, b) => String(a.vencimento || '9999').localeCompare(String(b.vencimento || '9999')));\nreturn [{ json: { organizacao_id: org.organizacao_id, publicacoes, falhas } }];"
       },
-      "id": "c992e1f0-d96d-48b2-802e-26b7fde37bec",
+      "id": "d059a365-0b8b-4f06-91bf-73eace74e8dd",
       "name": "Processar Publicações",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1920,
+        1680,
         300
       ]
     },
     {
       "parameters": {
-        "operation": "getAll",
-        "tableId": "prazos",
-        "returnAll": true,
-        "filterType": "string",
-        "filterString": "={{ (() => { const r = $('Processar Publicações').first().json; const ids = r.publicacoes.map(p => p.djen_id); return 'user_id=eq.' + r.user_id + '&djen_id=' + (ids.length ? 'in.(' + ids.join(',') + ')' : 'eq.nenhum'); })() }}"
+        "method": "POST",
+        "url": "={{ $('Configurar').first().json.supabase_url }}/rest/v1/rpc/robo_gravar_prazos",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ org: $json.organizacao_id, publicacoes: $json.publicacoes }) }}",
+        "options": {
+          "timeout": 60000
+        }
       },
-      "id": "944ea284-9f2e-4707-b77d-d30f72814cb1",
-      "name": "Ler Já Salvos",
-      "type": "n8n-nodes-base.supabase",
-      "typeVersion": 1,
+      "id": "f7df6164-5792-4093-846a-317e606f910d",
+      "name": "Gravar Prazos",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
       "position": [
-        2160,
+        1920,
         300
       ],
-      "executeOnce": true,
-      "alwaysOutputData": true
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000,
+      "onError": "continueRegularOutput"
     },
     {
       "parameters": {
-        "jsCode": "const jaSalvos = new Set(\n  $input.all().map(i => String(i.json.djen_id ?? '')).filter(Boolean)\n);\nconst { publicacoes } = $('Processar Publicações').first().json;\nconst novas = publicacoes.filter(p => !jaSalvos.has(String(p.djen_id)));\n\nreturn novas.length ? novas.map(p => ({ json: p })) : [{ json: { _vazio: true } }];"
+        "jsCode": "const org = $('Uma organização por vez').first().json;\nconst { publicacoes, falhas } = $('Processar Publicações').first().json;\nconst gravacao = $input.first().json || {};\nconst mensagem = e => (typeof e === 'string' ? e : (e && (e.message || JSON.stringify(e))) || 'erro desconhecido');\nconst erro = gravacao.error ? mensagem(gravacao.error) : null;\nconst problemas = [...falhas, ...(erro ? ['Erro ao gravar prazos: ' + erro] : [])];\nreturn [{ json: {\n  org: org.organizacao_id,\n  origem: org.origem,\n  autor: org.autor || null,\n  encontradas: publicacoes.length,\n  novas: erro ? [] : (gravacao.ids || []),\n  falhou: problemas.length > 0,\n  detalhe: problemas.length ? problemas.join(' | ').slice(0, 2000) : null,\n} }];"
       },
-      "id": "f9ba3c14-0286-4eaa-bb9e-ec38b3a15400",
-      "name": "Filtrar Novas",
+      "id": "90900cbe-9f37-4dff-ab79-7c3d429d1fff",
+      "name": "Resultado",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2400,
+        2160,
         300
       ]
     },
     {
       "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "loose",
-            "version": 2
-          },
-          "conditions": [
+        "method": "POST",
+        "url": "={{ $('Configurar').first().json.supabase_url }}/rest/v1/rpc/robo_concluir",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
             {
-              "id": "01058930-3793-4288-a8b4-8db666f17f31",
-              "leftValue": "={{ $json._vazio !== true }}",
-              "rightValue": "",
-              "operator": {
-                "type": "boolean",
-                "operation": "true",
-                "singleValue": true
-              }
+              "name": "Content-Type",
+              "value": "application/json"
             }
-          ],
-          "combinator": "and"
+          ]
         },
-        "looseTypeValidation": true,
-        "options": {}
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "timeout": 60000
+        }
       },
-      "id": "105b6675-98f1-4947-bcbe-326683cc5501",
-      "name": "Tem novas?",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2.2,
+      "id": "12c6c77f-eb02-4950-918c-9ce189bd7de9",
+      "name": "Concluir Execução",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2400,
+        300
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Um e-mail por membro, com a janela de alerta e a preferência (\"meus\" ou \"todos\") de cada um.\n// Buscar agora: só quem clicou. Turno das 12:00: só quem tem publicação nova.\nconst org = $('Uma organização por vez').first().json;\nconst cfg = $('Configurar').first().json;\nconst resultado = $('Resultado').first().json;\nconst resposta = $input.first().json || {};\nconst TZ = 'America/Sao_Paulo';\nconst hoje = DateTime.now().setZone(TZ).startOf('day');\nconst esc = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\"/g, '&quot;');\nconst br = iso => (iso ? DateTime.fromISO(String(iso).slice(0, 10)).toFormat('dd/MM/yyyy') : '-');\nconst mensagem = e => (typeof e === 'string' ? e : (e && (e.message || JSON.stringify(e))) || 'erro desconhecido');\n\nconst problemas = resultado.detalhe ? [resultado.detalhe] : [];\nif (resposta.error) problemas.push('Erro ao registrar a execução: ' + mensagem(resposta.error));\nconst falhou = resultado.falhou || Boolean(resposta.error);\nconst suporteValido = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(cfg.suporte) && !cfg.suporte.includes('troque-este-endereco');\nconst suporte = {\n  avisar_suporte: falhou && suporteValido,\n  suporte: cfg.suporte,\n  assunto_suporte: '[Despert] Falha na execução de ' + org.nome + ' (' + org.origem + ')',\n  html_suporte: '<p>Execução do robô falhou para a organização <b>' + esc(org.nome) + '</b> (' + esc(org.organizacao_id) + ').</p>'\n    + '<pre style=\"white-space:pre-wrap\">' + esc(problemas.join('\\n').slice(0, 4000)) + '</pre>',\n};\n\nlet destinatarios = Array.isArray(resposta.destinatarios) ? resposta.destinatarios : [];\nif (org.origem === 'site') destinatarios = destinatarios.filter(d => d.user_id === org.autor);\nif (cfg.turno === '12') destinatarios = destinatarios.filter(d => (d.novas || []).length > 0);\n\nfunction situacao(d) {\n  if (d < 0) return '<b style=\"color:#b00020\">VENCIDO há ' + -d + ' dia(s)</b>';\n  if (d === 0) return '<b style=\"color:#b00020\">VENCE HOJE</b>';\n  if (d === 1) return '<b style=\"color:#d35400\">Vence amanhã</b>';\n  return 'Em ' + d + ' dias';\n}\nconst TH = 'style=\"text-align:left;padding:6px;border-bottom:2px solid #333;background:#f2f2f2\"';\nconst TD = 'style=\"padding:6px;border-bottom:1px solid #ddd;vertical-align:top\"';\nconst link = r => (r.link ? '<a href=\"' + esc(r.link) + '\">abrir</a>' : '');\nconst tabela = (cabecalho, linhas) =>\n  '<table style=\"border-collapse:collapse;width:100%\"><tr>' + cabecalho.map(h => '<th ' + TH + '>' + h + '</th>').join('') + '</tr>' +\n  linhas.map(cols => '<tr>' + cols.map(c => '<td ' + TD + '>' + c + '</td>').join('') + '</tr>').join('') + '</table>';\n\nfunction avisoDaEtapa(d) {\n  if (d.papel !== 'administrador') return '';\n  if (resposta.etapa === 'aviso') {\n    return '<div style=\"border:1px solid #d35400;background:#fff4e5;padding:10px;margin-bottom:16px\">'\n      + '<b>O pagamento do Despert está vencido.</b> A partir de ' + esc(br(resposta.leitura_em))\n      + ' a organização fica em somente leitura, e em ' + esc(br(resposta.suspensa_em))\n      + ' o robô para de buscar. Fale com o suporte para regularizar.</div>';\n  }\n  if (resposta.etapa === 'leitura') {\n    return '<div style=\"border:1px solid #b00020;background:#fdecee;padding:10px;margin-bottom:16px\">'\n      + '<b>Organização em somente leitura.</b> O robô continua buscando até ' + esc(br(resposta.suspensa_em))\n      + '. Fale com o suporte para reativar.</div>';\n  }\n  return '';\n}\n\nconst itens = destinatarios.map(d => {\n  const janela = Number(d.dias_alerta) || 7;\n  const alertas = (d.alertas || [])\n    .map(r => ({ ...r, _dias: Math.round(DateTime.fromISO(String(r.vencimento).slice(0, 10), { zone: TZ }).diff(hoje, 'days').days) }))\n    .sort((a, b) => a._dias - b._dias);\n  const novas = falhou && !(d.novas || []).length ? [] : (d.novas || []);\n  const meus = d.escopo === 'meus';\n\n  let html = '<div style=\"font-family:Arial,sans-serif;font-size:14px;color:#222\">';\n  html += '<h2>Despert - ' + esc(resposta.organizacao || org.nome) + ' - ' + hoje.toFormat('dd/MM/yyyy') + '</h2>';\n  html += avisoDaEtapa(d);\n  if (falhou) {\n    html += '<div style=\"border:1px solid #b00020;background:#fdecee;padding:10px;margin-bottom:16px\">'\n      + '<b style=\"color:#b00020\">Não foi possível concluir a consulta ao Diário (DJEN).</b> '\n      + 'Verifique as publicações manualmente hoje em <a href=\"https://comunica.pje.jus.br/\">comunica.pje.jus.br</a>.'\n      + '<pre style=\"white-space:pre-wrap;font-size:12px\">' + esc(problemas.join('\\n').slice(0, 2000)) + '</pre></div>';\n  }\n  if (!alertas.length && !novas.length) {\n    html += '<p>Nenhum prazo ' + (meus ? 'seu ' : '') + 'em alerta nos próximos ' + janela + ' dias e nenhuma publicação nova no Diário.</p>';\n  } else {\n    html += '<h3>Prazos ' + (meus ? 'seus ' : '') + 'em alerta (próximos ' + janela + ' dias e vencidos não cumpridos)</h3>';\n    html += alertas.length\n      ? tabela(['Situação', 'Vencimento', 'Processo', 'Tribunal', 'Tipo', 'Responsável', 'Link'],\n          alertas.map(r => [situacao(r._dias), esc(br(r.vencimento)), esc(r.processo), esc(r.tribunal), esc(r.tipo), esc(r.responsavel), link(r)]))\n      : '<p>Nenhum prazo pendente nessa janela.</p>';\n    html += '<h3>Novas publicações no DJEN (' + novas.length + ')</h3>';\n    html += novas.length\n      ? tabela(['Vencimento', 'Prazo', 'Processo', 'Tribunal / Órgão', 'Tipo', 'Responsável', 'Trecho', 'Link'],\n          novas.map(r => [\n            '<b>' + esc(br(r.vencimento)) + '</b>',\n            esc(r.prazo_dias) + ' dias<br><small>' + esc(r.origem_prazo) + '</small>',\n            esc(r.processo),\n            esc(r.tribunal) + '<br><small>' + esc(r.orgao) + '</small>',\n            esc(r.tipo),\n            esc(r.responsavel),\n            '<small>' + esc(r.trecho) + '...</small>',\n            link(r),\n          ]))\n      : '<p>Nenhuma publicação nova desde a última verificação.</p>';\n  }\n  html += '<p style=\"color:#777;font-size:12px;margin-top:24px\">Vencimentos estimados automaticamente em dias úteis (CPC arts. 219, 220 e 224; Lei 11.419/2006, art. 4º). '\n    + 'Sempre confira no processo. Marque o prazo como cumprido no painel para tirá-lo dos alertas. '\n    + (meus ? 'Você recebe só os seus prazos; mude em Configurações.' : 'Você recebe os prazos de toda a organização; mude em Configurações.')\n    + '</p></div>';\n\n  const assunto = (falhou ? '[Prazos] FALHA na consulta ao Diário - verifique manualmente' : '[Prazos] '\n    + (novas.length ? novas.length + ' nova(s) publicação(ões)' : 'Sem novas publicações'))\n    + (alertas.length ? ' | ' + alertas.length + ' prazo(s) em alerta' : '')\n    + (d.papel === 'administrador' && ['aviso', 'leitura'].includes(resposta.etapa) ? ' | Pagamento vencido' : '');\n\n  return { json: { email: d.email, assunto, html, ...suporte } };\n});\n\nreturn itens.length ? itens : [{ json: { _nenhum: true, ...suporte } }];"
+      },
+      "id": "2da5ccb8-8fb7-4899-b8d6-f0f79e9610f9",
+      "name": "Montar E-mails",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
       "position": [
         2640,
         300
@@ -314,112 +338,56 @@
     },
     {
       "parameters": {
-        "tableId": "prazos",
-        "dataToSend": "autoMapInputData",
-        "inputsToIgnore": ""
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "693d7c8c-f69c-4c58-a78e-fce7302e7014",
+              "leftValue": "={{ $json._nenhum !== true }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
       },
-      "id": "d7630658-d4c2-48f1-b1ed-7f513293407a",
-      "name": "Salvar Prazos",
-      "type": "n8n-nodes-base.supabase",
-      "typeVersion": 1,
+      "id": "09517708-5b20-4138-8940-33c0aaa96733",
+      "name": "Tem destinatário?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
       "position": [
         2880,
-        200
-      ],
-      "onError": "continueRegularOutput"
-    },
-    {
-      "parameters": {
-        "operation": "getAll",
-        "tableId": "prazos",
-        "returnAll": true,
-        "filterType": "string",
-        "filterString": "={{ (() => { const a = $('Um advogado por vez').first().json; const hoje = $now.setZone('America/Sao_Paulo'); return 'user_id=eq.' + a.user_id + '&status=in.(pendente,conferir)&vencimento=gte.' + hoje.minus({ days: 30 }).toISODate() + '&vencimento=lte.' + hoje.plus({ days: a.dias_alerta }).toISODate(); })() }}"
-      },
-      "id": "3aea85a2-d445-4422-8bb8-0bc3dc2113be",
-      "name": "Prazos em Alerta",
-      "type": "n8n-nodes-base.supabase",
-      "typeVersion": 1,
-      "position": [
-        3120,
-        300
-      ],
-      "executeOnce": true,
-      "alwaysOutputData": true
-    },
-    {
-      "parameters": {
-        "jsCode": "const adv = $('Um advogado por vez').first().json;\nconst { publicacoes, falhas } = $('Processar Publicações').first().json;\nconst TZ = 'America/Sao_Paulo';\nconst hoje = DateTime.now().setZone(TZ).startOf('day');\nconst JANELA = adv.dias_alerta;\nconst esc = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\"/g, '&quot;');\nconst br = iso => (iso ? DateTime.fromISO(String(iso).slice(0, 10)).toFormat('dd/MM/yyyy') : '-');\n\nconst candidatas = $('Filtrar Novas').all().map(i => i.json).filter(j => !j._vazio);\nconst errosAoSalvar = candidatas.length\n  ? $('Salvar Prazos').all().map(i => i.json.error).filter(Boolean).map(e => (typeof e === 'string' ? e : e.message || JSON.stringify(e)))\n  : [];\nconst novas = errosAoSalvar.length ? [] : candidatas;\nconst problemas = [...falhas, ...errosAoSalvar.map(e => 'Erro ao gravar prazos: ' + e)];\nconst falhou = problemas.length > 0;\n\nconst alertas = $input.all().map(i => i.json)\n  .filter(r => r && r.djen_id && ['pendente', 'conferir'].includes(r.status) && r.vencimento)\n  .map(r => ({ ...r, _dias: Math.round(DateTime.fromISO(String(r.vencimento).slice(0, 10), { zone: TZ }).diff(hoje, 'days').days) }))\n  .filter(r => r._dias >= -30 && r._dias <= JANELA)\n  .sort((a, b) => a._dias - b._dias);\n\nfunction situacao(d) {\n  if (d < 0) return '<b style=\"color:#b00020\">VENCIDO há ' + -d + ' dia(s)</b>';\n  if (d === 0) return '<b style=\"color:#b00020\">VENCE HOJE</b>';\n  if (d === 1) return '<b style=\"color:#d35400\">Vence amanhã</b>';\n  return 'Em ' + d + ' dias';\n}\nconst TH = 'style=\"text-align:left;padding:6px;border-bottom:2px solid #333;background:#f2f2f2\"';\nconst TD = 'style=\"padding:6px;border-bottom:1px solid #ddd;vertical-align:top\"';\nconst link = r => (r.link ? '<a href=\"' + esc(r.link) + '\">abrir</a>' : '');\nconst tabela = (cabecalho, linhas) =>\n  '<table style=\"border-collapse:collapse;width:100%\"><tr>' + cabecalho.map(h => '<th ' + TH + '>' + h + '</th>').join('') + '</tr>' +\n  linhas.map(cols => '<tr>' + cols.map(c => '<td ' + TD + '>' + c + '</td>').join('') + '</tr>').join('') + '</table>';\n\nlet html = '<div style=\"font-family:Arial,sans-serif;font-size:14px;color:#222\">';\nhtml += '<h2>Despert - ' + hoje.toFormat('dd/MM/yyyy') + '</h2>';\n\nif (falhou) {\n  html += '<div style=\"border:1px solid #b00020;background:#fdecee;padding:10px;margin-bottom:16px\">'\n    + '<b style=\"color:#b00020\">Não foi possível concluir a consulta ao Diário (DJEN).</b> '\n    + 'Verifique as publicações manualmente hoje em <a href=\"https://comunica.pje.jus.br/\">comunica.pje.jus.br</a>.'\n    + '<pre style=\"white-space:pre-wrap;font-size:12px\">' + esc(problemas.join('\\n').slice(0, 2000)) + '</pre></div>';\n}\n\nif (!alertas.length && !novas.length) {\n  html += '<p>Nenhum prazo em alerta nos próximos ' + JANELA + ' dias e nenhuma publicação nova no Diário.</p>';\n} else {\n  html += '<h3>Prazos em alerta (próximos ' + JANELA + ' dias e vencidos não cumpridos)</h3>';\n  html += alertas.length\n    ? tabela(['Situação', 'Vencimento', 'Processo', 'Tribunal', 'Tipo', 'Link'],\n        alertas.map(r => [situacao(r._dias), esc(br(r.vencimento)), esc(r.processo), esc(r.tribunal), esc(r.tipo), link(r)]))\n    : '<p>Nenhum prazo pendente nessa janela.</p>';\n\n  html += '<h3>Novas publicações no DJEN (' + novas.length + ')</h3>';\n  html += novas.length\n    ? tabela(['Vencimento', 'Prazo', 'Processo', 'Tribunal / Órgão', 'Tipo', 'Trecho', 'Link'],\n        novas.map(r => [\n          '<b>' + esc(br(r.vencimento)) + '</b>',\n          esc(r.prazo_dias) + ' dias<br><small>' + esc(r.origem_prazo) + '</small>',\n          esc(r.processo),\n          esc(r.tribunal) + '<br><small>' + esc(r.orgao) + '</small>',\n          esc(r.tipo),\n          '<small>' + esc(String(r.teor || '').slice(0, 300)) + '...</small>',\n          link(r),\n        ]))\n    : '<p>Nenhuma publicação nova desde a última verificação.</p>';\n}\n\nhtml += '<p style=\"color:#777;font-size:12px;margin-top:24px\">Vencimentos estimados automaticamente em dias úteis (CPC arts. 219, 220 e 224; Lei 11.419/2006, art. 4º). '\n  + 'Sempre confira no processo. Marque o prazo como cumprido no painel para tirá-lo dos alertas.</p></div>';\n\nconst assunto = (falhou ? '[Prazos] FALHA na consulta ao Diário - verifique manualmente' : '[Prazos] '\n  + (novas.length ? novas.length + ' nova(s) publicação(ões)' : 'Sem novas publicações'))\n  + (alertas.length ? ' | ' + alertas.length + ' prazo(s) em alerta' : '');\n\nconst suporteValido = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(adv.suporte) && !adv.suporte.includes('troque-este-endereco');\n\nreturn [{ json: {\n  user_id: adv.user_id,\n  email: adv.email,\n  origem: adv.origem,\n  encontradas: publicacoes.length,\n  novas: novas.length,\n  status: falhou ? 'falha' : 'ok',\n  detalhe: falhou ? problemas.join(' | ').slice(0, 2000) : null,\n  assunto,\n  html,\n  avisar_suporte: falhou && suporteValido,\n  suporte: adv.suporte,\n  assunto_suporte: '[Despert] Falha na execução de ' + adv.email + ' (' + adv.origem + ')',\n  html_suporte: '<p>Execução do robô falhou para o advogado <b>' + esc(adv.email) + '</b> (user_id ' + esc(adv.user_id) + ').</p>'\n    + '<pre style=\"white-space:pre-wrap\">' + esc(problemas.join('\\n').slice(0, 4000)) + '</pre>',\n} }];"
-      },
-      "id": "5ab498b6-1981-445c-99a3-16ac14348a66",
-      "name": "Montar E-mail",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        3360,
         300
       ]
     },
     {
       "parameters": {
-        "tableId": "execucoes",
-        "dataToSend": "defineBelow",
-        "fieldsUi": {
-          "fieldValues": [
-            {
-              "fieldId": "user_id",
-              "fieldValue": "={{ $json.user_id }}"
-            },
-            {
-              "fieldId": "origem",
-              "fieldValue": "={{ $json.origem }}"
-            },
-            {
-              "fieldId": "encontradas",
-              "fieldValue": "={{ $json.encontradas }}"
-            },
-            {
-              "fieldId": "novas",
-              "fieldValue": "={{ $json.novas }}"
-            },
-            {
-              "fieldId": "status",
-              "fieldValue": "={{ $json.status }}"
-            },
-            {
-              "fieldId": "detalhe",
-              "fieldValue": "={{ $json.detalhe || '' }}"
-            }
-          ]
-        }
-      },
-      "id": "7027cd5c-b602-4dd2-845d-34a33757028f",
-      "name": "Registrar Execução",
-      "type": "n8n-nodes-base.supabase",
-      "typeVersion": 1,
-      "position": [
-        3600,
-        300
-      ],
-      "onError": "continueRegularOutput"
-    },
-    {
-      "parameters": {
-        "sendTo": "={{ $('Montar E-mail').first().json.email }}",
-        "subject": "={{ $('Montar E-mail').first().json.assunto }}",
+        "sendTo": "={{ $json.email }}",
+        "subject": "={{ $json.assunto }}",
         "emailType": "html",
-        "message": "={{ $('Montar E-mail').first().json.html }}",
+        "message": "={{ $json.html }}",
         "options": {
           "appendAttribution": false
         }
       },
-      "id": "dfadd538-8501-440f-ac8b-019b0a597350",
+      "id": "b0b14b23-cc6f-4bd3-b071-7784ddc56f34",
       "name": "Enviar Resumo",
       "type": "n8n-nodes-base.gmail",
       "typeVersion": 2.1,
       "position": [
-        3840,
-        300
+        3120,
+        200
       ],
       "onError": "continueRegularOutput"
     },
@@ -434,8 +402,8 @@
           },
           "conditions": [
             {
-              "id": "32bdf36f-8c9b-454c-ad9b-557f398c3126",
-              "leftValue": "={{ $('Montar E-mail').first().json.avisar_suporte }}",
+              "id": "afa7a267-d489-4179-b171-59e589cef851",
+              "leftValue": "={{ $('Montar E-mails').first().json.avisar_suporte }}",
               "rightValue": "",
               "operator": {
                 "type": "boolean",
@@ -449,34 +417,36 @@
         "looseTypeValidation": true,
         "options": {}
       },
-      "id": "19626578-5990-4ba2-ae75-07d201c35a4b",
+      "id": "074534e9-74aa-486c-a25c-187b00243029",
       "name": "Avisar suporte?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        4080,
+        3360,
         300
-      ]
+      ],
+      "executeOnce": true
     },
     {
       "parameters": {
-        "sendTo": "={{ $('Montar E-mail').first().json.suporte }}",
-        "subject": "={{ $('Montar E-mail').first().json.assunto_suporte }}",
+        "sendTo": "={{ $('Montar E-mails').first().json.suporte }}",
+        "subject": "={{ $('Montar E-mails').first().json.assunto_suporte }}",
         "emailType": "html",
-        "message": "={{ $('Montar E-mail').first().json.html_suporte }}",
+        "message": "={{ $('Montar E-mails').first().json.html_suporte }}",
         "options": {
           "appendAttribution": false
         }
       },
-      "id": "055c7505-1333-41aa-b7ec-d6c3d01aa402",
+      "id": "5fc5c101-8bbf-4f66-b169-a596b9aaa155",
       "name": "E-mail ao Suporte",
       "type": "n8n-nodes-base.gmail",
       "typeVersion": 2.1,
       "position": [
-        4320,
+        3600,
         200
       ],
-      "onError": "continueRegularOutput"
+      "onError": "continueRegularOutput",
+      "executeOnce": true
     }
   ],
   "connections": {
@@ -484,18 +454,29 @@
       "main": [
         [
           {
-            "node": "Ler Configurações",
+            "node": "Configurar",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Todo dia útil 07:00": {
+    "Dia útil 07:00": {
       "main": [
         [
           {
-            "node": "Ler Configurações",
+            "node": "Configurar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Dia útil 12:00": {
+      "main": [
+        [
+          {
+            "node": "Configurar",
             "type": "main",
             "index": 0
           }
@@ -506,47 +487,14 @@
       "main": [
         [
           {
-            "node": "Conferir Token",
+            "node": "Configurar",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Ler Configurações": {
-      "main": [
-        [
-          {
-            "node": "Ler Monitoramentos",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Conferir Token": {
-      "main": [
-        [
-          {
-            "node": "Ler Monitoramentos",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Ler Monitoramentos": {
-      "main": [
-        [
-          {
-            "node": "Ler Feriados",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Ler Feriados": {
+    "Configurar": {
       "main": [
         [
           {
@@ -561,14 +509,25 @@
       "main": [
         [
           {
-            "node": "Um advogado por vez",
+            "node": "Organizações",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Um advogado por vez": {
+    "Organizações": {
+      "main": [
+        [
+          {
+            "node": "Uma organização por vez",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Uma organização por vez": {
       "main": [
         [],
         [
@@ -606,91 +565,69 @@
       "main": [
         [
           {
-            "node": "Ler Já Salvos",
+            "node": "Gravar Prazos",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Ler Já Salvos": {
+    "Gravar Prazos": {
       "main": [
         [
           {
-            "node": "Filtrar Novas",
+            "node": "Resultado",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Filtrar Novas": {
+    "Resultado": {
       "main": [
         [
           {
-            "node": "Tem novas?",
+            "node": "Concluir Execução",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Tem novas?": {
+    "Concluir Execução": {
       "main": [
         [
           {
-            "node": "Salvar Prazos",
+            "node": "Montar E-mails",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Montar E-mails": {
+      "main": [
+        [
+          {
+            "node": "Tem destinatário?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tem destinatário?": {
+      "main": [
+        [
+          {
+            "node": "Enviar Resumo",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "Prazos em Alerta",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Salvar Prazos": {
-      "main": [
-        [
-          {
-            "node": "Prazos em Alerta",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Prazos em Alerta": {
-      "main": [
-        [
-          {
-            "node": "Montar E-mail",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Montar E-mail": {
-      "main": [
-        [
-          {
-            "node": "Registrar Execução",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Registrar Execução": {
-      "main": [
-        [
-          {
-            "node": "Enviar Resumo",
+            "node": "Avisar suporte?",
             "type": "main",
             "index": 0
           }
@@ -719,7 +656,7 @@
         ],
         [
           {
-            "node": "Um advogado por vez",
+            "node": "Uma organização por vez",
             "type": "main",
             "index": 0
           }
@@ -730,7 +667,7 @@
       "main": [
         [
           {
-            "node": "Um advogado por vez",
+            "node": "Uma organização por vez",
             "type": "main",
             "index": 0
           }

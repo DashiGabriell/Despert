@@ -269,7 +269,10 @@ export function useGerarTokenAdvogado() {
   })
 }
 
-/** Dispara uma execução do robô para um advogado, com o token dele, e registra na auditoria. */
+/**
+ * Dispara o robô para a organização (a mais antiga) da conta, como o Buscar agora: registra o
+ * disparo (o robô só aceita token com registro recente), chama o webhook e audita.
+ */
 export function useDispararBusca() {
   const queryClient = useQueryClient()
   return useMutation({
@@ -279,13 +282,18 @@ export function useDispararBusca() {
       dev: { id: string; email: string | undefined }
     }): Promise<number | null> => {
       const sb = cliente()
+      const org = await sb.rpc('organizacao_de', { uid: pedido.conta.id })
+      if (org.error) throw org.error
+      if (!org.data) throw new Error('Esta conta não pertence a nenhuma organização.')
       const { data, error } = await sb
-        .from('configuracoes')
+        .from('configuracoes_organizacao')
         .select('webhook_token')
-        .eq('user_id', pedido.conta.id)
+        .eq('organizacao_id', org.data)
         .maybeSingle()
       if (error) throw error
-      if (!data) throw new Error('Este advogado ainda não tem configuração (nunca entrou no site).')
+      if (!data) throw new Error('A organização desta conta ainda não tem configurações.')
+      const registro = await sb.rpc('registrar_busca_agora', { org: org.data })
+      if (registro.error) throw registro.error
       const status = await chamarWebhook(urlDisparo(pedido.webhookUrl, data.webhook_token))
       await sb.from('auditoria').insert({
         dev_id: pedido.dev.id,

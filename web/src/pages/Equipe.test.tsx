@@ -49,6 +49,7 @@ function convite(parcial: Partial<Convite>): Convite {
     criado_em: em(-1),
     expira_em: em(6),
     aceito_em: null,
+    enviado_em: null,
     ...parcial,
   }
 }
@@ -94,6 +95,13 @@ describe('tela Equipe', () => {
     renderizar()
     expect(screen.getByText(/Vagas do plano:/)).toHaveTextContent('3 de 10')
     expect(screen.getByText('Expirado')).toBeInTheDocument()
+  })
+
+  it('mostra se o e-mail do convite já saiu', () => {
+    convites = [convite({ email: 'fila@exemplo.com' }), convite({ email: 'foi@exemplo.com', enviado_em: em(0) })]
+    renderizar()
+    expect(screen.getByText('E-mail na fila')).toBeInTheDocument()
+    expect(screen.getByText(/^E-mail enviado em/)).toBeInTheDocument()
   })
 
   it('cria o convite e oferece copiar o link ou enviar por e-mail', async () => {
