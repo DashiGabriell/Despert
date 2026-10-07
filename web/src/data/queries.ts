@@ -3,13 +3,16 @@ import { useEffect } from 'react'
 import type {
   BuscaAgora,
   Configuracao,
+  ConfiguracaoOrganizacao,
   ConfiguracaoSistema,
+  Convite,
   Database,
   Execucao,
   Feriado,
-  Membro,
   MembroComOrganizacao,
+  MembroDaEquipe,
   Monitoramento,
+  PapelMembro,
   Prazo,
 } from '../lib/database.types'
 import { ausenciaConfiguracao, supabase } from '../lib/supabase'
@@ -28,8 +31,10 @@ export const chaves = {
   feriados: (orgId: string) => ['feriados', orgId] as const,
   execucoes: (orgId: string) => ['execucoes', orgId] as const,
   configuracao: (userId: string) => ['configuracao', userId] as const,
+  configuracaoOrganizacao: (orgId: string) => ['configuracao-organizacao', orgId] as const,
   configuracaoSistema: ['configuracao-sistema'] as const,
   membros: (orgId: string) => ['membros', orgId] as const,
+  convites: (orgId: string) => ['convites', orgId] as const,
   buscasAgora: (orgId: string) => ['buscas-agora', orgId] as const,
 }
 
@@ -73,11 +78,45 @@ export function usePertencas(userId: string) {
   })
 }
 
+/** Equipe da organização com o e-mail de cada membro (qualquer membro lê). */
 export function useMembros(orgId: string) {
   return useQuery({
     queryKey: chaves.membros(orgId),
-    queryFn: async (): Promise<Membro[]> => {
-      const { data, error } = await cliente().from('membros').select('*').eq('organizacao_id', orgId)
+    queryFn: async (): Promise<MembroDaEquipe[]> => {
+      const { data, error } = await cliente().rpc('membros_da_organizacao', { org: orgId })
+      if (error) throw error
+      return data
+    },
+  })
+}
+
+/** Convites da organização (o RLS só devolve para o Administrador). */
+export function useConvites(orgId: string, ativo = true) {
+  return useQuery({
+    queryKey: chaves.convites(orgId),
+    enabled: ativo,
+    queryFn: async (): Promise<Convite[]> => {
+      const { data, error } = await cliente()
+        .from('convites')
+        .select('*')
+        .eq('organizacao_id', orgId)
+        .is('aceito_em', null)
+        .order('criado_em', { ascending: false })
+      if (error) throw error
+      return data
+    },
+  })
+}
+
+export function useConfiguracaoOrganizacao(orgId: string) {
+  return useQuery({
+    queryKey: chaves.configuracaoOrganizacao(orgId),
+    queryFn: async (): Promise<ConfiguracaoOrganizacao | null> => {
+      const { data, error } = await cliente()
+        .from('configuracoes_organizacao')
+        .select('*')
+        .eq('organizacao_id', orgId)
+        .maybeSingle()
       if (error) throw error
       return data
     },
@@ -138,7 +177,7 @@ export function useFeriados(orgId: string) {
     queryKey: chaves.feriados(orgId),
     queryFn: async (): Promise<Feriado[]> => {
       const { data, error } = await cliente()
-        .from('feriados')
+        .from('feriados_organizacao')
         .select('*')
         .eq('organizacao_id', orgId)
         .order('data', { ascending: true })
@@ -268,7 +307,7 @@ export function useCriarMonitoramento(orgId: string, userId: string) {
     mutationFn: async (registro: Tabelas['monitoramentos']['Insert']) => {
       const { error } = await cliente()
         .from('monitoramentos')
-        .insert({ ...registro, organizacao_id: orgId, user_id: userId, ativo: true })
+        .insert({ user_id: userId, ...registro, organizacao_id: orgId, ativo: true })
       if (error) throw error
     },
     onSuccess: invalidar,
@@ -321,10 +360,11 @@ export function useCancelarBuscaAgora(orgId: string) {
   })
 }
 
+/** Só o que é pessoal: e-mail, janela de alerta e escopo do resumo. */
 export function useSalvarConfiguracao(userId: string) {
   const invalidar = useInvalidar(chaves.configuracao(userId))
   return useMutation({
-    mutationFn: async (dados: Tabelas['configuracoes']['Update']) => {
+    mutationFn: async (dados: Pick<Tabelas['configuracoes']['Update'], 'email_destino' | 'dias_alerta' | 'resumo_escopo'>) => {
       const { error } = await cliente()
         .from('configuracoes')
         .update(dados)
@@ -335,13 +375,28 @@ export function useSalvarConfiguracao(userId: string) {
   })
 }
 
-export function useCriarFeriado(orgId: string, userId: string) {
+/** O banco copia as mudanças para a configuração de cada membro (lida pelo robô). */
+export function useSalvarConfiguracaoOrganizacao(orgId: string, userId: string) {
+  const invalidar = useInvalidar(chaves.configuracaoOrganizacao(orgId), chaves.configuracao(userId))
+  return useMutation({
+    mutationFn: async (dados: Tabelas['configuracoes_organizacao']['Update']) => {
+      const { error } = await cliente()
+        .from('configuracoes_organizacao')
+        .update({ ...dados, updated_at: new Date().toISOString() })
+        .eq('organizacao_id', orgId)
+      if (error) throw error
+    },
+    onSuccess: invalidar,
+  })
+}
+
+export function useCriarFeriado(orgId: string) {
   const invalidar = useInvalidar(chaves.feriados(orgId))
   return useMutation({
     mutationFn: async (feriado: { data: string; descricao: string }) => {
       const { error } = await cliente()
-        .from('feriados')
-        .insert({ ...feriado, organizacao_id: orgId, user_id: userId })
+        .from('feriados_organizacao')
+        .insert({ ...feriado, organizacao_id: orgId })
       if (error) throw error
     },
     onSuccess: invalidar,
@@ -353,10 +408,76 @@ export function useRemoverFeriado(orgId: string) {
   return useMutation({
     mutationFn: async (data: string) => {
       const { error } = await cliente()
-        .from('feriados')
+        .from('feriados_organizacao')
         .delete()
         .eq('organizacao_id', orgId)
         .eq('data', data)
+      if (error) throw error
+    },
+    onSuccess: invalidar,
+  })
+}
+
+// ------------------------------------------------------------------ equipe
+// Tudo passa por funções do banco, que conferem papel, vagas do plano e o último Administrador.
+
+export function useConvidar(orgId: string) {
+  const invalidar = useInvalidar(chaves.convites(orgId))
+  return useMutation({
+    mutationFn: async (convite: { email: string; papel: PapelMembro }): Promise<Convite> => {
+      const { data, error } = await cliente().rpc('convidar', {
+        org: orgId,
+        email_convidado: convite.email,
+        papel_convidado: convite.papel,
+      })
+      if (error) throw error
+      return data
+    },
+    onSuccess: invalidar,
+  })
+}
+
+export function useReenviarConvite(orgId: string) {
+  const invalidar = useInvalidar(chaves.convites(orgId))
+  return useMutation({
+    mutationFn: async (convite: string): Promise<Convite> => {
+      const { data, error } = await cliente().rpc('reenviar_convite', { convite })
+      if (error) throw error
+      return data
+    },
+    onSuccess: invalidar,
+  })
+}
+
+export function useCancelarConvite(orgId: string) {
+  const invalidar = useInvalidar(chaves.convites(orgId))
+  return useMutation({
+    mutationFn: async (convite: string) => {
+      const { error } = await cliente().rpc('cancelar_convite', { convite })
+      if (error) throw error
+    },
+    onSuccess: invalidar,
+  })
+}
+
+/** Rebaixar para Assistente ou Leitura pausa a OAB da pessoa (no banco). */
+export function useAlterarPapel(orgId: string) {
+  const invalidar = useInvalidar(chaves.membros(orgId), chaves.monitoramentos(orgId))
+  return useMutation({
+    mutationFn: async ({ membro, papel }: { membro: string; papel: PapelMembro }) => {
+      const { error } = await cliente().rpc('alterar_papel', { org: orgId, membro, novo_papel: papel })
+      if (error) throw error
+    },
+    onSuccess: invalidar,
+  })
+}
+
+/** Na saída, o banco pausa a OAB e passa os prazos em aberto para o Administrador. */
+export function useRemoverMembro(orgId: string) {
+  const invalidar = useInvalidar(chaves.membros(orgId), chaves.monitoramentos(orgId), chaves.prazos(orgId))
+  return useMutation({
+    mutationFn: async (membro: string) => {
+      const { error } = await cliente().rpc('remover_membro', { org: orgId, membro })
       if (error) throw error
     },
     onSuccess: invalidar,

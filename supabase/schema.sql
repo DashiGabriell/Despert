@@ -18,8 +18,12 @@ create table if not exists public.configuracoes (
 );
 -- Legado: o "Buscar agora" passou a ser contado por organização em public.buscas_agora.
 alter table public.configuracoes add column if not exists ultima_busca_em timestamptz;
--- O n8n identifica o advogado pelo token do webhook.
-create unique index if not exists configuracoes_webhook_token_idx on public.configuracoes (webhook_token);
+-- O token do Buscar agora é da organização (configuracoes_organizacao), copiado para cada
+-- membro: o robô aceita o disparo de qualquer um e busca para todos os advogados dela.
+drop index if exists public.configuracoes_webhook_token_idx;
+-- Resumo diário só com os prazos da pessoa ou com todos; nulo = padrão do papel.
+alter table public.configuracoes add column if not exists resumo_escopo text
+  check (resumo_escopo in ('meus', 'todos'));
 
 -- ============================ monitoramentos ============================
 create table if not exists public.monitoramentos (
@@ -40,14 +44,8 @@ create table if not exists public.monitoramentos (
 create index if not exists monitoramentos_user_idx on public.monitoramentos (user_id);
 
 -- ============================ feriados ============================
--- Feriados locais e suspensões de expediente (os nacionais já são considerados pelo robô).
-create table if not exists public.feriados (
-  user_id   uuid not null references auth.users (id) on delete cascade,
-  data      date not null,
-  descricao text not null default '',
-  primary key (user_id, data)
-);
-create index if not exists feriados_user_idx on public.feriados (user_id);
+-- Feriados locais e suspensões de expediente (os nacionais já são considerados pelo robô)
+-- ficam em public.feriados_organizacao; public.feriados é a visão que o robô lê.
 
 -- ============================ prazos ============================
 create table if not exists public.prazos (
@@ -96,7 +94,6 @@ create index if not exists execucoes_user_idx on public.execucoes (user_id, exec
 
 -- A aplicação pode omitir o dono: o banco assume o usuário logado (o RLS confere de todo jeito).
 alter table public.monitoramentos alter column user_id set default auth.uid();
-alter table public.feriados       alter column user_id set default auth.uid();
 alter table public.prazos         alter column user_id set default auth.uid();
 
 -- ============================ updated_at automático ============================
@@ -153,16 +150,48 @@ create table if not exists public.buscas_agora (
 );
 create index if not exists buscas_agora_org_idx on public.buscas_agora (organizacao_id, criado_em desc);
 
+-- Feriados locais da organização: uma linha por data, só o Administrador altera.
+create table if not exists public.feriados_organizacao (
+  organizacao_id uuid not null references public.organizacoes (id) on delete cascade,
+  data           date not null,
+  descricao      text not null default '',
+  primary key (organizacao_id, data)
+);
+
+-- Configurações do robô que valem para a organização inteira (só o Administrador altera).
+create table if not exists public.configuracoes_organizacao (
+  organizacao_id     uuid primary key references public.organizacoes (id) on delete cascade,
+  dias_retroativos   int     not null default 5  check (dias_retroativos between 1 and 30),
+  prazo_padrao_dias  int     not null default 15 check (prazo_padrao_dias between 1 and 365),
+  considerar_recesso boolean not null default true,
+  webhook_token      text    not null unique default replace(gen_random_uuid()::text, '-', ''),
+  updated_at         timestamptz not null default now()
+);
+
+-- Convite para entrar na equipe: vale 7 dias, aceito pelo link com o token.
+create table if not exists public.convites (
+  id             uuid primary key default gen_random_uuid(),
+  organizacao_id uuid not null references public.organizacoes (id) on delete cascade,
+  email          text not null check (email = lower(btrim(email)) and email like '%_@_%'),
+  papel          text not null check (papel in ('administrador', 'advogado', 'assistente', 'leitura')),
+  token          text not null unique
+                 default replace(gen_random_uuid()::text, '-', '') || replace(gen_random_uuid()::text, '-', ''),
+  criado_por     uuid references auth.users (id) on delete set null,
+  criado_em      timestamptz not null default now(),
+  expira_em      timestamptz not null default now() + interval '7 days',
+  aceito_em      timestamptz
+);
+create unique index if not exists convites_pendente_idx on public.convites (organizacao_id, email)
+  where aceito_em is null;
+
 -- user_id continua: o n8n ainda grava por advogado e é o autor do registro.
 alter table public.monitoramentos add column if not exists organizacao_id uuid references public.organizacoes (id) on delete cascade;
-alter table public.feriados       add column if not exists organizacao_id uuid references public.organizacoes (id) on delete cascade;
 alter table public.prazos         add column if not exists organizacao_id uuid references public.organizacoes (id) on delete cascade;
 alter table public.prazos         add column if not exists responsavel_id uuid references auth.users (id) on delete set null;
 -- Falha geral, antes de identificar o advogado, não tem organização.
 alter table public.execucoes      add column if not exists organizacao_id uuid references public.organizacoes (id) on delete cascade;
 
 create index if not exists monitoramentos_org_idx on public.monitoramentos (organizacao_id);
-create index if not exists feriados_org_idx       on public.feriados (organizacao_id);
 create index if not exists prazos_org_vencimento_idx on public.prazos (organizacao_id, vencimento);
 create index if not exists execucoes_org_idx      on public.execucoes (organizacao_id, executado_em desc);
 
@@ -182,12 +211,36 @@ $$;
 revoke all on function public.membro_de(uuid) from public, anon;
 grant execute on function public.membro_de(uuid) to authenticated, service_role;
 
+-- O usuário logado tem um destes papéis na organização? (permissões, ADR-0007)
+create or replace function public.tem_papel(org uuid, papeis text[]) returns boolean
+language sql stable security definer set search_path = '' as $$
+  select exists (
+    select 1 from public.membros
+    where organizacao_id = org and user_id = auth.uid() and papel = any (papeis)
+  )
+$$;
+revoke all on function public.tem_papel(uuid, text[]) from public, anon;
+grant execute on function public.tem_papel(uuid, text[]) to authenticated, service_role;
+
+-- Organização onde o robô grava o que encontra para a pessoa: a dos monitoramentos ativos
+-- dela (uma só enquanto o robô roda por advogado); sem nenhum, a mais antiga.
+create or replace function public.organizacao_do_robo(uid uuid) returns uuid
+language sql stable security definer set search_path = '' as $$
+  select coalesce(
+    (select x.organizacao_id from public.monitoramentos x
+      where x.user_id = uid and x.ativo order by x.created_at desc, x.id desc limit 1),
+    public.organizacao_de(uid)
+  )
+$$;
+revoke all on function public.organizacao_do_robo(uuid) from public, anon, authenticated;
+grant execute on function public.organizacao_do_robo(uuid) to service_role;
+
 -- O n8n (service_role) grava só o user_id: a organização vem do membro.
 create or replace function public.preencher_organizacao() returns trigger
 language plpgsql security definer set search_path = '' as $$
 begin
   if new.organizacao_id is null and new.user_id is not null then
-    new.organizacao_id := public.organizacao_de(new.user_id);
+    new.organizacao_id := public.organizacao_do_robo(new.user_id);
   end if;
   if tg_table_name = 'prazos' then
     if new.responsavel_id is null then
@@ -200,7 +253,7 @@ end $$;
 do $$
 declare t text;
 begin
-  foreach t in array array['monitoramentos', 'feriados', 'prazos', 'execucoes'] loop
+  foreach t in array array['monitoramentos', 'prazos', 'execucoes'] loop
     execute format('drop trigger if exists preencher_organizacao on public.%I', t);
     execute format(
       'create trigger preencher_organizacao before insert on public.%I
@@ -246,18 +299,45 @@ update public.prazos set organizacao_id = public.organizacao_de(user_id) where o
 update public.prazos set responsavel_id = user_id where responsavel_id is null;
 alter table public.prazos enable trigger prazos_updated_at;
 update public.monitoramentos set organizacao_id = public.organizacao_de(user_id) where organizacao_id is null;
-update public.feriados       set organizacao_id = public.organizacao_de(user_id) where organizacao_id is null;
 update public.execucoes      set organizacao_id = public.organizacao_de(user_id)
   where organizacao_id is null and user_id is not null;
 
 -- Falha aqui = existe dado de alguém sem organização (o dev não deve ter dados próprios).
 alter table public.monitoramentos alter column organizacao_id set not null;
-alter table public.feriados       alter column organizacao_id set not null;
 alter table public.prazos         alter column organizacao_id set not null;
+
+-- Migração: a tabela antiga de feriados tinha uma linha por advogado; vira uma por data
+-- da organização. Depois de convertida, o nome passa a ser a visão do robô.
+do $$
+begin
+  if exists (
+    select 1 from pg_class c join pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'public' and c.relname = 'feriados' and c.relkind = 'r'
+  ) then
+    insert into public.feriados_organizacao (organizacao_id, data, descricao)
+    select distinct on (f.organizacao_id, f.data) f.organizacao_id, f.data, f.descricao
+    from public.feriados f
+    where f.organizacao_id is not null
+    order by f.organizacao_id, f.data, f.descricao
+    on conflict (organizacao_id, data) do nothing;
+    drop table public.feriados;
+  end if;
+end $$;
+
+-- O robô (n8n) lê os feriados por advogado: cada membro recebe os da organização onde o robô
+-- grava para ele. Só a service_role lê; a aplicação usa feriados_organizacao.
+create or replace view public.feriados with (security_invoker = true) as
+  select m.user_id, f.organizacao_id, f.data, f.descricao
+  from public.feriados_organizacao f
+  join public.membros m on m.organizacao_id = f.organizacao_id
+  where public.organizacao_do_robo(m.user_id) = f.organizacao_id;
+revoke all on public.feriados from public, anon, authenticated;
+grant select on public.feriados to service_role;
 
 -- ============================ nova conta ============================
 -- Toda conta nova nasce com uma configuração padrão, o e-mail já como destino do resumo,
--- e a própria organização (Solo, em período de teste) da qual é administradora.
+-- e a própria organização (Solo, em período de teste) da qual é administradora. Quem foi
+-- convidado não ganha organização própria: entra na que convidou ao aceitar.
 create or replace function public.ao_criar_conta() returns trigger
 language plpgsql security definer set search_path = public as $$
 declare
@@ -266,7 +346,11 @@ begin
   insert into public.configuracoes (user_id, email_destino)
   values (new.id, coalesce(new.email, ''))
   on conflict (user_id) do nothing;
-  if not exists (select 1 from public.membros where user_id = new.id) then
+  if not exists (select 1 from public.membros where user_id = new.id)
+     and not exists (
+       select 1 from public.convites c
+       where c.email = lower(btrim(coalesce(new.email, ''))) and c.aceito_em is null and c.expira_em > now()
+     ) then
     insert into public.organizacoes (nome, situacao, teste_iniciado_em)
     values (split_part(coalesce(new.email, ''), '@', 1), 'teste', now())
     returning id into org;
@@ -280,17 +364,19 @@ create trigger criar_conta_configuracoes after insert on auth.users
   for each row execute function public.ao_criar_conta();
 
 -- ============================ RLS ============================
--- Dados de negócio: qualquer membro da organização dona da linha.
--- Configurações: cada pessoa só a própria.
--- O n8n usa a chave service_role, que ignora o RLS.
-alter table public.configuracoes  enable row level security;
-alter table public.monitoramentos enable row level security;
-alter table public.feriados       enable row level security;
-alter table public.prazos         enable row level security;
-alter table public.execucoes      enable row level security;
-alter table public.organizacoes   enable row level security;
-alter table public.membros        enable row level security;
-alter table public.buscas_agora   enable row level security;
+-- Ler: qualquer membro da organização dona da linha. Escrever: conforme o papel (tabela de
+-- permissões no GLOSSARY.md, espelhada em web/src/domain/permissoes.ts).
+-- Configurações: cada pessoa só a própria. O n8n usa a chave service_role, que ignora o RLS.
+alter table public.configuracoes             enable row level security;
+alter table public.monitoramentos            enable row level security;
+alter table public.feriados_organizacao      enable row level security;
+alter table public.configuracoes_organizacao enable row level security;
+alter table public.prazos                    enable row level security;
+alter table public.execucoes                 enable row level security;
+alter table public.organizacoes              enable row level security;
+alter table public.membros                   enable row level security;
+alter table public.buscas_agora              enable row level security;
+alter table public.convites                  enable row level security;
 
 drop policy if exists "dono_do_registro" on public.configuracoes;
 create policy "dono_do_registro" on public.configuracoes
@@ -301,17 +387,55 @@ create policy "dono_do_registro" on public.configuracoes
 do $$
 declare t text;
 begin
-  foreach t in array array['monitoramentos', 'feriados', 'prazos', 'execucoes'] loop
+  foreach t in array array['monitoramentos', 'feriados_organizacao', 'configuracoes_organizacao', 'prazos', 'execucoes'] loop
     execute format('drop policy if exists "dono_do_registro" on public.%I', t);
     execute format('drop policy if exists "membro_da_organizacao" on public.%I', t);
-    execute format($p$create policy "membro_da_organizacao" on public.%I
-      for all to authenticated
-      using (public.membro_de(organizacao_id))
-      with check (public.membro_de(organizacao_id))$p$, t);
+    execute format('drop policy if exists "membro_le" on public.%I', t);
+    execute format($p$create policy "membro_le" on public.%I
+      for select to authenticated using (public.membro_de(organizacao_id))$p$, t);
   end loop;
 end $$;
 
--- Organização e equipe: só leitura para os membros nesta fase.
+-- Escrita por papel: (tabela, nome da política, comando, papéis).
+do $$
+declare
+  r record;
+begin
+  for r in
+    select * from (values
+      ('prazos', 'cria_prazo', 'insert', array['administrador', 'advogado', 'assistente']),
+      ('prazos', 'edita_prazo', 'update', array['administrador', 'advogado', 'assistente']),
+      ('prazos', 'exclui_prazo', 'delete', array['administrador', 'advogado']),
+      ('monitoramentos', 'cria_monitoramento', 'insert', array['administrador', 'advogado']),
+      ('monitoramentos', 'edita_monitoramento', 'update', array['administrador', 'advogado']),
+      ('monitoramentos', 'exclui_monitoramento', 'delete', array['administrador', 'advogado']),
+      ('feriados_organizacao', 'cria_feriado', 'insert', array['administrador']),
+      ('feriados_organizacao', 'edita_feriado', 'update', array['administrador']),
+      ('feriados_organizacao', 'exclui_feriado', 'delete', array['administrador']),
+      ('configuracoes_organizacao', 'edita_configuracao', 'update', array['administrador'])
+    ) as p (tabela, nome, comando, papeis)
+  loop
+    execute format('drop policy if exists %I on public.%I', r.nome, r.tabela);
+    if r.comando = 'insert' then
+      execute format('create policy %I on public.%I for insert to authenticated
+        with check (public.tem_papel(organizacao_id, %L))', r.nome, r.tabela, r.papeis);
+    elsif r.comando = 'update' then
+      execute format('create policy %I on public.%I for update to authenticated
+        using (public.tem_papel(organizacao_id, %L)) with check (public.tem_papel(organizacao_id, %L))',
+        r.nome, r.tabela, r.papeis, r.papeis);
+    else
+      execute format('create policy %I on public.%I for delete to authenticated
+        using (public.tem_papel(organizacao_id, %L))', r.nome, r.tabela, r.papeis);
+    end if;
+  end loop;
+end $$;
+
+-- Convites: só o Administrador vê; criar, reenviar, cancelar e aceitar passam pelas funções.
+drop policy if exists "administrador_le" on public.convites;
+create policy "administrador_le" on public.convites
+  for select to authenticated using (public.tem_papel(organizacao_id, array['administrador']));
+
+-- Organização e equipe: leitura para os membros; mudanças na equipe passam pelas funções.
 drop policy if exists "membro_le" on public.organizacoes;
 create policy "membro_le" on public.organizacoes
   for select to authenticated using (public.membro_de(id));
@@ -340,7 +464,8 @@ grant execute on function public.is_dev() to authenticated, service_role;
 do $$
 declare t text;
 begin
-  foreach t in array array['configuracoes', 'monitoramentos', 'feriados', 'prazos', 'execucoes', 'organizacoes', 'membros', 'buscas_agora'] loop
+  foreach t in array array['configuracoes', 'monitoramentos', 'feriados_organizacao', 'configuracoes_organizacao',
+                           'prazos', 'execucoes', 'organizacoes', 'membros', 'buscas_agora', 'convites'] loop
     execute format('drop policy if exists "dev_acesso_total" on public.%I', t);
     execute format($p$create policy "dev_acesso_total" on public.%I
       for all to authenticated
@@ -570,7 +695,7 @@ end $$;
 do $$
 declare t text;
 begin
-  foreach t in array array['monitoramentos', 'feriados', 'prazos'] loop
+  foreach t in array array['monitoramentos', 'feriados_organizacao', 'configuracoes_organizacao', 'prazos'] loop
     execute format('drop trigger if exists reforcar_plano on public.%I', t);
     execute format(
       'create trigger reforcar_plano before insert or update or delete on public.%I
@@ -660,6 +785,9 @@ begin
   if auth.uid() is null or not (public.membro_de(org) or public.is_dev()) then
     raise exception 'Você não faz parte desta organização.' using errcode = '42501';
   end if;
+  if public.tem_papel(org, array['leitura']) and not public.is_dev() then
+    raise exception 'O papel Leitura não dispara buscas.' using errcode = '42501';
+  end if;
   perform 1 from public.organizacoes where id = org for update;
   if public.etapa_de(org) in ('leitura', 'suspensa') then
     raise exception 'Somente leitura: o Buscar agora fica desligado até a organização ser reativada.'
@@ -733,6 +861,520 @@ end $$;
 revoke all on function public.admin_listar_organizacoes() from public, anon;
 grant execute on function public.admin_listar_organizacoes() to authenticated;
 
+-- ============================ equipe e papéis ============================
+-- Fase 3 (#18). Enquanto o robô roda por advogado (até a fase 4), o banco entrega a ele o
+-- que é da organização: configurações copiadas para cada membro e feriados pela visão.
+
+-- Toda organização nova nasce com as configurações padrão do robô.
+create or replace function public.criar_configuracao_organizacao() returns trigger
+language plpgsql security definer set search_path = '' as $$
+begin
+  insert into public.configuracoes_organizacao (organizacao_id) values (new.id)
+  on conflict (organizacao_id) do nothing;
+  return null;
+end $$;
+
+drop trigger if exists criar_configuracao_organizacao on public.organizacoes;
+create trigger criar_configuracao_organizacao after insert on public.organizacoes
+  for each row execute function public.criar_configuracao_organizacao();
+
+-- Migração: herda as configurações do Administrador mais antigo (o token dele continua valendo).
+insert into public.configuracoes_organizacao
+  (organizacao_id, dias_retroativos, prazo_padrao_dias, considerar_recesso, webhook_token)
+select
+  x.id, x.dias_retroativos, x.prazo_padrao_dias, x.considerar_recesso,
+  case when x.webhook_token is null or x.repeticao > 1
+    then replace(gen_random_uuid()::text, '-', '') else x.webhook_token end
+from (
+  select o.id,
+    coalesce(c.dias_retroativos, 5) as dias_retroativos,
+    coalesce(c.prazo_padrao_dias, 15) as prazo_padrao_dias,
+    coalesce(c.considerar_recesso, true) as considerar_recesso,
+    c.webhook_token,
+    row_number() over (partition by c.webhook_token order by o.criado_em, o.id) as repeticao
+  from public.organizacoes o
+  left join lateral (
+    select cfg.* from public.membros m join public.configuracoes cfg on cfg.user_id = m.user_id
+    where m.organizacao_id = o.id
+    order by (m.papel = 'administrador') desc, m.criado_em, m.user_id limit 1
+  ) c on true
+  where not exists (select 1 from public.configuracoes_organizacao co where co.organizacao_id = o.id)
+) x
+on conflict (organizacao_id) do nothing;
+
+-- Copia para a configuração da pessoa o que vale na organização onde o robô grava para ela.
+create or replace function public.sincronizar_configuracao(uid uuid) returns void
+language sql security definer set search_path = '' as $$
+  update public.configuracoes c set
+    dias_retroativos   = o.dias_retroativos,
+    prazo_padrao_dias  = o.prazo_padrao_dias,
+    considerar_recesso = o.considerar_recesso,
+    webhook_token      = o.webhook_token
+  from public.configuracoes_organizacao o
+  where c.user_id = uid
+    and o.organizacao_id = public.organizacao_do_robo(uid)
+    and (c.dias_retroativos, c.prazo_padrao_dias, c.considerar_recesso, c.webhook_token)
+        is distinct from (o.dias_retroativos, o.prazo_padrao_dias, o.considerar_recesso, o.webhook_token)
+$$;
+revoke all on function public.sincronizar_configuracao(uuid) from public, anon, authenticated;
+grant execute on function public.sincronizar_configuracao(uuid) to service_role;
+
+create or replace function public.sincronizar_por_gatilho() returns trigger
+language plpgsql security definer set search_path = '' as $$
+begin
+  if tg_table_name = 'configuracoes_organizacao' then
+    perform public.sincronizar_configuracao(m.user_id)
+    from public.membros m where m.organizacao_id = new.organizacao_id;
+  elsif tg_op = 'DELETE' then
+    perform public.sincronizar_configuracao(old.user_id);
+  else
+    perform public.sincronizar_configuracao(new.user_id);
+    if tg_op = 'UPDATE' then
+      if old.user_id is distinct from new.user_id then
+        perform public.sincronizar_configuracao(old.user_id);
+      end if;
+    end if;
+  end if;
+  return null;
+end $$;
+
+drop trigger if exists sincronizar_configuracao on public.configuracoes_organizacao;
+create trigger sincronizar_configuracao after insert or update on public.configuracoes_organizacao
+  for each row execute function public.sincronizar_por_gatilho();
+drop trigger if exists sincronizar_configuracao on public.membros;
+create trigger sincronizar_configuracao after insert or delete on public.membros
+  for each row execute function public.sincronizar_por_gatilho();
+drop trigger if exists sincronizar_configuracao on public.monitoramentos;
+create trigger sincronizar_configuracao after insert or delete or update of ativo, user_id on public.monitoramentos
+  for each row execute function public.sincronizar_por_gatilho();
+drop trigger if exists sincronizar_configuracao on public.configuracoes;
+create trigger sincronizar_configuracao after insert on public.configuracoes
+  for each row execute function public.sincronizar_por_gatilho();
+
+-- O que vem da organização não se altera pela configuração pessoal (só pela da organização).
+create or replace function public.proteger_configuracao_pessoal() returns trigger
+language plpgsql security definer set search_path = '' as $$
+begin
+  if pg_trigger_depth() = 1 and auth.uid() is not null and not public.is_dev()
+     and (new.dias_retroativos, new.prazo_padrao_dias, new.considerar_recesso, new.webhook_token)
+         is distinct from (old.dias_retroativos, old.prazo_padrao_dias, old.considerar_recesso, old.webhook_token) then
+    raise exception 'Essas configurações são da organização: só o Administrador altera, em Configurações.'
+      using errcode = '42501';
+  end if;
+  return new;
+end $$;
+
+drop trigger if exists proteger_configuracao_pessoal on public.configuracoes;
+create trigger proteger_configuracao_pessoal before update on public.configuracoes
+  for each row execute function public.proteger_configuracao_pessoal();
+
+select public.sincronizar_configuracao(c.user_id) from public.configuracoes c;
+
+-- Monitoramentos por papel. Vale para o que a pessoa faz direto (os ajustes automáticos,
+-- feitos dentro de outros gatilhos, seguem as próprias regras).
+create or replace function public.reforcar_papeis_monitoramentos() returns trigger
+language plpgsql security definer set search_path = '' as $$
+declare
+  eu   uuid := auth.uid();
+  org  uuid;
+  meu  text;
+  dono text;
+begin
+  if tg_op = 'DELETE' then
+    org := old.organizacao_id;
+  else
+    org := new.organizacao_id;
+  end if;
+  if eu is null or pg_trigger_depth() > 1 or public.is_dev() then
+    if tg_op = 'DELETE' then return old; end if;
+    return new;
+  end if;
+  select m.papel into meu from public.membros m where m.organizacao_id = org and m.user_id = eu;
+  if meu is null or meu not in ('administrador', 'advogado') then
+    if tg_op = 'DELETE' then return old; end if;
+    return new;
+  end if;
+
+  if meu = 'advogado' then
+    if tg_op <> 'INSERT' then
+      if old.tipo = 'oab' and old.user_id <> eu then
+        raise exception 'Advogados só alteram a própria OAB.' using errcode = '42501';
+      end if;
+    end if;
+    if tg_op <> 'DELETE' then
+      if new.tipo = 'oab' and new.user_id <> eu then
+        raise exception 'Advogados só alteram a própria OAB.' using errcode = '42501';
+      end if;
+    end if;
+  end if;
+
+  if tg_op = 'DELETE' then
+    return old;
+  end if;
+  if not new.ativo then
+    return new;
+  end if;
+  if tg_op = 'UPDATE' then
+    if old.ativo and old.user_id = new.user_id and old.tipo = new.tipo then
+      return new;
+    end if;
+  end if;
+
+  select m.papel into dono from public.membros m where m.organizacao_id = org and m.user_id = new.user_id;
+  if dono is null or dono not in ('administrador', 'advogado') then
+    raise exception 'O monitoramento precisa pertencer a um Administrador ou Advogado da equipe.'
+      using errcode = 'P0001';
+  end if;
+  if new.tipo = 'oab' and public.limites_de(org) ->> 'oabs' = 'por_advogado' then
+    if exists (
+      select 1 from public.monitoramentos x
+      where x.organizacao_id = org and x.user_id = new.user_id and x.tipo = 'oab' and x.ativo and x.id <> new.id
+    ) then
+      raise exception 'Cada advogado pode ter uma OAB monitorada ativa neste plano.' using errcode = 'P0001';
+    end if;
+  end if;
+  if exists (
+    select 1 from public.monitoramentos x
+    where x.user_id = new.user_id and x.ativo and x.organizacao_id <> org
+  ) then
+    raise exception 'Essa pessoa já tem monitoramentos ativos em outra organização. Por enquanto o robô busca para uma organização por pessoa: pause-os lá primeiro.'
+      using errcode = 'P0001';
+  end if;
+  return new;
+end $$;
+
+drop trigger if exists reforcar_papeis on public.monitoramentos;
+create trigger reforcar_papeis before insert or update or delete on public.monitoramentos
+  for each row execute function public.reforcar_papeis_monitoramentos();
+
+-- O responsável por um prazo é sempre alguém da equipe (o robô grava o próprio advogado).
+create or replace function public.validar_responsavel() returns trigger
+language plpgsql security definer set search_path = '' as $$
+begin
+  if auth.uid() is null or new.responsavel_id is null
+     or not (public.membro_de(new.organizacao_id) or public.is_dev()) then
+    return new;
+  end if;
+  if tg_op = 'UPDATE' then
+    if new.responsavel_id is not distinct from old.responsavel_id then
+      return new;
+    end if;
+  end if;
+  if not exists (
+    select 1 from public.membros m where m.organizacao_id = new.organizacao_id and m.user_id = new.responsavel_id
+  ) then
+    raise exception 'O responsável precisa fazer parte da equipe.' using errcode = 'P0001';
+  end if;
+  return new;
+end $$;
+
+drop trigger if exists validar_responsavel on public.prazos;
+create trigger validar_responsavel before insert or update of responsavel_id on public.prazos
+  for each row execute function public.validar_responsavel();
+
+-- Sempre sobra ao menos um Administrador (a exclusão da conta pelo dev ou pelo sistema passa).
+create or replace function public.proteger_administrador() returns trigger
+language plpgsql security definer set search_path = '' as $$
+begin
+  if old.papel = 'administrador' and auth.uid() is not null and not public.is_dev() then
+    if tg_op = 'DELETE' or new.papel <> 'administrador' then
+      if not exists (
+        select 1 from public.membros m
+        where m.organizacao_id = old.organizacao_id and m.papel = 'administrador' and m.user_id <> old.user_id
+      ) then
+        raise exception 'A organização precisa de pelo menos um Administrador.' using errcode = 'P0001';
+      end if;
+    end if;
+  end if;
+  if tg_op = 'DELETE' then return old; end if;
+  return new;
+end $$;
+
+drop trigger if exists proteger_administrador on public.membros;
+create trigger proteger_administrador before update of papel or delete on public.membros
+  for each row execute function public.proteger_administrador();
+
+-- Quem deixa de ser Administrador/Advogado ou sai da equipe para de ter OAB monitorada.
+-- Na saída, os prazos em aberto dele e os processos avulsos passam para um Administrador
+-- (quem removeu, ou o mais antigo); os prazos continuam na organização.
+create or replace function public.ao_mudar_membro() returns trigger
+language plpgsql security definer set search_path = '' as $$
+declare
+  admin uuid;
+begin
+  if tg_op = 'UPDATE' then
+    if new.papel not in ('administrador', 'advogado') then
+      update public.monitoramentos set ativo = false
+      where organizacao_id = new.organizacao_id and user_id = new.user_id and tipo = 'oab' and ativo;
+    end if;
+    return null;
+  end if;
+
+  update public.monitoramentos set ativo = false
+  where organizacao_id = old.organizacao_id and user_id = old.user_id and tipo = 'oab' and ativo;
+
+  select m.user_id into admin from public.membros m
+  where m.organizacao_id = old.organizacao_id and m.papel = 'administrador'
+  order by (m.user_id = auth.uid()) desc, m.criado_em, m.user_id
+  limit 1;
+  if admin is null then
+    return null;
+  end if;
+
+  update public.prazos set responsavel_id = admin
+  where organizacao_id = old.organizacao_id and responsavel_id = old.user_id
+    and status in ('pendente', 'conferir');
+
+  if exists (
+    select 1 from public.monitoramentos x
+    where x.user_id = admin and x.ativo and x.organizacao_id <> old.organizacao_id
+  ) then
+    update public.monitoramentos set user_id = admin, ativo = false
+    where organizacao_id = old.organizacao_id and user_id = old.user_id and tipo = 'processo';
+  else
+    update public.monitoramentos set user_id = admin
+    where organizacao_id = old.organizacao_id and user_id = old.user_id and tipo = 'processo';
+  end if;
+  return null;
+end $$;
+
+drop trigger if exists ao_mudar_membro on public.membros;
+create trigger ao_mudar_membro after update of papel or delete on public.membros
+  for each row execute function public.ao_mudar_membro();
+
+-- Equipe com e-mail (para mostrar nomes e escolher responsável): qualquer membro.
+create or replace function public.membros_da_organizacao(org uuid)
+returns table (user_id uuid, email text, papel text, criado_em timestamptz)
+language plpgsql stable security definer set search_path = '' as $$
+begin
+  if not (public.membro_de(org) or public.is_dev()) then
+    raise exception 'Você não faz parte desta organização.' using errcode = '42501';
+  end if;
+  return query
+  select m.user_id, u.email::text, m.papel, m.criado_em
+  from public.membros m join auth.users u on u.id = m.user_id
+  where m.organizacao_id = org
+  order by m.criado_em, m.user_id;
+end $$;
+
+create or replace function public.exigir_administrador(org uuid) returns void
+language plpgsql stable security definer set search_path = '' as $$
+begin
+  if auth.uid() is null or not (public.tem_papel(org, array['administrador']) or public.is_dev()) then
+    raise exception 'Só o Administrador da organização gerencia a equipe.' using errcode = '42501';
+  end if;
+end $$;
+
+create or replace function public.exigir_escrita(org uuid) returns void
+language plpgsql stable security definer set search_path = '' as $$
+begin
+  if public.etapa_de(org) in ('leitura', 'suspensa') then
+    raise exception 'Somente leitura: o período de uso desta organização terminou. Fale com o suporte para reativar.'
+      using errcode = '42501';
+  end if;
+end $$;
+
+-- Vagas ocupadas = membros + convites pendentes ainda válidos (sem contar `exceto`).
+create or replace function public.vagas_ocupadas(org uuid, exceto uuid default null) returns int
+language sql stable security definer set search_path = '' as $$
+  select (select count(*) from public.membros where organizacao_id = org)::int
+       + (select count(*) from public.convites
+          where organizacao_id = org and aceito_em is null and expira_em > now()
+            and id is distinct from exceto)::int
+$$;
+
+create or replace function public.convidar(org uuid, email_convidado text, papel_convidado text)
+returns public.convites
+language plpgsql security definer set search_path = '' as $$
+declare
+  e    text := lower(btrim(coalesce(email_convidado, '')));
+  l    jsonb;
+  novo public.convites;
+begin
+  perform public.exigir_administrador(org);
+  if e !~ '^[^@[:space:]]+@[^@[:space:]]+\.[^@[:space:]]+$' then
+    raise exception 'Informe um e-mail válido.' using errcode = 'P0001';
+  end if;
+  if papel_convidado is null or papel_convidado not in ('administrador', 'advogado', 'assistente', 'leitura') then
+    raise exception 'Papel inválido.' using errcode = 'P0001';
+  end if;
+  perform 1 from public.organizacoes where id = org for update;
+  perform public.exigir_escrita(org);
+  l := public.limites_de(org);
+  if papel_convidado <> 'administrador' and not (l ->> 'papeis')::boolean then
+    raise exception 'O plano desta organização não tem papéis além do Administrador.' using errcode = 'P0001';
+  end if;
+  if exists (
+    select 1 from public.membros m join auth.users u on u.id = m.user_id
+    where m.organizacao_id = org and lower(u.email) = e
+  ) then
+    raise exception 'Essa pessoa já faz parte da equipe.' using errcode = 'P0001';
+  end if;
+  if exists (
+    select 1 from public.convites c
+    where c.organizacao_id = org and c.email = e and c.aceito_em is null and c.expira_em > now()
+  ) then
+    raise exception 'Já existe um convite pendente para esse e-mail: reenvie ou cancele o atual.' using errcode = 'P0001';
+  end if;
+  delete from public.convites c where c.organizacao_id = org and c.email = e and c.aceito_em is null;
+  if public.vagas_ocupadas(org) >= (l ->> 'usuarios')::int then
+    raise exception 'Limite de usuários atingido (%): equipe e convites pendentes já ocupam todas as vagas do plano.',
+      l ->> 'usuarios' using errcode = 'P0001';
+  end if;
+  insert into public.convites (organizacao_id, email, papel, criado_por)
+  values (org, e, papel_convidado, auth.uid())
+  returning * into novo;
+  return novo;
+end $$;
+
+-- Reenviar renova a validade (o link continua o mesmo).
+create or replace function public.reenviar_convite(convite uuid) returns public.convites
+language plpgsql security definer set search_path = '' as $$
+declare
+  c public.convites;
+begin
+  select * into c from public.convites where id = convite;
+  if not found then
+    raise exception 'Convite não encontrado.' using errcode = 'P0001';
+  end if;
+  perform public.exigir_administrador(c.organizacao_id);
+  if c.aceito_em is not null then
+    raise exception 'Este convite já foi aceito.' using errcode = 'P0001';
+  end if;
+  perform 1 from public.organizacoes where id = c.organizacao_id for update;
+  perform public.exigir_escrita(c.organizacao_id);
+  if public.vagas_ocupadas(c.organizacao_id, c.id) >= (public.limites_de(c.organizacao_id) ->> 'usuarios')::int then
+    raise exception 'Limite de usuários atingido (%): equipe e convites pendentes já ocupam todas as vagas do plano.',
+      public.limites_de(c.organizacao_id) ->> 'usuarios' using errcode = 'P0001';
+  end if;
+  update public.convites set expira_em = now() + interval '7 days' where id = c.id returning * into c;
+  return c;
+end $$;
+
+create or replace function public.cancelar_convite(convite uuid) returns void
+language plpgsql security definer set search_path = '' as $$
+declare
+  org uuid;
+begin
+  select organizacao_id into org from public.convites where id = convite;
+  if org is null then
+    return;
+  end if;
+  perform public.exigir_administrador(org);
+  delete from public.convites where id = convite and aceito_em is null;
+end $$;
+
+-- Dados para a página do convite (antes de entrar): só quem tem o link.
+create or replace function public.ver_convite(codigo text)
+returns table (organizacao text, papel text, email text, situacao text)
+language sql stable security definer set search_path = '' as $$
+  select o.nome, c.papel, c.email,
+    case when c.aceito_em is not null then 'aceito'
+         when c.expira_em <= now() then 'expirado'
+         else 'pendente' end
+  from public.convites c join public.organizacoes o on o.id = c.organizacao_id
+  where c.token = codigo
+$$;
+
+create or replace function public.aceitar_convite(codigo text) returns uuid
+language plpgsql security definer set search_path = '' as $$
+declare
+  c          public.convites;
+  meu_email  text;
+  confirmado timestamptz;
+begin
+  if auth.uid() is null then
+    raise exception 'Entre na sua conta para aceitar o convite.' using errcode = '42501';
+  end if;
+  select * into c from public.convites where token = codigo for update;
+  if not found then
+    raise exception 'Convite não encontrado. Peça um novo ao Administrador.' using errcode = 'P0001';
+  end if;
+  select lower(u.email), u.email_confirmed_at into meu_email, confirmado from auth.users u where u.id = auth.uid();
+  if meu_email is distinct from c.email then
+    raise exception 'Este convite foi enviado para %. Entre com essa conta para aceitar.', c.email using errcode = 'P0001';
+  end if;
+  if confirmado is null then
+    raise exception 'Confirme seu e-mail antes de aceitar o convite.' using errcode = 'P0001';
+  end if;
+  if exists (select 1 from public.membros m where m.organizacao_id = c.organizacao_id and m.user_id = auth.uid()) then
+    update public.convites set aceito_em = coalesce(aceito_em, now()) where id = c.id;
+    return c.organizacao_id;
+  end if;
+  if c.aceito_em is not null then
+    raise exception 'Este convite já foi usado.' using errcode = 'P0001';
+  end if;
+  if c.expira_em <= now() then
+    raise exception 'Este convite expirou. Peça um novo ao Administrador.' using errcode = 'P0001';
+  end if;
+  insert into public.membros (organizacao_id, user_id, papel) values (c.organizacao_id, auth.uid(), c.papel);
+  update public.convites set aceito_em = now() where id = c.id;
+  return c.organizacao_id;
+end $$;
+
+create or replace function public.alterar_papel(org uuid, membro uuid, novo_papel text) returns void
+language plpgsql security definer set search_path = '' as $$
+begin
+  perform public.exigir_administrador(org);
+  if novo_papel is null or novo_papel not in ('administrador', 'advogado', 'assistente', 'leitura') then
+    raise exception 'Papel inválido.' using errcode = 'P0001';
+  end if;
+  update public.membros set papel = novo_papel where organizacao_id = org and user_id = membro;
+  if not found then
+    raise exception 'Essa pessoa não faz parte da equipe.' using errcode = 'P0001';
+  end if;
+end $$;
+
+create or replace function public.remover_membro(org uuid, membro uuid) returns void
+language plpgsql security definer set search_path = '' as $$
+begin
+  perform public.exigir_administrador(org);
+  if membro = auth.uid() then
+    raise exception 'Você não pode remover a si mesmo da equipe.' using errcode = 'P0001';
+  end if;
+  perform public.exigir_escrita(org);
+  delete from public.membros where organizacao_id = org and user_id = membro;
+  if not found then
+    raise exception 'Essa pessoa não faz parte da equipe.' using errcode = 'P0001';
+  end if;
+end $$;
+
+-- Painel dev: novo token do Buscar agora para a organização onde o robô grava para a conta.
+create or replace function public.admin_trocar_token(conta uuid, token text) returns void
+language plpgsql security definer set search_path = '' as $$
+begin
+  if not public.is_dev() then
+    raise exception 'Acesso restrito ao dev.' using errcode = '42501';
+  end if;
+  update public.configuracoes_organizacao set webhook_token = token, updated_at = now()
+  where organizacao_id = public.organizacao_do_robo(conta);
+  if not found then
+    raise exception 'Esta conta não pertence a nenhuma organização.' using errcode = 'P0001';
+  end if;
+end $$;
+
+revoke all on function public.exigir_administrador(uuid) from public, anon, authenticated;
+revoke all on function public.exigir_escrita(uuid) from public, anon, authenticated;
+revoke all on function public.vagas_ocupadas(uuid, uuid) from public, anon, authenticated;
+revoke all on function public.membros_da_organizacao(uuid) from public, anon;
+revoke all on function public.convidar(uuid, text, text) from public, anon;
+revoke all on function public.reenviar_convite(uuid) from public, anon;
+revoke all on function public.cancelar_convite(uuid) from public, anon;
+revoke all on function public.ver_convite(text) from public;
+revoke all on function public.aceitar_convite(text) from public, anon;
+revoke all on function public.alterar_papel(uuid, uuid, text) from public, anon;
+revoke all on function public.remover_membro(uuid, uuid) from public, anon;
+revoke all on function public.admin_trocar_token(uuid, text) from public, anon;
+grant execute on function public.membros_da_organizacao(uuid) to authenticated;
+grant execute on function public.convidar(uuid, text, text) to authenticated;
+grant execute on function public.reenviar_convite(uuid) to authenticated;
+grant execute on function public.cancelar_convite(uuid) to authenticated;
+grant execute on function public.ver_convite(text) to anon, authenticated;
+grant execute on function public.aceitar_convite(text) to authenticated;
+grant execute on function public.alterar_papel(uuid, uuid, text) to authenticated;
+grant execute on function public.remover_membro(uuid, uuid) to authenticated;
+grant execute on function public.admin_trocar_token(uuid, text) to authenticated;
+
 -- ============================ auditoria ============================
 -- Tudo o que um dev faz: ações administrativas (Edge Function "admin") e qualquer escrita
 -- nos dados dos advogados (gatilhos abaixo). Sem chave estrangeira no alvo: o registro
@@ -794,7 +1436,8 @@ end $$;
 do $$
 declare t text;
 begin
-  foreach t in array array['configuracoes', 'monitoramentos', 'feriados', 'prazos', 'configuracao_sistema', 'organizacoes', 'membros'] loop
+  foreach t in array array['configuracoes', 'monitoramentos', 'feriados_organizacao', 'configuracoes_organizacao',
+                           'prazos', 'configuracao_sistema', 'organizacoes', 'membros', 'convites'] loop
     execute format('drop trigger if exists auditar_dev on public.%I', t);
     execute format(
       'create trigger auditar_dev after insert or update or delete on public.%I

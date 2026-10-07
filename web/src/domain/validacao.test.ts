@@ -1,13 +1,16 @@
 import { describe, expect, it } from 'vitest'
 import {
-  validarConfiguracao,
+  validarConfiguracaoOrganizacao,
+  validarConfiguracaoPessoal,
+  validarConvite,
   validarFeriado,
   validarMonitoramento,
   validarNovaConta,
   validarNovaSenha,
   validarPrazoManual,
   validarUrlWebhook,
-  type FormConfiguracao,
+  type FormConfiguracaoOrganizacao,
+  type FormConfiguracaoPessoal,
   type FormNovaConta,
   type FormPrazoManual,
 } from './validacao'
@@ -110,30 +113,64 @@ describe('validarPrazoManual', () => {
   })
 })
 
-describe('validarConfiguracao', () => {
-  const form: FormConfiguracao = {
-    email_destino: 'ana@exemplo.com',
+describe('validarConfiguracaoPessoal', () => {
+  const form: FormConfiguracaoPessoal = { email_destino: ' ana@exemplo.com ', dias_alerta: '7', resumo_escopo: 'meus' }
+
+  it('converte a janela e mantém o escopo', () => {
+    expect(validarConfiguracaoPessoal(form)).toEqual({
+      ok: true,
+      valor: { email_destino: 'ana@exemplo.com', dias_alerta: 7, resumo_escopo: 'meus' },
+    })
+  })
+
+  it('aponta e-mail inválido e janela fora da faixa', () => {
+    expect(validarConfiguracaoPessoal({ ...form, email_destino: 'ana' })).toEqual({
+      ok: false,
+      erro: 'Informe um e-mail válido para os alertas.',
+    })
+    expect(validarConfiguracaoPessoal({ ...form, dias_alerta: 'x' }).ok).toBe(false)
+    expect(validarConfiguracaoPessoal({ ...form, dias_alerta: '61' }).ok).toBe(false)
+  })
+})
+
+describe('validarConfiguracaoOrganizacao', () => {
+  const form: FormConfiguracaoOrganizacao = {
     dias_retroativos: '5',
     prazo_padrao_dias: '15',
-    dias_alerta: '7',
     considerar_recesso: true,
     webhook_token: 'a1b2c3d4e5f6a7b8c9d0',
   }
 
   it('converte os números', () => {
-    const resultado = validarConfiguracao(form)
-    expect(resultado.ok && resultado.valor.dias_alerta).toBe(7)
+    const resultado = validarConfiguracaoOrganizacao(form)
+    expect(resultado.ok && resultado.valor.prazo_padrao_dias).toBe(15)
   })
 
   it('aponta o campo fora da faixa ou inválido', () => {
-    expect(validarConfiguracao({ ...form, email_destino: 'ana' })).toEqual({
+    expect(validarConfiguracaoOrganizacao({ ...form, dias_retroativos: '31' }).ok).toBe(false)
+    expect(validarConfiguracaoOrganizacao({ ...form, prazo_padrao_dias: '0' }).ok).toBe(false)
+    expect(validarConfiguracaoOrganizacao({ ...form, webhook_token: 'curto' })).toEqual({
       ok: false,
-      erro: 'Informe um e-mail válido para os alertas.',
+      erro: 'Gere um novo token de segurança.',
     })
-    expect(validarConfiguracao({ ...form, dias_retroativos: '31' }).ok).toBe(false)
-    expect(validarConfiguracao({ ...form, prazo_padrao_dias: '0' }).ok).toBe(false)
-    expect(validarConfiguracao({ ...form, dias_alerta: 'x' }).ok).toBe(false)
-    expect(validarConfiguracao({ ...form, webhook_token: 'curto' }).ok).toBe(false)
+  })
+})
+
+describe('validarConvite', () => {
+  it('normaliza o e-mail', () => {
+    expect(validarConvite({ email: ' Bia@Ex.com ', papel: 'assistente' }, [], [])).toEqual({
+      ok: true,
+      valor: { email: 'bia@ex.com', papel: 'assistente' },
+    })
+  })
+
+  it('recusa e-mail inválido, quem já é da equipe e convite repetido', () => {
+    expect(validarConvite({ email: 'bia', papel: 'leitura' }, [], []).ok).toBe(false)
+    expect(validarConvite({ email: 'ANA@ex.com', papel: 'leitura' }, ['ana@ex.com'], [])).toEqual({
+      ok: false,
+      erro: 'Essa pessoa já faz parte da equipe.',
+    })
+    expect(validarConvite({ email: 'bia@ex.com', papel: 'leitura' }, [], ['bia@ex.com']).ok).toBe(false)
   })
 })
 

@@ -8,7 +8,7 @@ Banco multitenant: a **organização** (escritório ou departamento jurídico) �
 - `monitoramentos`, `feriados`, `prazos` e `execucoes` têm `organizacao_id`; a policy `membro_da_organizacao` usa `public.membro_de(organizacao_id)`.
 - `user_id` continua nas tabelas como autor. Se um insert vier só com `user_id` (como o n8n faz hoje), o gatilho `preencher_organizacao` completa `organizacao_id` com a organização mais antiga da conta — e, em `prazos`, `responsavel_id` com o próprio `user_id`.
 - Toda conta nova ganha uma organização em período de teste com ela como administradora. Contas anteriores viraram organizações Solo ativas na migração.
-- `configuracoes` continua por conta (a divisão entre configuração da organização e do membro vem na fase de equipe).
+- `configuracoes` guarda o que é pessoal (e-mail e janela de alerta, escopo do resumo); o que é da organização fica em `configuracoes_organizacao` — veja a seção de equipe abaixo.
 
 ## Aplicar
 
@@ -62,6 +62,17 @@ Veja [ADR-0008](../docs/adr/0008-planos-limites-e-cobranca-manual.md). Só o dev
 - O Buscar agora é registrado por `public.registrar_busca_agora(org)`, que confere etapa, intervalo mínimo e cota diária (zera à meia-noite de Brasília) da organização. A conferência pelo robô e as buscas automáticas por plano chegam com a fase do robô.
 
 [`tests/limites_planos.sql`](./tests/limites_planos.sql) cria uma organização Solo temporária e tenta passar de cada limite; rode-o como o teste de isolamento abaixo, numa transação desfeita.
+
+## Equipe, papéis e convites
+
+- As policies de `prazos`, `monitoramentos`, `feriados_organizacao` e `configuracoes_organizacao` usam `public.tem_papel(org, papeis)` conforme a matriz da [#18](https://github.com/DashiGabriell/Despert/issues/18): todos leem; Assistente cria, edita, cumpre e troca o responsável; só Administrador e Advogado excluem prazo e mexem em monitoramentos; feriados e configurações da organização são do Administrador. Leitura só lê.
+- `configuracoes_organizacao` (dias retroativos, prazo padrão, recesso, token do Buscar agora) é copiada para a `configuracoes` de cada membro por `sincronizar_configuracao`, porque o robô ainda lê por advogado (até a fase do robô). O gatilho `proteger_configuracao_pessoal` impede alterar essas colunas pela configuração pessoal. `feriados` virou uma visão sobre `feriados_organizacao`.
+- Cada OAB pertence a um Administrador ou Advogado (`reforcar_papeis_monitoramentos`); no plano "por advogado", no máximo uma ativa por pessoa. Advogados só alteram a própria OAB.
+- O responsável de um prazo precisa ser da equipe (`validar_responsavel`).
+- Convites: `convidar`, `reenviar_convite` (renova 7 dias), `cancelar_convite`, `ver_convite` e `aceitar_convite`. Membros mais convites pendentes contam no limite de usuários (`vagas_ocupadas`). O convite vale só para o e-mail convidado, confirmado. O link é copiado ou aberto no cliente de e-mail do Administrador (não há envio pelo servidor).
+- `alterar_papel` e `remover_membro` são do Administrador; sempre sobra um Administrador (`proteger_administrador`). Ao sair ou deixar de ser Advogado, a OAB da pessoa é pausada; na saída, os prazos em aberto e os processos avulsos dela passam para um Administrador (`ao_mudar_membro`).
+
+[`tests/permissoes_papeis.sql`](./tests/permissoes_papeis.sql) monta uma equipe temporária com os quatro papéis e confere cada linha da matriz, os convites acima do limite e a saída de um membro; rode-o numa transação desfeita, como os outros.
 
 ## Verificar o isolamento (teste automatizado)
 

@@ -13,17 +13,27 @@ export interface PrazoFiltravel {
   partes?: string | null
   teor?: string | null
   observacoes?: string | null
+  responsavel_id?: string | null
 }
 
 export type FiltroStatus = 'abertos' | 'todos' | StatusPrazo
 
 export type FiltroRapido = 'vencido' | 'hoje' | 'semana' | 'conferir' | 'abertos' | null
 
+/** Responsável: `TODOS_RESPONSAVEIS` ou o id de um membro ("Meus prazos" = o próprio id). */
+export const TODOS_RESPONSAVEIS = 'todos'
+
 export interface FiltrosPrazos {
   busca?: string
   status?: FiltroStatus
   rapido?: FiltroRapido
+  responsavel?: string
   hoje: DataISO
+}
+
+export function filtrarPorResponsavel<T extends PrazoFiltravel>(prazos: readonly T[], responsavel?: string): T[] {
+  if (!responsavel || responsavel === TODOS_RESPONSAVEIS) return [...prazos]
+  return prazos.filter((prazo) => prazo.responsavel_id === responsavel)
 }
 
 const CAMPOS_BUSCA = [
@@ -38,7 +48,7 @@ const CAMPOS_BUSCA = [
 ] as const
 
 export function filtrarPrazos<T extends PrazoFiltravel>(prazos: readonly T[], filtros: FiltrosPrazos): T[] {
-  let selecionados = prazos
+  let selecionados: readonly T[] = filtrarPorResponsavel(prazos, filtros.responsavel)
   if (filtros.status === 'abertos') {
     selecionados = selecionados.filter(emAberto)
   } else if (filtros.status && filtros.status !== 'todos') {

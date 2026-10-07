@@ -13,9 +13,22 @@ interface Props {
   onAbrir: (prazo: Prazo) => void
   onCumprir: (prazo: Prazo) => void
   cumprindo?: string | null
+  /** Nome de cada responsável (id → nome); sem ele (Solo) a coluna não aparece. */
+  responsaveis?: ReadonlyMap<string, string>
+  podeCumprir?: boolean
 }
 
-export default function TabelaPrazos({ prazos, hoje, vazio, onAbrir, onCumprir, cumprindo }: Props) {
+export default function TabelaPrazos({
+  prazos,
+  hoje,
+  vazio,
+  onAbrir,
+  onCumprir,
+  cumprindo,
+  responsaveis,
+  podeCumprir = true,
+}: Props) {
+  const colunas = responsaveis ? 8 : 7
   return (
     <div className="overflow-x-auto">
       <table className={tabela}>
@@ -27,6 +40,7 @@ export default function TabelaPrazos({ prazos, hoje, vazio, onAbrir, onCumprir, 
             <th>Tribunal / Órgão</th>
             <th>Tipo</th>
             <th>Prazo</th>
+            {responsaveis && <th>Responsável</th>}
             <th>
               <span className="sr-only">Ações</span>
             </th>
@@ -35,7 +49,7 @@ export default function TabelaPrazos({ prazos, hoje, vazio, onAbrir, onCumprir, 
         <tbody>
           {prazos.length === 0 && (
             <tr>
-              <td colSpan={7} className={vazioTabela}>
+              <td colSpan={colunas} className={vazioTabela}>
                 {vazio}
               </td>
             </tr>
@@ -71,8 +85,13 @@ export default function TabelaPrazos({ prazos, hoje, vazio, onAbrir, onCumprir, 
                   {prazo.prazo_dias ? `${prazo.prazo_dias} dias` : '—'}
                   {conferir && <div className="text-xs font-semibold text-alert">conferir</div>}
                 </td>
+                {responsaveis && (
+                  <td className="whitespace-nowrap">
+                    {prazo.responsavel_id ? (responsaveis.get(prazo.responsavel_id) ?? 'Fora da equipe') : '—'}
+                  </td>
+                )}
                 <td className="text-right">
-                  {aberto && (
+                  {aberto && podeCumprir && (
                     <button
                       type="button"
                       className={botaoSucessoPequeno}

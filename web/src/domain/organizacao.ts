@@ -1,5 +1,10 @@
 import type { MembroComOrganizacao } from '../lib/database.types'
 
+/** Onde fica (no localStorage) a organização escolhida por cada pessoa no seletor. */
+export function chaveOrganizacaoPreferida(userId: string): string {
+  return `despert:organizacao:${userId}`
+}
+
 /**
  * Organização cujos dados a tela mostra: a preferida, se a pessoa ainda pertence a ela;
  * senão, a mais antiga das suas organizações.

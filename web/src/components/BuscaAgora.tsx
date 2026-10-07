@@ -12,13 +12,14 @@ import {
   urlDisparo,
 } from '../domain/busca'
 import { buscasAgoraRestantes, resumoBuscasAgora } from '../domain/planos'
-import type { Configuracao, Monitoramento } from '../lib/database.types'
+import type { Monitoramento } from '../lib/database.types'
 import { mensagemDeErro, useToast } from '../lib/toast-context'
 import BotaoBuscarAgora from './BotaoBuscarAgora'
 
 interface Props {
   orgId: string
-  config: Configuracao | undefined
+  /** Token do Buscar agora da organização: o robô busca para todos os advogados dela. */
+  token: string | undefined
   /** URL do webhook da configuração do sistema (definida pelo dev). */
   webhookUrl: string | undefined
   monitoramentos: readonly Monitoramento[]
@@ -29,7 +30,7 @@ interface Props {
  * e confere o intervalo mínimo e a cota diária da organização (ADR-0008). A resposta do fetch
  * não é lida: o resultado chega pela tabela de execuções, acompanhada em tempo real.
  */
-export default function BuscaAgora({ orgId, config, webhookUrl, monitoramentos }: Props) {
+export default function BuscaAgora({ orgId, token, webhookUrl, monitoramentos }: Props) {
   const avisar = useToast()
   const navigate = useNavigate()
   const { limites, escrita } = usePlano()
@@ -83,8 +84,8 @@ export default function BuscaAgora({ orgId, config, webhookUrl, monitoramentos }
       avisar('O robô ainda não foi ativado pelo administrador do sistema. Tente mais tarde.', 'erro')
       return
     }
-    if (!config) {
-      avisar('Suas configurações ainda estão carregando. Tente de novo em instantes.', 'erro')
+    if (!token) {
+      avisar('As configurações da organização ainda estão carregando. Tente de novo em instantes.', 'erro')
       return
     }
     if (pendencia === 'monitoramento') {
@@ -108,7 +109,7 @@ export default function BuscaAgora({ orgId, config, webhookUrl, monitoramentos }
       avisar(mensagem, 'erro')
     }
 
-    const url = urlDisparo(webhookUrl, config.webhook_token)
+    const url = urlDisparo(webhookUrl, token)
     try {
       const resposta = await fetch(url, { method: 'GET' })
       if (!resposta.ok) {

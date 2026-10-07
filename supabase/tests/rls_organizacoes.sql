@@ -24,7 +24,7 @@ begin
   if n <> 0 then raise exception 'A leu % prazo(s) da organização de B', n; end if;
   select count(*) into n from public.monitoramentos where organizacao_id = org_b;
   if n <> 0 then raise exception 'A leu monitoramentos de B'; end if;
-  select count(*) into n from public.feriados where organizacao_id = org_b;
+  select count(*) into n from public.feriados_organizacao where organizacao_id = org_b;
   if n <> 0 then raise exception 'A leu feriados de B'; end if;
   select count(*) into n from public.execucoes where organizacao_id = org_b;
   if n <> 0 then raise exception 'A leu execuções de B'; end if;

@@ -1,8 +1,10 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
+import { pode } from '../domain/permissoes'
+import type { MembroDaEquipe, PapelMembro } from '../lib/database.types'
 import { fabricarPrazo } from '../test/fabricas'
-import ModalPrazo from './ModalPrazo'
+import ModalPrazo, { type PermissoesPrazo } from './ModalPrazo'
 
 const HOJE = '2026-10-06'
 
@@ -97,5 +99,62 @@ describe('ModalPrazo', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Salvar' }))
     expect(await screen.findByText('sem conexão')).toBeInTheDocument()
     expect(onFechar).not.toHaveBeenCalled()
+  })
+})
+
+describe('ModalPrazo por papel', () => {
+  const EQUIPE: MembroDaEquipe[] = [
+    { user_id: 'advogada-1', email: 'ana@exemplo.com', papel: 'administrador', criado_em: '' },
+    { user_id: 'bruno-1', email: 'bruno@exemplo.com', papel: 'advogado', criado_em: '' },
+  ]
+  const permissoesDe = (papel: PapelMembro): PermissoesPrazo => ({
+    editar: pode(papel, 'editar_prazo'),
+    cumprir: pode(papel, 'cumprir_prazo'),
+    excluir: pode(papel, 'excluir_prazo'),
+    trocarResponsavel: pode(papel, 'trocar_responsavel'),
+  })
+  const botao = (nome: string) => screen.queryByRole('button', { name: nome }) !== null
+
+  it.each([
+    ['administrador', { salvar: true, cumprir: true, excluir: true }],
+    ['advogado', { salvar: true, cumprir: true, excluir: true }],
+    ['assistente', { salvar: true, cumprir: true, excluir: false }],
+    ['leitura', { salvar: false, cumprir: false, excluir: false }],
+  ] as const)('%s vê só as ações permitidas', (papel, esperado) => {
+    abrir(fabricarPrazo(), { permissoes: permissoesDe(papel), membros: EQUIPE, eu: 'advogada-1' })
+    expect(botao('Salvar')).toBe(esperado.salvar)
+    expect(botao('Marcar cumprido')).toBe(esperado.cumprir)
+    expect(botao('Excluir')).toBe(esperado.excluir)
+    expect(screen.getByLabelText('Responsável')).toHaveProperty('disabled', papel === 'leitura')
+    expect(screen.getByLabelText('Prazo (dias úteis)')).toHaveProperty('disabled', papel === 'leitura')
+  })
+
+  it('Leitura só pode fechar o detalhe', async () => {
+    const { onFechar } = abrir(fabricarPrazo(), { permissoes: permissoesDe('leitura'), membros: EQUIPE })
+    const rodape = screen.getAllByRole('button', { name: 'Fechar' }).at(-1)!
+    expect(rodape).toHaveTextContent('Fechar')
+    await userEvent.click(rodape)
+    expect(onFechar).toHaveBeenCalled()
+  })
+
+  it('troca o responsável e grava junto com o prazo', async () => {
+    const { onSalvar } = abrir(fabricarPrazo(), { membros: EQUIPE, eu: 'advogada-1' })
+    const campo = screen.getByLabelText('Responsável')
+    expect(campo).toHaveDisplayValue('ana (você)')
+    await userEvent.selectOptions(campo, 'bruno-1')
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar' }))
+    expect(onSalvar).toHaveBeenCalledWith(expect.objectContaining({ responsavel_id: 'bruno-1' }))
+  })
+
+  it('sem trocar o responsável não o envia', async () => {
+    const onSalvar = vi.fn().mockResolvedValue(undefined)
+    abrir(fabricarPrazo(), { membros: EQUIPE, eu: 'advogada-1', onSalvar })
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar' }))
+    expect(onSalvar.mock.calls[0][0]).not.toHaveProperty('responsavel_id')
+  })
+
+  it('no Solo não mostra o responsável', () => {
+    abrir()
+    expect(screen.queryByLabelText('Responsável')).not.toBeInTheDocument()
   })
 })

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { filtrarPrazos, type PrazoFiltravel } from './filtros'
+import { filtrarPorResponsavel, filtrarPrazos, TODOS_RESPONSAVEIS, type PrazoFiltravel } from './filtros'
 
 function prazo(parcial: Partial<PrazoFiltravel> = {}): PrazoFiltravel {
   return {
@@ -19,6 +19,28 @@ function prazo(parcial: Partial<PrazoFiltravel> = {}): PrazoFiltravel {
 }
 
 const HOJE = '2026-10-06'
+
+describe('filtro por responsável', () => {
+  const meu = prazo({ responsavel_id: 'ana' })
+  const dela = prazo({ responsavel_id: 'bia' })
+  const semNinguem = prazo({ responsavel_id: null })
+
+  it('"Meus prazos" (o próprio id) mostra só os da pessoa', () => {
+    expect(filtrarPorResponsavel([meu, dela, semNinguem], 'ana')).toEqual([meu])
+  })
+
+  it('todos ou sem filtro mostra tudo', () => {
+    expect(filtrarPorResponsavel([meu, dela, semNinguem], TODOS_RESPONSAVEIS)).toHaveLength(3)
+    expect(filtrarPorResponsavel([meu, dela, semNinguem])).toHaveLength(3)
+  })
+
+  it('combina com os outros filtros de filtrarPrazos', () => {
+    const delaCumprido = prazo({ responsavel_id: 'bia', status: 'cumprido' })
+    expect(filtrarPrazos([meu, dela, delaCumprido], { responsavel: 'bia', status: 'abertos', hoje: HOJE })).toEqual([
+      dela,
+    ])
+  })
+})
 
 describe('filtrarPrazos', () => {
   it('acha por texto livre ignorando caixa, em processo, tribunal e partes', () => {

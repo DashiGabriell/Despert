@@ -2,12 +2,13 @@ import { useCallback, useMemo, useState } from 'react'
 import { Navigate, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import {
   useAtualizarPrazo,
-  useConfiguracao,
+  useConfiguracaoOrganizacao,
   useConfiguracaoSistema,
   useCriarPrazo,
   useExcluirPrazo,
   useExecucoes,
   useFeriados,
+  useMembros,
   useMonitoramentos,
   usePertencas,
   usePrazos,
@@ -18,18 +19,19 @@ import { useHoje } from '../data/relogio'
 import { rotaDev, type Atuacao } from '../domain/acesso'
 import { formatarDataHora } from '../domain/datas'
 import type { DataISO, OpcoesDias } from '../domain/dias'
+import { ROTULO_PAPEL } from '../domain/equipe'
 import { contarIndicadores } from '../domain/indicadores'
-import { organizacaoAtiva } from '../domain/organizacao'
+import { chaveOrganizacaoPreferida, organizacaoAtiva } from '../domain/organizacao'
 import { useAuth, useEmailEfetivo, useUserId } from '../lib/auth-context'
-import type { Prazo } from '../lib/database.types'
+import type { MembroComOrganizacao, Prazo } from '../lib/database.types'
 import type { ContextoLayout } from '../lib/layout-context'
-import { OrganizacaoContext, useOrganizacaoId, usePertenca } from '../lib/organizacao-context'
+import { OrganizacaoContext, useOrganizacaoId, usePertenca, usePode } from '../lib/organizacao-context'
 import { ausenciaConfiguracao } from '../lib/supabase'
 import { mensagemDeErro, useToast } from '../lib/toast-context'
 import BuscaAgora from './BuscaAgora'
 import ModalNovoPrazo from './ModalNovoPrazo'
 import ModalPrazo from './ModalPrazo'
-import { alertaAviso, alertaErro, botao, botaoPequeno } from './ui'
+import { alertaAviso, alertaErro, botao, botaoPequeno, campo } from './ui'
 
 const CHAVE_MENU_RECOLHIDO = 'despert:menu-recolhido'
 
@@ -39,6 +41,7 @@ const TITULOS: Record<string, string> = {
   '/monitoramento': 'Monitoramento',
   '/historico': 'Histórico de execuções',
   '/configuracoes': 'Configurações',
+  '/equipe': 'Equipe',
 }
 
 function Icone({ d }: { d: string }) {
@@ -77,6 +80,12 @@ const ITENS = [
     d: 'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68 1.65 1.65 0 0 0 10 3.17V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z',
   },
 ]
+
+const ITEM_EQUIPE = {
+  to: '/equipe',
+  label: 'Equipe',
+  d: 'M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75',
+}
 
 type ModalAberto = { tipo: 'prazo'; id: string } | { tipo: 'novo'; data?: DataISO } | null
 
@@ -157,7 +166,16 @@ function FaixaEtapa() {
 function AreaLogada() {
   const userId = useUserId()
   const pertencas = usePertencas(userId)
-  const pertenca = organizacaoAtiva(pertencas.data ?? [])
+  const [preferida, setPreferida] = useState(() => localStorage.getItem(chaveOrganizacaoPreferida(userId)))
+  const pertenca = organizacaoAtiva(pertencas.data ?? [], preferida)
+
+  const trocar = useCallback(
+    (orgId: string) => {
+      localStorage.setItem(chaveOrganizacaoPreferida(userId), orgId)
+      setPreferida(orgId)
+    },
+    [userId],
+  )
 
   if (pertencas.isPending) {
     return <main className="grid min-h-dvh place-items-center text-sm text-muted">Carregando…</main>
@@ -168,19 +186,56 @@ function AreaLogada() {
         <div role="alert" className={`${alertaErro} max-w-md`}>
           {pertencas.isError
             ? `Não foi possível carregar sua organização: ${mensagemDeErro(pertencas.error)}`
-            : 'Sua conta não está vinculada a nenhum escritório. Fale com o suporte.'}
+            : 'Sua conta ainda não faz parte de nenhuma organização. Se você recebeu um convite, abra o link do e-mail para entrar na equipe.'}
         </div>
       </main>
     )
   }
   return (
     <OrganizacaoContext.Provider value={pertenca}>
-      <AreaDaOrganizacao />
+      <AreaDaOrganizacao pertencas={pertencas.data ?? []} onTrocar={trocar} />
     </OrganizacaoContext.Provider>
   )
 }
 
-function AreaDaOrganizacao() {
+/** Só aparece para quem está em mais de uma organização. */
+function SeletorOrganizacao({
+  pertencas,
+  onTrocar,
+}: {
+  pertencas: readonly MembroComOrganizacao[]
+  onTrocar: (orgId: string) => void
+}) {
+  const orgId = useOrganizacaoId()
+  if (pertencas.length < 2) return null
+  return (
+    <div className="ds-sb-texto mb-3 px-1">
+      <label htmlFor="seletor-organizacao" className="mb-1 block text-[11px] font-semibold tracking-wide text-muted uppercase">
+        Organização
+      </label>
+      <select
+        id="seletor-organizacao"
+        className={`${campo} py-1.5 text-sm`}
+        value={orgId}
+        onChange={(e) => onTrocar(e.target.value)}
+      >
+        {pertencas.map((p) => (
+          <option key={p.organizacao_id} value={p.organizacao_id}>
+            {p.organizacao.nome || 'Sem nome'} · {ROTULO_PAPEL[p.papel]}
+          </option>
+        ))}
+      </select>
+    </div>
+  )
+}
+
+function AreaDaOrganizacao({
+  pertencas,
+  onTrocar,
+}: {
+  pertencas: readonly MembroComOrganizacao[]
+  onTrocar: (orgId: string) => void
+}) {
   const userId = useUserId()
   const orgId = useOrganizacaoId()
   const email = useEmailEfetivo() ?? ''
@@ -188,18 +243,22 @@ function AreaDaOrganizacao() {
   const { pathname } = useLocation()
   const avisar = useToast()
   const hoje = useHoje()
+  const permite = usePode()
   useTempoReal(orgId)
 
   const prazos = usePrazos(orgId)
   const execucoes = useExecucoes(orgId)
-  const config = useConfiguracao(userId, email)
+  const configOrganizacao = useConfiguracaoOrganizacao(orgId)
   const sistema = useConfiguracaoSistema()
   const monitoramentos = useMonitoramentos(orgId)
   const feriados = useFeriados(orgId)
+  const membros = useMembros(orgId)
   const atualizar = useAtualizarPrazo(orgId)
   const excluir = useExcluirPrazo(orgId)
   const criar = useCriarPrazo(orgId, userId)
   const plano = usePlano()
+  const podeCriar = plano.escrita && permite('editar_prazo')
+  const itens = permite('gerenciar_equipe') && plano.limites.papeis ? [...ITENS, ITEM_EQUIPE] : ITENS
 
   const [modal, setModal] = useState<ModalAberto>(null)
   const fechar = useCallback(() => setModal(null), [])
@@ -213,18 +272,20 @@ function AreaDaOrganizacao() {
   const opcoesDias: OpcoesDias = useMemo(
     () => ({
       feriadosLocais: (feriados.data ?? []).map((f) => f.data),
-      considerarRecesso: config.data?.considerar_recesso ?? true,
+      considerarRecesso: configOrganizacao.data?.considerar_recesso ?? true,
     }),
-    [feriados.data, config.data?.considerar_recesso],
+    [feriados.data, configOrganizacao.data?.considerar_recesso],
   )
 
   const contexto: ContextoLayout = useMemo(
     () => ({
       hoje,
       abrirPrazo: (prazo: Prazo) => setModal({ tipo: 'prazo', id: prazo.id }),
-      novoPrazo: (data?: DataISO) => setModal({ tipo: 'novo', data }),
+      novoPrazo: (data?: DataISO) => {
+        if (podeCriar) setModal({ tipo: 'novo', data })
+      },
     }),
-    [hoje],
+    [hoje, podeCriar],
   )
 
   const indicadores = contarIndicadores(prazos.data ?? [], hoje)
@@ -256,8 +317,10 @@ function AreaDaOrganizacao() {
           </button>
         </div>
 
+        <SeletorOrganizacao pertencas={pertencas} onTrocar={onTrocar} />
+
         <nav className="flex gap-1 overflow-x-auto md:flex-col md:overflow-visible">
-          {ITENS.map((item) => (
+          {itens.map((item) => (
             <NavLink key={item.to} to={item.to} className="ds-sb-item" title={recolhida ? item.label : undefined}>
               <Icone d={item.d} />
               <span className="ds-sb-texto">{item.label}</span>
@@ -314,24 +377,28 @@ function AreaDaOrganizacao() {
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              className={botao}
-              disabled={!plano.escrita}
-              title={plano.escrita ? undefined : 'Organização em modo somente leitura.'}
-              onClick={() => contexto.novoPrazo()}
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="size-4" aria-hidden>
-                <path d="M12 5v14M5 12h14" />
-              </svg>
-              Prazo manual
-            </button>
-            <BuscaAgora
-              orgId={orgId}
-              config={config.data}
-              webhookUrl={sistema.data?.n8n_webhook_url}
-              monitoramentos={monitoramentos.data ?? []}
-            />
+            {permite('editar_prazo') && (
+              <button
+                type="button"
+                className={botao}
+                disabled={!plano.escrita}
+                title={plano.escrita ? undefined : 'Organização em modo somente leitura.'}
+                onClick={() => contexto.novoPrazo()}
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="size-4" aria-hidden>
+                  <path d="M12 5v14M5 12h14" />
+                </svg>
+                Prazo manual
+              </button>
+            )}
+            {permite('buscar_agora') && (
+              <BuscaAgora
+                orgId={orgId}
+                token={configOrganizacao.data?.webhook_token}
+                webhookUrl={sistema.data?.n8n_webhook_url}
+                monitoramentos={monitoramentos.data ?? []}
+              />
+            )}
           </div>
         </header>
 
@@ -346,6 +413,14 @@ function AreaDaOrganizacao() {
           prazo={prazoAberto}
           hoje={hoje}
           opcoesDias={opcoesDias}
+          permissoes={{
+            editar: plano.escrita && permite('editar_prazo'),
+            cumprir: plano.escrita && permite('cumprir_prazo'),
+            excluir: plano.escrita && permite('excluir_prazo'),
+            trocarResponsavel: plano.escrita && permite('trocar_responsavel'),
+          }}
+          membros={(membros.data ?? []).length > 1 ? membros.data : undefined}
+          eu={userId}
           onFechar={fechar}
           onSalvar={async (dados) => {
             await atualizar.mutateAsync({ id: prazoAberto.id, dados })

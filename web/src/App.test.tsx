@@ -6,6 +6,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
 import AuthProvider from './components/AuthProvider'
 import ToastProvider from './components/ToastProvider'
+import type { MembroComOrganizacao, PapelMembro, Plano, Prazo } from './lib/database.types'
+import { fabricarPrazo } from './test/fabricas'
 
 type SessaoTeste = { user: { id: string; email: string; app_metadata?: Record<string, unknown> } }
 
@@ -33,30 +35,47 @@ vi.mock('./lib/supabase', () => ({
 }))
 
 const vazio = { data: [], isPending: false, isError: false, isSuccess: true }
-const PERTENCA = {
-  organizacao_id: 'org-1',
-  user_id: 'advogada-1',
-  papel: 'administrador',
-  criado_em: '2026-10-01T10:00:00Z',
-  organizacao: {
-    id: 'org-1',
-    nome: 'Escritório da Ana',
-    rotulo: 'escritorio',
-    plano: 'solo',
-    situacao: 'ativa',
-    teste_iniciado_em: null,
-    pago_ate: null,
-    limites: {},
+
+function pertenca(orgId: string, nome: string, papel: PapelMembro, plano: Plano): MembroComOrganizacao {
+  return {
+    organizacao_id: orgId,
+    user_id: 'advogada-1',
+    papel,
     criado_em: '2026-10-01T10:00:00Z',
-  },
+    organizacao: {
+      id: orgId,
+      nome,
+      rotulo: 'escritorio',
+      plano,
+      situacao: 'ativa',
+      teste_iniciado_em: null,
+      pago_ate: null,
+      limites: {},
+      criado_em: '2026-10-01T10:00:00Z',
+    },
+  }
 }
+const PERTENCA = pertenca('org-1', 'Escritório da Ana', 'administrador', 'solo')
+let pertencas: MembroComOrganizacao[] = [PERTENCA]
+let prazosPorOrg: Record<string, Prazo[]> = {}
+
 vi.mock('./data/queries', () => ({
-  usePertencas: () => ({ data: [PERTENCA], isPending: false, isError: false, isSuccess: true }),
+  chaves: { pertencas: (userId: string) => ['pertencas', userId] },
+  cliente: vi.fn(),
+  usePertencas: () => ({ data: pertencas, isPending: false, isError: false, isSuccess: true }),
   useMembros: () => vazio,
+  useConvites: () => vazio,
+  useConvidar: () => mutacao,
+  useReenviarConvite: () => mutacao,
+  useCancelarConvite: () => mutacao,
+  useAlterarPapel: () => mutacao,
+  useRemoverMembro: () => mutacao,
+  useConfiguracaoOrganizacao: () => ({ data: undefined, isPending: true, isError: false }),
+  useSalvarConfiguracaoOrganizacao: () => mutacao,
   useBuscasAgora: () => vazio,
   useRegistrarBuscaAgora: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useCancelarBuscaAgora: () => ({ mutate: vi.fn() }),
-  usePrazos: () => vazio,
+  usePrazos: (orgId: string) => ({ ...vazio, data: prazosPorOrg[orgId] ?? [] }),
   useExecucoes: () => vazio,
   useMonitoramentos: () => vazio,
   useFeriados: () => vazio,
@@ -243,5 +262,91 @@ describe('acesso dev', () => {
     renderizar('/prazos')
     expect(await screen.findByRole('heading', { name: 'Prazos' })).toBeInTheDocument()
     expect(screen.queryByText(/você está atuando como/)).not.toBeInTheDocument()
+  })
+})
+
+describe('equipe e organizações', () => {
+  beforeEach(() => {
+    auth.session = ADVOGADA
+    auth.devNoBanco = undefined
+    sessionStorage.clear()
+    localStorage.clear()
+    pertencas = [PERTENCA]
+    prazosPorOrg = {}
+  })
+
+  it('no Solo não há Equipe nem seletor de organização', async () => {
+    renderizar('/equipe')
+    expect(await screen.findByRole('heading', { name: 'Prazos' })).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Equipe' })).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Organização')).not.toBeInTheDocument()
+  })
+
+  it('Administrador de escritório vê e abre a Equipe', async () => {
+    pertencas = [pertenca('org-1', 'Escritório da Ana', 'administrador', 'escritorio')]
+    renderizar('/equipe')
+    expect(await screen.findByRole('heading', { name: 'Equipe' })).toBeInTheDocument()
+    expect(screen.getAllByRole('link', { name: 'Equipe' }).length).toBeGreaterThan(0)
+    expect(screen.getByText(/Vagas do plano:/)).toHaveTextContent('0 de 10')
+  })
+
+  it.each(['advogado', 'assistente', 'leitura'] as const)('%s não vê a Equipe e cai nos prazos', async (papel) => {
+    pertencas = [pertenca('org-1', 'Escritório da Ana', papel, 'escritorio')]
+    renderizar('/equipe')
+    expect(await screen.findByRole('heading', { name: 'Prazos' })).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Equipe' })).not.toBeInTheDocument()
+  })
+
+  it.each([
+    ['administrador', true],
+    ['advogado', true],
+    ['assistente', true],
+    ['leitura', false],
+  ] as const)('%s vê Prazo manual e Buscar agora: %s', async (papel, ve) => {
+    pertencas = [pertenca('org-1', 'Escritório da Ana', papel, 'escritorio')]
+    renderizar('/prazos')
+    expect(await screen.findByRole('heading', { name: 'Prazos' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Prazo manual/ }) !== null).toBe(ve)
+    expect(screen.queryByRole('button', { name: /Buscar agora/ }) !== null).toBe(ve)
+  })
+
+  it('quem está em duas organizações troca entre elas e vê só os dados da ativa', async () => {
+    pertencas = [
+      pertenca('org-1', 'Escritório da Ana', 'administrador', 'escritorio'),
+      pertenca('org-2', 'Jurídico ACME', 'leitura', 'corporativo'),
+    ]
+    prazosPorOrg = {
+      'org-1': [fabricarPrazo({ organizacao_id: 'org-1', processo: 'PROC-ANA' })],
+      'org-2': [fabricarPrazo({ organizacao_id: 'org-2', processo: 'PROC-ACME' })],
+    }
+    renderizar('/prazos')
+    const seletor = await screen.findByLabelText('Organização')
+    expect(screen.getByText('PROC-ANA')).toBeInTheDocument()
+    expect(screen.queryByText('PROC-ACME')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Prazo manual/ })).toBeInTheDocument()
+
+    await userEvent.selectOptions(seletor, 'org-2')
+    expect(await screen.findByText('PROC-ACME')).toBeInTheDocument()
+    expect(screen.queryByText('PROC-ANA')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Prazo manual/ })).not.toBeInTheDocument()
+    expect(localStorage.getItem('despert:organizacao:advogada-1')).toBe('org-2')
+  })
+
+  it('a organização escolhida é lembrada na próxima visita', async () => {
+    pertencas = [
+      pertenca('org-1', 'Escritório da Ana', 'administrador', 'escritorio'),
+      pertenca('org-2', 'Jurídico ACME', 'leitura', 'corporativo'),
+    ]
+    prazosPorOrg = { 'org-2': [fabricarPrazo({ organizacao_id: 'org-2', processo: 'PROC-ACME' })] }
+    localStorage.setItem('despert:organizacao:advogada-1', 'org-2')
+    renderizar('/prazos')
+    expect(await screen.findByText('PROC-ACME')).toBeInTheDocument()
+    expect(screen.getByLabelText('Organização')).toHaveValue('org-2')
+  })
+
+  it('sem organização, orienta a abrir o link do convite', async () => {
+    pertencas = []
+    renderizar('/prazos')
+    expect(await screen.findByRole('alert')).toHaveTextContent(/abra o link do e-mail/)
   })
 })

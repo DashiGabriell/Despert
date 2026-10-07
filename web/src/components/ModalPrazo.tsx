@@ -2,11 +2,12 @@ import { useState, type ReactNode } from 'react'
 import { formatarData, formatarDataHora } from '../domain/datas'
 import type { DataISO, OpcoesDias } from '../domain/dias'
 import { montarAtualizacao, recalcularVencimento, type AtualizacaoPrazo } from '../domain/edicao'
+import { nomeDoMembro } from '../domain/equipe'
 import { ROTULO_STATUS } from '../domain/selo'
 import { emAberto, precisaConferir, type StatusPrazo } from '../domain/urgencia'
 import { lerDias } from '../domain/validacao'
 import { mensagemDeErro } from '../lib/toast-context'
-import type { Prazo } from '../lib/database.types'
+import type { MembroDaEquipe, Prazo } from '../lib/database.types'
 import Modal from './Modal'
 import SeloPrazo from './SeloPrazo'
 import {
@@ -23,11 +24,27 @@ import {
   separador,
 } from './ui'
 
+/** O que o papel (e a etapa do plano) deixa fazer neste prazo. */
+export interface PermissoesPrazo {
+  editar: boolean
+  cumprir: boolean
+  excluir: boolean
+  trocarResponsavel: boolean
+}
+
+const TODAS: PermissoesPrazo = { editar: true, cumprir: true, excluir: true, trocarResponsavel: true }
+
+export type SalvarPrazo = AtualizacaoPrazo & { responsavel_id?: string | null }
+
 interface Props {
   prazo: Prazo
   hoje: DataISO
   opcoesDias: OpcoesDias
-  onSalvar: (dados: AtualizacaoPrazo) => Promise<void>
+  permissoes?: PermissoesPrazo
+  /** Equipe para escolher o responsável; sem ela (Solo) o campo não aparece. */
+  membros?: readonly MembroDaEquipe[]
+  eu?: string
+  onSalvar: (dados: SalvarPrazo) => Promise<void>
   onExcluir: () => Promise<void>
   onFechar: () => void
 }
@@ -41,7 +58,18 @@ function Info({ titulo, children, largo }: { titulo: string; children: ReactNode
   )
 }
 
-export default function ModalPrazo({ prazo, hoje, opcoesDias, onSalvar, onExcluir, onFechar }: Props) {
+export default function ModalPrazo({
+  prazo,
+  hoje,
+  opcoesDias,
+  permissoes = TODAS,
+  membros,
+  eu,
+  onSalvar,
+  onExcluir,
+  onFechar,
+}: Props) {
+  const [responsavel, setResponsavel] = useState(prazo.responsavel_id ?? '')
   const [status, setStatus] = useState<StatusPrazo>(prazo.status)
   const [inicio, setInicio] = useState(prazo.inicio_prazo ?? '')
   const [dias, setDias] = useState(prazo.prazo_dias ? String(prazo.prazo_dias) : '')
@@ -77,15 +105,21 @@ export default function ModalPrazo({ prazo, hoje, opcoesDias, onSalvar, onExclui
       setErro('O prazo deve ter entre 1 e 365 dias.')
       return
     }
-    const dados = montarAtualizacao(
+    const dados: SalvarPrazo = montarAtualizacao(
       prazo,
       { status: statusFinal, vencimento, prazo_dias: diasNumero, inicio_prazo: inicio, observacoes },
       new Date().toISOString(),
     )
+    if (membros && responsavel && responsavel !== prazo.responsavel_id) dados.responsavel_id = responsavel
     void executar(() => onSalvar(dados))
   }
 
-  const rodape = confirmandoExclusao ? (
+  const podeSalvar = permissoes.editar || (Boolean(membros) && permissoes.trocarResponsavel)
+  const rodape = !podeSalvar && !permissoes.cumprir && !permissoes.excluir ? (
+    <button type="button" className={botao} onClick={onFechar}>
+      Fechar
+    </button>
+  ) : confirmandoExclusao ? (
     <>
       <span className="mr-auto self-center text-sm text-danger">
         Excluir este prazo? Se a publicação ainda estiver no período de busca, o robô vai capturá-la de novo.
@@ -104,17 +138,19 @@ export default function ModalPrazo({ prazo, hoje, opcoesDias, onSalvar, onExclui
     </>
   ) : (
     <>
-      <button
-        type="button"
-        className={`${botaoPerigo} mr-auto`}
-        onClick={() => setConfirmandoExclusao(true)}
-      >
-        Excluir
-      </button>
-      <button type="button" className={botao} onClick={onFechar}>
+      {permissoes.excluir && (
+        <button
+          type="button"
+          className={`${botaoPerigo} mr-auto`}
+          onClick={() => setConfirmandoExclusao(true)}
+        >
+          Excluir
+        </button>
+      )}
+      <button type="button" className={`${botao} ${permissoes.excluir ? '' : 'mr-auto'}`} onClick={onFechar}>
         Cancelar
       </button>
-      {emAberto(prazo) && (
+      {emAberto(prazo) && permissoes.cumprir && (
         <button
           type="button"
           className={botaoSucesso}
@@ -124,9 +160,11 @@ export default function ModalPrazo({ prazo, hoje, opcoesDias, onSalvar, onExclui
           Marcar cumprido
         </button>
       )}
-      <button type="button" className={botaoPrimario} disabled={ocupado} onClick={() => salvar(status)}>
-        Salvar
-      </button>
+      {podeSalvar && (
+        <button type="button" className={botaoPrimario} disabled={ocupado} onClick={() => salvar(status)}>
+          Salvar
+        </button>
+      )}
     </>
   )
 
@@ -182,6 +220,29 @@ export default function ModalPrazo({ prazo, hoje, opcoesDias, onSalvar, onExclui
       )}
 
       <div className={separador}>Controle</div>
+      {membros && (
+        <div className="mb-3.5 sm:max-w-xs">
+          <label className={rotulo} htmlFor="e-responsavel">
+            Responsável
+          </label>
+          <select
+            id="e-responsavel"
+            className={campo}
+            value={responsavel}
+            disabled={!permissoes.trocarResponsavel}
+            onChange={(e) => setResponsavel(e.target.value)}
+          >
+            {!membros.some((m) => m.user_id === responsavel) && (
+              <option value={responsavel}>{responsavel ? 'Fora da equipe' : 'Sem responsável'}</option>
+            )}
+            {membros.map((m) => (
+              <option key={m.user_id} value={m.user_id}>
+                {nomeDoMembro(m, eu)}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
       <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-4">
         <div>
           <label className={rotulo} htmlFor="e-inicio">
@@ -191,6 +252,7 @@ export default function ModalPrazo({ prazo, hoje, opcoesDias, onSalvar, onExclui
             id="e-inicio"
             type="date"
             className={campo}
+            disabled={!permissoes.editar}
             value={inicio}
             onChange={(e) => {
               setInicio(e.target.value)
@@ -208,6 +270,7 @@ export default function ModalPrazo({ prazo, hoje, opcoesDias, onSalvar, onExclui
             min={1}
             max={365}
             className={campo}
+            disabled={!permissoes.editar}
             value={dias}
             onChange={(e) => {
               setDias(e.target.value)
@@ -223,6 +286,7 @@ export default function ModalPrazo({ prazo, hoje, opcoesDias, onSalvar, onExclui
             id="e-venc"
             type="date"
             className={campo}
+            disabled={!permissoes.editar}
             value={vencimento}
             onChange={(e) => {
               setVencimento(e.target.value)
@@ -237,6 +301,7 @@ export default function ModalPrazo({ prazo, hoje, opcoesDias, onSalvar, onExclui
           <select
             id="e-status"
             className={campo}
+            disabled={!permissoes.editar}
             value={status}
             onChange={(e) => setStatus(e.target.value as StatusPrazo)}
           >
@@ -261,6 +326,7 @@ export default function ModalPrazo({ prazo, hoje, opcoesDias, onSalvar, onExclui
           id="e-obs"
           rows={3}
           className={campo}
+          disabled={!permissoes.editar}
           placeholder="Anotações internas sobre este prazo…"
           value={observacoes}
           onChange={(e) => setObservacoes(e.target.value)}

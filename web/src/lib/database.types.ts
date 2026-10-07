@@ -55,6 +55,40 @@ export type Membro = {
 /** Pertença de uma pessoa com os dados da organização (`membros` + `organizacoes`). */
 export type MembroComOrganizacao = Membro & { organizacao: Organizacao }
 
+/** Retorno de `membros_da_organizacao()`: a equipe com o e-mail de cada um. */
+export type MembroDaEquipe = {
+  user_id: string
+  email: string
+  papel: PapelMembro
+  criado_em: string
+}
+
+export type Convite = {
+  id: string
+  organizacao_id: string
+  email: string
+  papel: PapelMembro
+  token: string
+  criado_por: string | null
+  criado_em: string
+  expira_em: string
+  aceito_em: string | null
+}
+
+/** Retorno de `ver_convite()`, lido antes de a pessoa entrar. */
+export type ResumoConvite = {
+  organizacao: string
+  papel: PapelMembro
+  email: string
+  situacao: 'pendente' | 'aceito' | 'expirado'
+}
+
+export type EscopoResumo = 'meus' | 'todos'
+
+/**
+ * Configuração pessoal. Dias para trás, prazo padrão, recesso e token vêm da organização
+ * (copiados pelo banco); a pessoa altera só e-mail, janela de alerta e escopo do resumo.
+ */
 export type Configuracao = {
   user_id: string
   email_destino: string
@@ -63,7 +97,18 @@ export type Configuracao = {
   dias_alerta: number
   considerar_recesso: boolean
   webhook_token: string
+  resumo_escopo: EscopoResumo | null
   ultima_busca_em: string | null
+  updated_at: string
+}
+
+/** Configurações do robô que valem para a organização inteira; só o Administrador altera. */
+export type ConfiguracaoOrganizacao = {
+  organizacao_id: string
+  dias_retroativos: number
+  prazo_padrao_dias: number
+  considerar_recesso: boolean
+  webhook_token: string
   updated_at: string
 }
 
@@ -82,7 +127,6 @@ export type Monitoramento = {
 
 export type Feriado = {
   organizacao_id: string
-  user_id: string
   data: string
   descricao: string
 }
@@ -196,10 +240,22 @@ export type Database = {
         Update: Partial<Omit<Monitoramento, 'id'>>
         Relationships: []
       }
-      feriados: {
+      feriados_organizacao: {
         Row: Feriado
-        Insert: Partial<Feriado> & Pick<Feriado, 'data'>
-        Update: Partial<Feriado>
+        Insert: Partial<Feriado> & Pick<Feriado, 'organizacao_id' | 'data'>
+        Update: Partial<Omit<Feriado, 'organizacao_id'>>
+        Relationships: []
+      }
+      configuracoes_organizacao: {
+        Row: ConfiguracaoOrganizacao
+        Insert: Partial<ConfiguracaoOrganizacao> & Pick<ConfiguracaoOrganizacao, 'organizacao_id'>
+        Update: Partial<Omit<ConfiguracaoOrganizacao, 'organizacao_id'>>
+        Relationships: []
+      }
+      convites: {
+        Row: Convite
+        Insert: Record<string, never>
+        Update: Record<string, never>
         Relationships: []
       }
       prazos: {
@@ -265,6 +321,19 @@ export type Database = {
       admin_listar_organizacoes: { Args: Record<string, never>; Returns: OrganizacaoAdmin[] }
       registrar_busca_agora: { Args: { org: string }; Returns: number }
       cancelar_busca_agora: { Args: { busca: number }; Returns: undefined }
+      tem_papel: { Args: { org: string; papeis: PapelMembro[] }; Returns: boolean }
+      membros_da_organizacao: { Args: { org: string }; Returns: MembroDaEquipe[] }
+      convidar: {
+        Args: { org: string; email_convidado: string; papel_convidado: PapelMembro }
+        Returns: Convite
+      }
+      reenviar_convite: { Args: { convite: string }; Returns: Convite }
+      cancelar_convite: { Args: { convite: string }; Returns: undefined }
+      ver_convite: { Args: { codigo: string }; Returns: ResumoConvite[] }
+      aceitar_convite: { Args: { codigo: string }; Returns: string }
+      alterar_papel: { Args: { org: string; membro: string; novo_papel: PapelMembro }; Returns: undefined }
+      remover_membro: { Args: { org: string; membro: string }; Returns: undefined }
+      admin_trocar_token: { Args: { conta: string; token: string }; Returns: undefined }
     }
     Enums: Record<string, never>
     CompositeTypes: Record<string, never>

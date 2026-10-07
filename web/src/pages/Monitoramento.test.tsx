@@ -3,22 +3,27 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { EstadoDoPlano } from '../data/plano'
+import { pode } from '../domain/permissoes'
 import { CARENCIA_PADRAO, LIMITES_PADRAO } from '../domain/planos'
-import type { Monitoramento as TipoMonitoramento } from '../lib/database.types'
+import type { MembroDaEquipe, PapelMembro, Monitoramento as TipoMonitoramento } from '../lib/database.types'
 import Monitoramento from './Monitoramento'
 
 let monitoramentos: TipoMonitoramento[] = []
 let plano: EstadoDoPlano
+let papel: PapelMembro = 'administrador'
+let membros: MembroDaEquipe[] = []
 const criar = vi.fn()
 
 vi.mock('../lib/auth-context', () => ({ useUserId: () => 'advogada-1' }))
-vi.mock('../lib/organizacao-context', () => ({ useOrganizacaoId: () => 'org-1' }))
+vi.mock('../lib/organizacao-context', () => ({
+  useOrganizacaoId: () => 'org-1',
+  usePertenca: () => ({ organizacao_id: 'org-1', user_id: 'advogada-1', papel }),
+  usePode: () => (acao: Parameters<typeof pode>[1]) => pode(papel, acao),
+}))
 vi.mock('../data/plano', () => ({ usePlano: () => plano }))
 vi.mock('../data/queries', () => ({
   useMonitoramentos: () => ({ data: monitoramentos, isPending: false, isError: false, isSuccess: true }),
-  useMembros: () => ({
-    data: [{ organizacao_id: 'org-1', user_id: 'advogada-1', papel: 'administrador', criado_em: '' }],
-  }),
+  useMembros: () => ({ data: membros }),
   useCriarMonitoramento: () => ({ mutate: criar, isPending: false }),
   useAlternarMonitoramento: () => ({ mutate: vi.fn(), isPending: false }),
   useRemoverMonitoramento: () => ({ mutate: vi.fn() }),
@@ -53,6 +58,8 @@ function renderizar() {
 describe('tela de Monitoramento com limites do plano', () => {
   beforeEach(() => {
     criar.mockReset()
+    papel = 'administrador'
+    membros = [{ user_id: 'advogada-1', email: 'ana@exemplo.com', papel: 'administrador', criado_em: '' }]
     plano = {
       limites: LIMITES_PADRAO.solo,
       etapa: 'ativa',
@@ -92,5 +99,60 @@ describe('tela de Monitoramento com limites do plano', () => {
     expect(screen.getByRole('button', { name: 'Adicionar' })).toBeDisabled()
     expect(screen.getByRole('checkbox')).toBeDisabled()
     expect(screen.getByRole('button', { name: 'Remover' })).toBeDisabled()
+  })
+})
+
+describe('tela de Monitoramento por papel', () => {
+  const EQUIPE: MembroDaEquipe[] = [
+    { user_id: 'advogada-1', email: 'ana@exemplo.com', papel: 'administrador', criado_em: '' },
+    { user_id: 'bruno-1', email: 'bruno@exemplo.com', papel: 'advogado', criado_em: '' },
+    { user_id: 'carla-1', email: 'carla@exemplo.com', papel: 'assistente', criado_em: '' },
+  ]
+
+  beforeEach(() => {
+    criar.mockReset()
+    papel = 'administrador'
+    membros = EQUIPE
+    plano = {
+      limites: LIMITES_PADRAO.escritorio,
+      etapa: 'ativa',
+      carencia: CARENCIA_PADRAO,
+      diasAteMudar: null,
+      escrita: true,
+    }
+    monitoramentos = [
+      monitoramento({ tipo: 'oab', oab_numero: '123', oab_uf: 'SP', numero_processo: null }),
+      monitoramento({ tipo: 'oab', oab_numero: '456', oab_uf: 'RJ', numero_processo: null, user_id: 'bruno-1' }),
+    ]
+  })
+
+  it.each(['assistente', 'leitura'] as const)('%s acompanha, mas não altera nada', (p) => {
+    papel = p
+    renderizar()
+    expect(screen.getByText(/só Administradores e Advogados os alteram/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Adicionar' })).toBeDisabled()
+    for (const chave of screen.getAllByRole('checkbox')) expect(chave).toBeDisabled()
+    for (const botao of screen.getAllByRole('button', { name: 'Remover' })) expect(botao).toBeDisabled()
+  })
+
+  it('advogado altera só a própria OAB e não escolhe o dono', () => {
+    papel = 'advogado'
+    renderizar()
+    expect(screen.queryByLabelText('Advogado(a) da OAB')).not.toBeInTheDocument()
+    expect(screen.getByLabelText('Desativar OAB 123/SP')).toBeEnabled()
+    expect(screen.getByLabelText('Desativar OAB 456/RJ')).toBeDisabled()
+  })
+
+  it('administrador escolhe de qual advogado é a OAB e vê a coluna de dono', async () => {
+    monitoramentos = monitoramentos.slice(0, 1)
+    renderizar()
+    const dono = screen.getByLabelText('Advogado(a) da OAB')
+    expect(Array.from((dono as HTMLSelectElement).options).map((o) => o.textContent)).toEqual(['ana (você)', 'bruno'])
+    expect(screen.getByRole('columnheader', { name: 'Advogado(a)' })).toBeInTheDocument()
+
+    await userEvent.selectOptions(dono, 'bruno-1')
+    await userEvent.type(screen.getByLabelText('Número da OAB'), '789')
+    await userEvent.click(screen.getByRole('button', { name: 'Adicionar' }))
+    expect(criar).toHaveBeenCalledWith(expect.objectContaining({ user_id: 'bruno-1', oab_numero: '789' }), expect.anything())
   })
 })

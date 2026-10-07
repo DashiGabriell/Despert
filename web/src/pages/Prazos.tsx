@@ -1,14 +1,18 @@
 import { useState } from 'react'
+import FiltroResponsavel from '../components/FiltroResponsavel'
 import GuiaInicio from '../components/GuiaInicio'
 import Indicadores from '../components/Indicadores'
 import TabelaPrazos from '../components/TabelaPrazos'
 import { alertaErro, botaoPequeno, campo } from '../components/ui'
+import { usePlano } from '../data/plano'
 import { useAtualizarPrazo, useConfiguracaoSistema, useMonitoramentos, usePrazos } from '../data/queries'
-import { filtrarPrazos, type FiltroRapido, type FiltroStatus } from '../domain/filtros'
+import { useFiltroResponsavel } from '../data/responsaveis'
+import { filtrarPorResponsavel, filtrarPrazos, type FiltroRapido, type FiltroStatus } from '../domain/filtros'
 import { contarIndicadores } from '../domain/indicadores'
+import { useUserId } from '../lib/auth-context'
 import type { Prazo } from '../lib/database.types'
 import { useLayout } from '../lib/layout-context'
-import { useOrganizacaoId } from '../lib/organizacao-context'
+import { useOrganizacaoId, usePode } from '../lib/organizacao-context'
 import { mensagemDeErro, useToast } from '../lib/toast-context'
 
 const OPCOES_STATUS: { valor: FiltroStatus; rotulo: string }[] = [
@@ -22,12 +26,16 @@ const OPCOES_STATUS: { valor: FiltroStatus; rotulo: string }[] = [
 
 export default function Prazos() {
   const orgId = useOrganizacaoId()
+  const eu = useUserId()
   const { hoje, abrirPrazo, novoPrazo } = useLayout()
   const avisar = useToast()
   const prazos = usePrazos(orgId)
   const monitoramentos = useMonitoramentos(orgId)
   const sistema = useConfiguracaoSistema()
   const atualizar = useAtualizarPrazo(orgId)
+  const filtroResponsavel = useFiltroResponsavel(orgId, eu)
+  const permite = usePode()
+  const { escrita } = usePlano()
 
   const [busca, setBusca] = useState('')
   const [status, setStatus] = useState<FiltroStatus>('abertos')
@@ -63,7 +71,8 @@ export default function Prazos() {
   }
 
   const todos = prazos.data
-  const lista = filtrarPrazos(todos, { busca, status, rapido, hoje })
+  const doResponsavel = filtrarPorResponsavel(todos, filtroResponsavel.responsavel)
+  const lista = filtrarPrazos(doResponsavel, { busca, status, rapido, hoje })
   const filtrando = rapido !== null || busca.trim() !== '' || status !== 'abertos'
 
   function cumprir(prazo: Prazo) {
@@ -79,7 +88,7 @@ export default function Prazos() {
   return (
     <>
       <Indicadores
-        contagem={contarIndicadores(todos, hoje)}
+        contagem={contarIndicadores(doResponsavel, hoje)}
         ativo={rapido}
         onSelecionar={(filtro) => {
           setRapido(filtro)
@@ -112,6 +121,7 @@ export default function Prazos() {
               </option>
             ))}
           </select>
+          <FiltroResponsavel filtro={filtroResponsavel} eu={eu} />
           {filtrando && (
             <button
               type="button"
@@ -136,6 +146,8 @@ export default function Prazos() {
           onAbrir={abrirPrazo}
           onCumprir={cumprir}
           cumprindo={atualizar.isPending ? atualizar.variables?.id : null}
+          responsaveis={filtroResponsavel.nomes}
+          podeCumprir={escrita && permite('cumprir_prazo')}
           vazio={
             todos.length === 0 ? (
               <GuiaInicio
@@ -143,6 +155,8 @@ export default function Prazos() {
                 temWebhook={Boolean(sistema.data?.n8n_webhook_url.trim())}
                 onPrazoManual={() => novoPrazo()}
               />
+            ) : doResponsavel.length === 0 && filtroResponsavel.responsavel === eu ? (
+              'Nenhum prazo sob sua responsabilidade. Escolha "Todos os responsáveis" para ver os da equipe.'
             ) : (
               'Nenhum prazo com esses filtros.'
             )

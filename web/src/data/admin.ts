@@ -257,10 +257,7 @@ export function useGerarTokenAdvogado() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: async ({ userId, token }: { userId: string; token: string }) => {
-      const { error } = await cliente()
-        .from('configuracoes')
-        .update({ webhook_token: token })
-        .eq('user_id', userId)
+      const { error } = await cliente().rpc('admin_trocar_token', { conta: userId, token })
       if (error) throw error
     },
     onSuccess: (_, { userId }) =>

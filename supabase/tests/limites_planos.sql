@@ -1,22 +1,20 @@
 -- Limites do plano reforçados no banco (ADR-0008). Rode depois do schema.sql, dentro de uma
 -- transação desfeita no final: não grava nada.
 --   begin; \i supabase/tests/limites_planos.sql rollback;
--- Cria uma organização Solo de teste para a conta A e tenta passar de cada limite como A.
+-- Cria duas contas descartáveis e uma organização Solo de teste para A, e tenta passar de
+-- cada limite como A.
 do $$
 declare
-  a        uuid;
-  b        uuid;
+  a        uuid := gen_random_uuid();
+  b        uuid := gen_random_uuid();
   t        uuid;
   n        int;
   id_busca bigint;
   hoje     date := (now() at time zone 'America/Sao_Paulo')::date;
 begin
-  select m.user_id into a from public.membros m order by m.criado_em limit 1;
-  select u.id into b from auth.users u
-    where u.id <> a and coalesce(u.raw_app_meta_data ->> 'app_role', '') <> 'dev' limit 1;
-  if a is null or b is null then
-    raise exception 'São necessárias duas contas de advogado.';
-  end if;
+  insert into auth.users (id, aud, role, email, email_confirmed_at, raw_app_meta_data, raw_user_meta_data) values
+    (a, 'authenticated', 'authenticated', 'limites-a@teste.despert.dev', now(), '{}', '{}'),
+    (b, 'authenticated', 'authenticated', 'limites-b@teste.despert.dev', now(), '{}', '{}');
 
   insert into public.organizacoes (nome, plano, situacao) values ('teste-limites', 'solo', 'ativa') returning id into t;
   insert into public.membros (organizacao_id, user_id, papel) values (t, a, 'administrador');
@@ -112,7 +110,7 @@ begin
   perform set_config('request.jwt.claims', json_build_object('sub', a, 'role', 'authenticated')::text, true);
   perform set_config('role', 'authenticated', true);
   begin
-    insert into public.feriados (organizacao_id, user_id, data, descricao) values (t, a, '2030-01-02', 'x');
+    insert into public.feriados_organizacao (organizacao_id, data, descricao) values (t, '2030-01-02', 'x');
     raise exception 'Membro gravou em somente leitura';
   exception when insufficient_privilege then
     if sqlerrm not like 'Somente leitura%' then raise; end if;
@@ -130,7 +128,7 @@ begin
   update public.organizacoes set pago_ate = hoje - 5 where id = t;
   perform set_config('request.jwt.claims', json_build_object('sub', a, 'role', 'authenticated')::text, true);
   perform set_config('role', 'authenticated', true);
-  insert into public.feriados (organizacao_id, user_id, data, descricao) values (t, a, '2030-01-03', 'x');
+  insert into public.feriados_organizacao (organizacao_id, data, descricao) values (t, '2030-01-03', 'x');
 
   -- Plano maior com ajuste libera a segunda OAB; voltar ao Solo pausa a mais nova.
   perform set_config('role', 'postgres', true);

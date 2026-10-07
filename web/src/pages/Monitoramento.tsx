@@ -27,9 +27,11 @@ import {
   type Recurso,
   type Uso,
 } from '../domain/planos'
+import { donosDeOab, nomeDoMembro, ROTULO_PAPEL } from '../domain/equipe'
 import { UFS, validarMonitoramento, type FormMonitoramento } from '../domain/validacao'
 import { useUserId } from '../lib/auth-context'
-import { useOrganizacaoId } from '../lib/organizacao-context'
+import type { Monitoramento as RegistroMonitoramento } from '../lib/database.types'
+import { useOrganizacaoId, usePertenca, usePode } from '../lib/organizacao-context'
 import { mensagemDeErro, useToast } from '../lib/toast-context'
 
 const FORM_VAZIO: FormMonitoramento = { tipo: 'oab', oab: '', uf: 'SP', processo: '', descricao: '' }
@@ -84,8 +86,20 @@ export default function Monitoramento() {
   const remover = useRemoverMonitoramento(orgId)
   const membros = useMembros(orgId)
   const { limites, escrita } = usePlano()
+  const { papel } = usePertenca()
+  const permite = usePode()
   const [form, setForm] = useState<FormMonitoramento>(FORM_VAZIO)
+  const [dono, setDono] = useState(userId)
   const [erro, setErro] = useState<string | null>(null)
+
+  const gerencia = permite('gerenciar_monitoramentos')
+  const altera = gerencia && escrita
+  const equipe = membros.data && membros.data.length > 1 ? membros.data : null
+  const nomes = new Map((equipe ?? []).map((m) => [m.user_id, nomeDoMembro(m, userId)]))
+  // O Advogado só mexe na própria OAB; o Administrador escolhe de quem é.
+  const escolheDono = equipe !== null && papel === 'administrador' && form.tipo === 'oab'
+  const podeAlterar = (m: RegistroMonitoramento) =>
+    altera && (papel !== 'advogado' || m.tipo !== 'oab' || m.user_id === userId)
 
   const lista = monitoramentos.data ?? []
   // Enquanto os membros carregam, conta só a própria pessoa.
@@ -109,7 +123,8 @@ export default function Monitoramento() {
       return
     }
     setErro(null)
-    criar.mutate(resultado.valor, {
+    const registro = escolheDono ? { ...resultado.valor, user_id: dono } : resultado.valor
+    criar.mutate(registro, {
       onSuccess: () => {
         setForm({ ...FORM_VAZIO, tipo: form.tipo, uf: form.uf })
         avisar('Monitoramento adicionado. Ele entra na próxima busca.', 'ok')
@@ -125,6 +140,12 @@ export default function Monitoramento() {
         <UsoDoPlano limites={limites} uso={uso} />
         {!escrita && (
           <div className={`${alertaAviso} mb-4`}>Organização em modo somente leitura: não é possível alterar os monitoramentos.</div>
+        )}
+        {escrita && !gerencia && (
+          <div className={`${alertaAviso} mb-4`}>
+            Com o papel {ROTULO_PAPEL[papel]} você acompanha os monitoramentos, mas só Administradores e Advogados
+            os alteram.
+          </div>
         )}
         <form onSubmit={enviar} noValidate className="space-y-3.5">
           <div>
@@ -144,6 +165,21 @@ export default function Monitoramento() {
               <option value="processo">Processo específico</option>
             </select>
           </div>
+          {escolheDono && equipe && (
+            <div>
+              <label className={rotulo} htmlFor="m-dono">
+                Advogado(a) da OAB
+              </label>
+              <select id="m-dono" className={campo} value={dono} onChange={(e) => setDono(e.target.value)}>
+                {donosDeOab(equipe).map((m) => (
+                  <option key={m.user_id} value={m.user_id}>
+                    {nomeDoMembro(m, userId)}
+                  </option>
+                ))}
+              </select>
+              <p className={dica}>Cada advogado tem uma OAB; os prazos dela ficam sob a responsabilidade dele.</p>
+            </div>
+          )}
           {form.tipo === 'oab' ? (
             <div className="grid grid-cols-[minmax(0,2fr)_minmax(0,1fr)] gap-3.5">
               <div>
@@ -210,7 +246,7 @@ export default function Monitoramento() {
                 : 'O limite de processos avulsos foi atingido. Pause um processo para cadastrar outro ou fale com o suporte.'}
             </div>
           )}
-          <button type="submit" className={botaoPrimario} disabled={criar.isPending || cheio || !escrita}>
+          <button type="submit" className={botaoPrimario} disabled={criar.isPending || cheio || !altera}>
             Adicionar
           </button>
         </form>
@@ -229,6 +265,7 @@ export default function Monitoramento() {
               <tr>
                 <th>Ativo</th>
                 <th>Monitoramento</th>
+                {equipe && <th>Advogado(a)</th>}
                 <th>Descrição</th>
                 <th>
                   <span className="sr-only">Ações</span>
@@ -238,7 +275,7 @@ export default function Monitoramento() {
             <tbody>
               {monitoramentos.isPending && (
                 <tr>
-                  <td colSpan={4} className="space-y-2.5 py-5">
+                  <td colSpan={equipe ? 5 : 4} className="space-y-2.5 py-5">
                     <span className="sr-only">Carregando…</span>
                     <div className="ds-skeleton h-4 w-2/3" />
                     <div className="ds-skeleton h-4 w-1/2" />
@@ -247,7 +284,7 @@ export default function Monitoramento() {
               )}
               {monitoramentos.isSuccess && lista.length === 0 && (
                 <tr>
-                  <td colSpan={4} className={vazioTabela}>
+                  <td colSpan={equipe ? 5 : 4} className={vazioTabela}>
                     Nada cadastrado ainda. Adicione a sua OAB ao lado para o robô começar a buscar as
                     intimações no Diário.
                   </td>
@@ -265,7 +302,7 @@ export default function Monitoramento() {
                           className="sr-only"
                           aria-label={`${m.ativo ? 'Desativar' : 'Ativar'} ${nome}`}
                           checked={m.ativo}
-                          disabled={alternar.isPending || !escrita}
+                          disabled={alternar.isPending || !podeAlterar(m)}
                           onChange={(e) =>
                             alternar.mutate(
                               { id: m.id, ativo: e.target.checked },
@@ -289,12 +326,13 @@ export default function Monitoramento() {
                         </>
                       )}
                     </td>
+                    {equipe && <td className="whitespace-nowrap">{nomes.get(m.user_id) ?? 'Fora da equipe'}</td>}
                     <td>{m.descricao}</td>
                     <td className={`text-right`}>
                       <button
                         type="button"
                         className={botaoPerigoPequeno}
-                        disabled={!escrita}
+                        disabled={!podeAlterar(m)}
                         onClick={() => {
                           if (
                             !window.confirm(

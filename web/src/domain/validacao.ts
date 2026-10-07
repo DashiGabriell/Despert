@@ -1,3 +1,4 @@
+import type { EscopoResumo, PapelMembro } from '../lib/database.types'
 import { formatarCNJ, validarCNJ } from './cnj'
 import { ehDataISO } from './datas'
 import { ORIGEM_MANUAL } from './edicao'
@@ -142,24 +143,6 @@ export function validarPrazoManual(form: FormPrazoManual): Resultado<NovoPrazoMa
 
 // ---------------------------------------------------------------- configurações
 
-export interface FormConfiguracao {
-  email_destino: string
-  dias_retroativos: string
-  prazo_padrao_dias: string
-  dias_alerta: string
-  considerar_recesso: boolean
-  webhook_token: string
-}
-
-export interface ConfiguracaoValida {
-  email_destino: string
-  dias_retroativos: number
-  prazo_padrao_dias: number
-  dias_alerta: number
-  considerar_recesso: boolean
-  webhook_token: string
-}
-
 const EMAIL_VALIDO = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 function inteiroEntre(valor: string, minimo: number, maximo: number): number | null {
@@ -168,29 +151,83 @@ function inteiroEntre(valor: string, minimo: number, maximo: number): number | n
   return numero
 }
 
-export function validarConfiguracao(form: FormConfiguracao): Resultado<ConfiguracaoValida> {
+/** Configuração pessoal: para onde vai o resumo, quantos dias à frente e de quais prazos. */
+export interface FormConfiguracaoPessoal {
+  email_destino: string
+  dias_alerta: string
+  resumo_escopo: EscopoResumo
+}
+
+export interface ConfiguracaoPessoalValida {
+  email_destino: string
+  dias_alerta: number
+  resumo_escopo: EscopoResumo
+}
+
+export function validarConfiguracaoPessoal(form: FormConfiguracaoPessoal): Resultado<ConfiguracaoPessoalValida> {
   const email = form.email_destino.trim()
   if (!EMAIL_VALIDO.test(email)) return falha('Informe um e-mail válido para os alertas.')
+  const alerta = inteiroEntre(form.dias_alerta, 1, 60)
+  if (alerta === null) return falha('Janela de alerta: use um número entre 1 e 60.')
+  return { ok: true, valor: { email_destino: email, dias_alerta: alerta, resumo_escopo: form.resumo_escopo } }
+}
+
+/** Configuração do robô para a organização inteira (só o Administrador). */
+export interface FormConfiguracaoOrganizacao {
+  dias_retroativos: string
+  prazo_padrao_dias: string
+  considerar_recesso: boolean
+  webhook_token: string
+}
+
+export interface ConfiguracaoOrganizacaoValida {
+  dias_retroativos: number
+  prazo_padrao_dias: number
+  considerar_recesso: boolean
+  webhook_token: string
+}
+
+export function validarConfiguracaoOrganizacao(
+  form: FormConfiguracaoOrganizacao,
+): Resultado<ConfiguracaoOrganizacaoValida> {
   const retroativos = inteiroEntre(form.dias_retroativos, 1, 30)
   if (retroativos === null) return falha('Dias para trás: use um número entre 1 e 30.')
   const padrao = inteiroEntre(form.prazo_padrao_dias, 1, 365)
   if (padrao === null) return falha('Prazo padrão: use um número entre 1 e 365.')
-  const alerta = inteiroEntre(form.dias_alerta, 1, 60)
-  if (alerta === null) return falha('Janela de alerta: use um número entre 1 e 60.')
   if (!/^[A-Za-z0-9]{16,}$/.test(form.webhook_token)) {
     return falha('Gere um novo token de segurança.')
   }
   return {
     ok: true,
     valor: {
-      email_destino: email,
       dias_retroativos: retroativos,
       prazo_padrao_dias: padrao,
-      dias_alerta: alerta,
       considerar_recesso: form.considerar_recesso,
       webhook_token: form.webhook_token,
     },
   }
+}
+
+// ---------------------------------------------------------------- equipe
+
+export interface NovoConvite {
+  email: string
+  papel: PapelMembro
+}
+
+/** Confere antes de mandar ao banco (que repete tudo, inclusive as vagas do plano). */
+export function validarConvite(
+  form: NovoConvite,
+  emailsDaEquipe: readonly string[],
+  emailsConvidados: readonly string[],
+): Resultado<NovoConvite> {
+  const email = form.email.trim().toLowerCase()
+  if (!EMAIL_VALIDO.test(email)) return falha('Informe um e-mail válido.')
+  if (emailsDaEquipe.some((e) => e.toLowerCase() === email)) return falha('Essa pessoa já faz parte da equipe.')
+  if (emailsConvidados.some((e) => e.toLowerCase() === email)) {
+    return falha('Já existe um convite para esse e-mail: reenvie ou cancele o atual.')
+  }
+  return { ok: true, valor: { email, papel: form.papel } }
 }
 
 // ---------------------------------------------------------------- painel dev
