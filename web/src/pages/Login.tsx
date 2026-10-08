@@ -1,6 +1,6 @@
 import type { AuthError } from '@supabase/supabase-js'
 import { useState, type FormEvent } from 'react'
-import { Navigate } from 'react-router-dom'
+import { Link, Navigate, useSearchParams } from 'react-router-dom'
 import { alertaAviso, alertaErro, alertaOk, botaoPrimario, campo, rotulo } from '../components/ui'
 import { rotaInicial } from '../domain/acesso'
 import { useAuth } from '../lib/auth-context'
@@ -20,7 +20,8 @@ function mensagemDeLogin(erro: AuthError): string {
 
 export default function Login() {
   const { sessao, papel, atuacao } = useAuth()
-  const [modo, setModo] = useState<Modo>('entrar')
+  const [parametros] = useSearchParams()
+  const [modo, setModo] = useState<Modo>(parametros.has('criar') ? 'criar' : 'entrar')
   const [email, setEmail] = useState('')
   const [senha, setSenha] = useState('')
   const [ocupado, setOcupado] = useState(false)
@@ -76,13 +77,13 @@ export default function Login() {
         className="ds-card ds-entrar w-full max-w-sm p-8 shadow-2xl"
         aria-label={modo === 'entrar' ? 'Entrar' : 'Criar conta'}
       >
-        <div className="mb-7 flex items-center gap-3">
-          <img src="/logo-despert-256.png" alt="Despert" className="size-16 shrink-0 object-contain" />
+        <Link to="/" className="mb-7 flex items-center gap-3" aria-label="Despert, página inicial">
+          <img src="/logo-despert-256.png" alt="" className="size-16 shrink-0 object-contain" />
           <span aria-hidden>
             <span className="block font-display text-3xl leading-tight font-bold text-navy">Despert</span>
             <span className="block text-[11px] tracking-wider text-muted uppercase">Monitor de prazos · DJEN</span>
           </span>
-        </div>
+        </Link>
 
         <h1 className="mb-1 text-3xl leading-tight font-bold text-navy">
           {modo === 'entrar' ? 'Entrar' : 'Criar conta'}

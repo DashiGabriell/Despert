@@ -1,0 +1,80 @@
+.lp {
+  --lp-papel: #fbf9f4;
+  --lp-hachura: #e6dfd3;
+  caret-color: #8b1e2d;
+}
+
+.lp ::selection {
+  background: #8b1e2d;
+  color: #fff;
+}
+
+.lp a:not(.ds-btn) {
+  text-underline-offset: 0.2em;
+  text-decoration-thickness: 1px;
+}
+
+.lp-hachura {
+  background-image: repeating-linear-gradient(
+    135deg,
+    transparent 0 7px,
+    var(--lp-hachura) 7px 8px
+  );
+}
+
+@keyframes lp-marca-entra {
+  from {
+    opacity: 0;
+    filter: blur(6px);
+    transform: translateY(4px) scale(0.92);
+  }
+}
+
+@keyframes lp-selo-carimba {
+  0% {
+    opacity: 0;
+    transform: scale(1.9) rotate(-24deg);
+    filter: blur(3px);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(0.94) rotate(-6deg);
+    filter: blur(0);
+  }
+  100% {
+    transform: scale(1) rotate(-9deg);
+  }
+}
+
+.lp-marca {
+  animation: lp-marca-entra 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.lp-selo {
+  transform: rotate(-9deg);
+  animation: lp-selo-carimba 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+  filter: drop-shadow(0 6px 10px rgba(107, 20, 33, 0.28));
+}
+
+.lp details > summary {
+  list-style: none;
+}
+
+.lp details > summary::-webkit-details-marker {
+  display: none;
+}
+
+.lp details[open] .lp-sinal {
+  transform: rotate(45deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lp-marca,
+  .lp-selo {
+    animation: none;
+  }
+
+  .lp-sinal {
+    transition: none;
+  }
+}

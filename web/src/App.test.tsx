@@ -144,6 +144,22 @@ describe('acesso à aplicação', () => {
     auth.signOut.mockReset()
   })
 
+  it('visitante sem sessão vê a landing page na raiz', async () => {
+    renderizar('/')
+    expect(await screen.findByRole('heading', { level: 1 })).toHaveTextContent(/O Despert conta o prazo/)
+  })
+
+  it('com sessão, a raiz leva para os prazos', async () => {
+    auth.session = ADVOGADA
+    renderizar('/')
+    expect(await screen.findByRole('heading', { name: 'Prazos' })).toBeInTheDocument()
+  })
+
+  it('o link de teste grátis abre o login já no cadastro', async () => {
+    renderizar('/login?criar=1')
+    expect(await screen.findByRole('heading', { name: 'Criar conta' })).toBeInTheDocument()
+  })
+
   it('rota protegida sem sessão leva para o login', async () => {
     renderizar('/agenda')
     expect(await screen.findByRole('heading', { name: 'Entrar' })).toBeInTheDocument()
