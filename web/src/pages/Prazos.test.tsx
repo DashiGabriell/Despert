@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Outlet, Route, Routes } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { pode } from '../domain/permissoes'
+import { LIMITES_PADRAO, type Limites } from '../domain/planos'
 import type { MembroDaEquipe, PapelMembro, Prazo } from '../lib/database.types'
 import type { ContextoLayout } from '../lib/layout-context'
 import { fabricarPrazo } from '../test/fabricas'
@@ -24,7 +25,11 @@ vi.mock('../lib/organizacao-context', () => ({
   usePode: () => (acao: Parameters<typeof pode>[1]) => pode(papel, acao),
 }))
 
-vi.mock('../data/plano', () => ({ usePlano: () => ({ escrita: true }) }))
+let limites: Limites = LIMITES_PADRAO.solo
+const exportar = vi.fn()
+const baixar = vi.fn()
+
+vi.mock('../data/plano', () => ({ usePlano: () => ({ escrita: true, limites }) }))
 
 vi.mock('../data/queries', () => ({
   usePrazos: () => ({ data: prazos, isPending: false, isError: false, isSuccess: true }),
@@ -32,7 +37,10 @@ vi.mock('../data/queries', () => ({
   useConfiguracaoSistema: () => ({ data: { n8n_webhook_url: '' }, isPending: false }),
   useAtualizarPrazo: () => ({ mutate, isPending: false }),
   useMembros: () => ({ data: membros, isPending: false, isSuccess: true }),
+  useExportarPrazos: () => ({ mutate: exportar, isPending: false }),
 }))
+
+vi.mock('../lib/download', () => ({ baixarArquivo: (...args: unknown[]) => baixar(...args) }))
 
 const EQUIPE: MembroDaEquipe[] = [
   { user_id: 'advogada-1', email: 'ana@exemplo.com', papel: 'administrador', criado_em: '' },
@@ -65,8 +73,11 @@ function processosNaTabela() {
 describe('tela de Prazos', () => {
   beforeEach(() => {
     mutate.mockReset()
+    exportar.mockReset()
+    baixar.mockReset()
     membros = []
     papel = 'administrador'
+    limites = LIMITES_PADRAO.solo
     prazos = [
       fabricarPrazo({ processo: 'PROC-VENCIDO', vencimento: '2026-10-01' }),
       fabricarPrazo({ processo: 'PROC-HOJE', vencimento: HOJE }),
@@ -182,5 +193,39 @@ describe('tela de Prazos', () => {
     renderizar()
     const linha = screen.getByText('PROC-HOJE').closest('tr')!
     expect(within(linha).queryByRole('button', { name: 'Cumprido' }) !== null).toBe(ve)
+  })
+
+  it.each([
+    ['administrador', true],
+    ['advogado', true],
+    ['assistente', false],
+    ['leitura', true],
+  ] as const)('no Escritório, %s vê Exportar CSV: %s', (p, ve) => {
+    papel = p
+    limites = LIMITES_PADRAO.escritorio
+    renderizar()
+    expect(screen.queryByRole('button', { name: 'Exportar CSV' }) !== null).toBe(ve)
+  })
+
+  it('no Solo não há exportação', () => {
+    renderizar()
+    expect(screen.queryByRole('button', { name: 'Exportar CSV' })).not.toBeInTheDocument()
+  })
+
+  it('exporta o que o banco devolve com os filtros da tela', async () => {
+    limites = LIMITES_PADRAO.escritorio
+    membros = EQUIPE
+    exportar.mockImplementation((_vars, opcoes) => opcoes.onSuccess(prazos))
+    renderizar()
+    await userEvent.selectOptions(screen.getByLabelText('Filtrar por responsável'), 'todos')
+    await userEvent.type(screen.getByLabelText('Buscar prazos'), 'xpto')
+    await userEvent.click(screen.getByRole('button', { name: 'Exportar CSV' }))
+    expect(baixar).toHaveBeenCalledTimes(1)
+    const [nome, csv] = baixar.mock.calls[0] as [string, string]
+    expect(nome).toBe(`prazos-${HOJE}.csv`)
+    const linhas = csv.replace('\uFEFF', '').trimEnd().split('\r\n')
+    expect(linhas).toHaveLength(2)
+    expect(linhas[1]).toMatch(/^PROC-SEMANA;/)
+    expect(linhas[1]).toContain(';ana@exemplo.com;')
   })
 })

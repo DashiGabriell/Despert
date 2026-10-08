@@ -149,8 +149,12 @@ O que vale para todas as organizações ao mesmo tempo — hoje, a URL do webhoo
 _Avoid_: configuração global, settings
 
 **Auditoria**:
-O registro de quem fez o quê, quando e em qual organização: todas as ações do dev e, nos planos que incluem auditoria, as alterações feitas pelos membros.
+O registro de quem fez o quê, quando e em qual organização: todas as ações do dev e, nos planos que incluem auditoria, as alterações feitas pelos membros. O Administrador vê a da organização dele, inclusive o que o dev fez lá (aparece como "Suporte Despert"); no detalhe do prazo, qualquer membro vê as **alterações** daquele prazo.
 _Avoid_: log, histórico (histórico é das execuções)
+
+**Exportação**:
+Baixar em CSV, para abrir no Excel, os prazos com os filtros da tela (Administrador, Advogado e Leitura) ou a auditoria do período (Administrador). Só nos planos que incluem auditoria; continua valendo com o acesso suspenso.
+_Avoid_: relatório em PDF, download
 
 **Janela de alerta do resumo**:
 _Ver_: Janela de alerta

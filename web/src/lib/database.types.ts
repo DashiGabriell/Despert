@@ -182,15 +182,31 @@ export type ConfiguracaoSistema = {
   updated_by: string | null
 }
 
+/** Ação do dev (`dev_*`) ou de um membro (`membro_*`); num update, antes/depois só têm o que mudou. */
 export type RegistroAuditoria = {
   id: number
   criado_em: string
+  organizacao_id: string | null
   dev_id: string | null
   dev_email: string | null
+  membro_id: string | null
+  membro_email: string | null
   acao: string
   alvo_user_id: string | null
   alvo_email: string | null
   detalhe: Json
+  antes: Json | null
+  depois: Json | null
+}
+
+/** Retorno de `alteracoes_do_prazo()`: só os campos de controle do prazo. */
+export type AlteracaoPrazo = {
+  criado_em: string
+  autor_email: string | null
+  por_dev: boolean
+  acao: string
+  antes: Json | null
+  depois: Json | null
 }
 
 /** Retorno de `admin_listar_contas()`. */
@@ -335,6 +351,9 @@ export type Database = {
       alterar_papel: { Args: { org: string; membro: string; novo_papel: PapelMembro }; Returns: undefined }
       remover_membro: { Args: { org: string; membro: string }; Returns: undefined }
       admin_trocar_token: { Args: { conta: string; token: string }; Returns: undefined }
+      exportar_prazos: { Args: { org: string }; Returns: Prazo[] }
+      exportar_auditoria: { Args: { org: string; de?: string; ate?: string }; Returns: RegistroAuditoria[] }
+      alteracoes_do_prazo: { Args: { prazo: string }; Returns: AlteracaoPrazo[] }
     }
     Enums: Record<string, never>
     CompositeTypes: Record<string, never>

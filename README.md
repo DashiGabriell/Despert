@@ -57,6 +57,6 @@ A conta dev controla a aplicação inteira e não é advogado: ao entrar, cai no
 | `dados` | ler prazos, monitoramentos, feriados, configuração e execuções de qualquer advogado |
 | `execucoes` | todas as rodadas do robô, com filtros por status e conta |
 | `n8n` | URL do webhook (exclusiva do dev), teste de conexão e disparo de busca por advogado |
-| `auditoria` | tudo o que os devs fizeram em dados de advogados e na configuração do sistema |
+| `auditoria` | tudo o que os devs fizeram e, nos planos com auditoria, as alterações feitas pelos membros |
 
 Decisões em [ADR-0005](./docs/adr/0005-papel-dev-no-app-metadata.md) e [ADR-0006](./docs/adr/0006-url-do-webhook-global-e-exclusiva-do-dev.md).

@@ -87,6 +87,10 @@ vi.mock('./data/queries', () => ({
   useTempoReal: () => {},
   useCriarFeriado: () => ({ mutate: vi.fn() }),
   useRemoverFeriado: () => ({ mutate: vi.fn() }),
+  useExportarPrazos: () => mutacao,
+  useExportarAuditoria: () => mutacao,
+  useAuditoriaDaOrganizacao: () => vazio,
+  useAlteracoesDoPrazo: () => vazio,
   useConfiguracaoSistema: () => ({
     data: { id: 1, n8n_webhook_url: '', updated_at: '2026-10-01T10:00:00Z', updated_by: null },
     isPending: false,
@@ -295,6 +299,20 @@ describe('equipe e organizações', () => {
     renderizar('/equipe')
     expect(await screen.findByRole('heading', { name: 'Prazos' })).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Equipe' })).not.toBeInTheDocument()
+  })
+
+  it('Administrador de escritório vê e abre a Auditoria', async () => {
+    pertencas = [pertenca('org-1', 'Escritório da Ana', 'administrador', 'escritorio')]
+    renderizar('/auditoria')
+    expect(await screen.findByRole('heading', { name: 'Auditoria' })).toBeInTheDocument()
+    expect(screen.getAllByRole('link', { name: 'Auditoria' }).length).toBeGreaterThan(0)
+  })
+
+  it.each(['solo', 'escritorio'] as const)('sem acesso à Auditoria (%s) cai nos prazos', async (plano) => {
+    pertencas = [pertenca('org-1', 'Escritório da Ana', plano === 'solo' ? 'administrador' : 'advogado', plano)]
+    renderizar('/auditoria')
+    expect(await screen.findByRole('heading', { name: 'Prazos' })).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Auditoria' })).not.toBeInTheDocument()
   })
 
   it.each([

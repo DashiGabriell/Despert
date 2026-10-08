@@ -44,6 +44,8 @@ interface Props {
   /** Equipe para escolher o responsável; sem ela (Solo) o campo não aparece. */
   membros?: readonly MembroDaEquipe[]
   eu?: string
+  /** Histórico de alterações (só nos planos com auditoria). */
+  alteracoes?: ReactNode
   onSalvar: (dados: SalvarPrazo) => Promise<void>
   onExcluir: () => Promise<void>
   onFechar: () => void
@@ -65,6 +67,7 @@ export default function ModalPrazo({
   permissoes = TODAS,
   membros,
   eu,
+  alteracoes,
   onSalvar,
   onExcluir,
   onFechar,
@@ -343,6 +346,7 @@ export default function ModalPrazo({
           onChange={(e) => setObservacoes(e.target.value)}
         />
       </div>
+      {alteracoes}
       {erro && <div className={`${alertaErro} mt-4`}>{erro}</div>}
     </Modal>
   )

@@ -3,7 +3,6 @@
 --   begin; \i supabase/tests/permissoes_papeis.sql rollback;
 -- Cria contas e um Escritório descartáveis e confere cada linha da tabela de permissões
 -- (GLOSSARY.md) para os quatro papéis, além de convites, saída de membro e duas organizações.
--- "Ver auditoria" e "Exportar relatórios" chegam na fase 5 (#20).
 do $$
 declare
   adm   uuid := gen_random_uuid();
@@ -139,9 +138,19 @@ begin
     select count(*) into n from public.convites where organizacao_id = org;
     if r.papel <> 'administrador' and n <> 0 then raise exception '% leu convites', r.papel; end if;
 
-    -- Auditoria (fase 5): por enquanto nenhum papel da organização lê.
+    -- Ver auditoria: só o Administrador, e só a da própria organização.
+    select count(*) into n from public.auditoria where organizacao_id is distinct from org;
+    if n <> 0 then raise exception '% leu auditoria de outra organização', r.papel; end if;
     select count(*) into n from public.auditoria;
-    if n <> 0 then raise exception '% leu a auditoria', r.papel; end if;
+    if (n > 0) <> (r.papel = 'administrador') then raise exception 'Ver auditoria como %: %', r.papel, n; end if;
+
+    -- Exportar relatórios: Administrador, Advogado, Leitura.
+    begin
+      perform public.exportar_prazos(org);
+      pode := true;
+    exception when insufficient_privilege then pode := false;
+    end;
+    if pode <> (r.papel <> 'assistente') then raise exception 'Exportar como %: %', r.papel, pode; end if;
 
     -- Buscar agora: todos menos Leitura.
     if r.papel = 'leitura' then

@@ -1581,9 +1581,10 @@ grant execute on function public.robo_convites_pendentes() to service_role;
 grant execute on function public.robo_marcar_convite_enviado(uuid) to service_role;
 
 -- ============================ auditoria ============================
--- Tudo o que um dev faz: ações administrativas (Edge Function "admin") e qualquer escrita
--- nos dados dos advogados (gatilhos abaixo). Sem chave estrangeira no alvo: o registro
--- sobrevive à exclusão da conta.
+-- Quem fez o quê, quando e em qual organização (#20): toda escrita de um dev e, nos planos com
+-- auditoria, toda alteração de um membro em prazos, monitoramentos, feriados, configurações e
+-- equipe. O robô (sem sessão) não entra. Sem chave estrangeira no alvo nem na organização: o
+-- registro sobrevive à exclusão da conta.
 create table if not exists public.auditoria (
   id           bigint generated always as identity primary key,
   criado_em    timestamptz not null default now(),
@@ -1596,45 +1597,119 @@ create table if not exists public.auditoria (
 );
 create index if not exists auditoria_data_idx on public.auditoria (criado_em desc);
 
+-- dev_* = ação do dev; membro_* = ação de um membro. Num update, antes/depois só têm os campos
+-- que mudaram; tokens ficam mascarados.
+alter table public.auditoria add column if not exists organizacao_id uuid;
+alter table public.auditoria add column if not exists membro_id uuid;
+alter table public.auditoria add column if not exists membro_email text;
+alter table public.auditoria add column if not exists antes jsonb;
+alter table public.auditoria add column if not exists depois jsonb;
+create index if not exists auditoria_org_idx on public.auditoria (organizacao_id, criado_em desc);
+create index if not exists auditoria_registro_idx on public.auditoria (organizacao_id, (detalhe ->> 'registro'));
+
+-- O plano da organização inclui auditoria e exportação? (ADR-0008)
+create or replace function public.plano_tem_auditoria(org uuid) returns boolean
+language sql stable security definer set search_path = '' as $$
+  select coalesce((public.limites_de(org) ->> 'auditoria')::boolean, false)
+$$;
+revoke all on function public.plano_tem_auditoria(uuid) from public, anon;
+grant execute on function public.plano_tem_auditoria(uuid) to authenticated, service_role;
+
 alter table public.auditoria enable row level security;
 drop policy if exists "dev_le" on public.auditoria;
 create policy "dev_le" on public.auditoria
   for select to authenticated using ((select public.is_dev()));
+drop policy if exists "administrador_le" on public.auditoria;
+create policy "administrador_le" on public.auditoria
+  for select to authenticated
+  using (organizacao_id is not null
+         and public.tem_papel(organizacao_id, array['administrador'])
+         and public.plano_tem_auditoria(organizacao_id));
 drop policy if exists "dev_registra" on public.auditoria;
 create policy "dev_registra" on public.auditoria
   for insert to authenticated
   with check ((select public.is_dev()) and dev_id = (select auth.uid()));
 
-create or replace function public.auditar_dev() returns trigger
+-- Ações do dev gravadas pela aplicação ou pela Edge Function (entrar como, bloquear…): a
+-- organização é a da conta afetada.
+create or replace function public.completar_auditoria() returns trigger
+language plpgsql security definer set search_path = '' as $$
+begin
+  if new.organizacao_id is null and new.alvo_user_id is not null and position(':' in new.acao) = 0 then
+    new.organizacao_id := public.organizacao_de(new.alvo_user_id);
+  end if;
+  return new;
+end $$;
+
+drop trigger if exists completar_auditoria on public.auditoria;
+create trigger completar_auditoria before insert on public.auditoria
+  for each row execute function public.completar_auditoria();
+
+update public.auditoria a set organizacao_id = public.organizacao_de(a.alvo_user_id)
+where a.organizacao_id is null and a.alvo_user_id is not null and a.dev_id is not null
+  and public.organizacao_de(a.alvo_user_id) is not null;
+
+create or replace function public.auditar() returns trigger
 language plpgsql security definer set search_path = '' as $$
 declare
   antes  jsonb := case when tg_op = 'INSERT' then null else to_jsonb(old) end;
   depois jsonb := case when tg_op = 'DELETE' then null else to_jsonb(new) end;
   linha  jsonb := coalesce(depois, antes);
   alvo   uuid  := nullif(linha ->> 'user_id', '')::uuid;
-  campos jsonb := '[]'::jsonb;
+  autor  uuid  := auth.uid();
+  dev    boolean;
+  org    uuid;
+  campos jsonb;
+  chave  text;
 begin
-  if not public.is_dev() then
+  if autor is null then
+    return null;
+  end if;
+  dev := public.is_dev();
+  org := case tg_table_name
+    when 'organizacoes' then (linha ->> 'id')::uuid
+    when 'configuracoes' then public.organizacao_de(alvo)
+    when 'configuracao_sistema' then null
+    else nullif(linha ->> 'organizacao_id', '')::uuid
+  end;
+  if not dev and (org is null or not public.plano_tem_auditoria(org)) then
     return null;
   end if;
   if tg_op = 'UPDATE' then
     select coalesce(jsonb_agg(k order by k), '[]'::jsonb) into campos
     from jsonb_object_keys(depois) as k
     where k not in ('updated_at', 'updated_by') and depois -> k is distinct from antes -> k;
+    if campos = '[]'::jsonb then
+      return null;
+    end if;
+    select jsonb_object_agg(k, antes -> k), jsonb_object_agg(k, depois -> k) into antes, depois
+    from jsonb_array_elements_text(campos) as k;
   end if;
-  insert into public.auditoria (dev_id, dev_email, acao, alvo_user_id, alvo_email, detalhe)
-  values (
-    auth.uid(),
-    (select email from auth.users where id = auth.uid()),
+  foreach chave in array array['token', 'webhook_token'] loop
+    if antes ? chave then antes := jsonb_set(antes, array[chave], '"•••"'); end if;
+    if depois ? chave then depois := jsonb_set(depois, array[chave], '"•••"'); end if;
+  end loop;
+  insert into public.auditoria (dev_id, dev_email, membro_id, membro_email, organizacao_id, acao,
+                                alvo_user_id, alvo_email, detalhe, antes, depois)
+  select
+    case when dev then autor end,
+    case when dev then quem.email end,
+    case when not dev then autor end,
+    case when not dev then quem.email end,
+    org,
     lower(tg_op) || ':' || tg_table_name,
     alvo,
     (select email from auth.users where id = alvo),
     jsonb_strip_nulls(jsonb_build_object(
       'registro', coalesce(linha ->> 'id', linha ->> 'data'),
       'processo', linha ->> 'processo',
+      'papel', linha ->> 'papel',
+      'email', case when tg_table_name = 'convites' then linha ->> 'email' end,
       'campos', case when tg_op = 'UPDATE' then campos end
-    ))
-  );
+    )),
+    antes,
+    depois
+  from (select (select email from auth.users where id = autor)::text as email) quem;
   return null;
 end $$;
 
@@ -1644,11 +1719,101 @@ begin
   foreach t in array array['configuracoes', 'monitoramentos', 'feriados_organizacao', 'configuracoes_organizacao',
                            'prazos', 'configuracao_sistema', 'organizacoes', 'membros', 'convites'] loop
     execute format('drop trigger if exists auditar_dev on public.%I', t);
+    execute format('drop trigger if exists auditar on public.%I', t);
     execute format(
-      'create trigger auditar_dev after insert or update or delete on public.%I
-         for each row execute function public.auditar_dev()', t);
+      'create trigger auditar after insert or update or delete on public.%I
+         for each row execute function public.auditar()', t);
   end loop;
 end $$;
+drop function if exists public.auditar_dev();
+
+-- Exportação (planos com auditoria; vale até na suspensão, ADR-0008): confere papel e plano e
+-- registra quem exportou.
+create or replace function public.exigir_exportacao(org uuid, papeis text[], acao text) returns void
+language plpgsql security definer set search_path = '' as $$
+declare
+  dev boolean := public.is_dev();
+begin
+  if not (dev or public.tem_papel(org, papeis)) then
+    raise exception 'Seu papel não permite esta exportação.' using errcode = '42501';
+  end if;
+  if not public.plano_tem_auditoria(org) then
+    raise exception 'O plano desta organização não inclui auditoria e exportação.' using errcode = '42501';
+  end if;
+  insert into public.auditoria (dev_id, dev_email, membro_id, membro_email, organizacao_id, acao)
+  select
+    case when dev then u.id end,
+    case when dev then u.email::text end,
+    case when not dev then u.id end,
+    case when not dev then u.email::text end,
+    org,
+    acao
+  from auth.users u where u.id = auth.uid();
+end $$;
+revoke all on function public.exigir_exportacao(uuid, text[], text) from public, anon, authenticated;
+
+create or replace function public.exportar_prazos(org uuid) returns setof public.prazos
+language plpgsql security definer set search_path = '' as $$
+begin
+  perform public.exigir_exportacao(org, array['administrador', 'advogado', 'leitura'], 'exportar_prazos');
+  return query
+  select p.* from public.prazos p
+  where p.organizacao_id = org
+  order by p.vencimento nulls last, p.created_at;
+end $$;
+
+create or replace function public.exportar_auditoria(org uuid, de timestamptz default null, ate timestamptz default null)
+returns setof public.auditoria
+language plpgsql security definer set search_path = '' as $$
+begin
+  perform public.exigir_exportacao(org, array['administrador'], 'exportar_auditoria');
+  return query
+  select a.* from public.auditoria a
+  where a.organizacao_id = org
+    and (de is null or a.criado_em >= de)
+    and (ate is null or a.criado_em < ate)
+  order by a.criado_em desc, a.id desc
+  limit 20000;
+end $$;
+
+-- Alterações de um prazo para o detalhe: qualquer membro, nos planos com auditoria. Só os campos
+-- de controle (quem cumpriu, mudou vencimento ou responsável).
+create or replace function public.alteracoes_do_prazo(prazo uuid)
+returns table (criado_em timestamptz, autor_email text, por_dev boolean, acao text, antes jsonb, depois jsonb)
+language plpgsql stable security definer set search_path = '' as $$
+#variable_conflict use_column
+declare
+  org    uuid;
+  chaves text[] := array['status', 'vencimento', 'responsavel_id', 'inicio_prazo', 'prazo_dias', 'observacoes'];
+begin
+  select p.organizacao_id into org from public.prazos p where p.id = alteracoes_do_prazo.prazo;
+  if org is null or not (public.membro_de(org) or public.is_dev()) then
+    raise exception 'Prazo não encontrado.' using errcode = '42501';
+  end if;
+  if not public.plano_tem_auditoria(org) then
+    raise exception 'O plano desta organização não inclui auditoria.' using errcode = '42501';
+  end if;
+  return query
+  select a.criado_em, coalesce(a.membro_email, a.dev_email), a.membro_id is null, a.acao, x.antes_f, x.depois_f
+  from public.auditoria a
+  cross join lateral (
+    select
+      (select jsonb_object_agg(e.key, e.value) from jsonb_each(a.antes) e where e.key = any (chaves)) as antes_f,
+      (select jsonb_object_agg(e.key, e.value) from jsonb_each(a.depois) e where e.key = any (chaves)) as depois_f
+  ) x
+  where a.organizacao_id = org
+    and a.detalhe ->> 'registro' = alteracoes_do_prazo.prazo::text
+    and (a.acao = 'insert:prazos' or (a.acao = 'update:prazos' and x.depois_f is not null))
+  order by a.criado_em desc, a.id desc
+  limit 50;
+end $$;
+
+revoke all on function public.exportar_prazos(uuid) from public, anon;
+revoke all on function public.exportar_auditoria(uuid, timestamptz, timestamptz) from public, anon;
+revoke all on function public.alteracoes_do_prazo(uuid) from public, anon;
+grant execute on function public.exportar_prazos(uuid) to authenticated;
+grant execute on function public.exportar_auditoria(uuid, timestamptz, timestamptz) to authenticated;
+grant execute on function public.alteracoes_do_prazo(uuid) to authenticated;
 
 -- ============================ funções do painel dev ============================
 create or replace function public.admin_listar_contas()

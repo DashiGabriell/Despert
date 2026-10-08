@@ -92,6 +92,8 @@ const ACOES: Record<string, string> = {
   excluir_conta: 'Excluiu conta',
   atuar_como: 'Entrou como advogado',
   disparar_busca: 'Disparou busca',
+  exportar_prazos: 'Exportou prazos',
+  exportar_auditoria: 'Exportou a auditoria',
 }
 
 /** Texto legível de uma ação registrada na auditoria (`insert:prazos`, `bloquear`…). */

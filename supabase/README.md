@@ -35,7 +35,7 @@ O papel fica em `auth.users.raw_app_meta_data.app_role = 'dev'` (só a `service_
 - `public.is_dev()`, que lê o papel em `auth.users` (rebaixar ou bloquear vale na hora, sem esperar o token expirar);
 - a policy `dev_acesso_total` em todas as tabelas dos advogados;
 - `configuracao_sistema` (linha única com a URL do webhook do n8n: todos leem, só o dev altera);
-- `auditoria` e o gatilho `auditar_dev()`, que registra toda escrita de um dev em dados de advogados;
+- `auditoria` e o gatilho `auditar()`, que registra toda escrita de um dev e, nos planos com auditoria, toda alteração de um membro (veja "Auditoria e exportação");
 - as funções `admin_listar_contas()` e `admin_metricas()` do painel.
 
 Depois de rodar o `schema.sql`:
@@ -85,6 +85,16 @@ O n8n (chave `service_role`) só chama funções do banco; as regras ficam aqui 
 - Saíram na fase 4: a cópia das configurações da organização em cada membro, a visão `feriados` e a trava de monitoramentos ativos em uma organização só por pessoa.
 
 [`tests/robo_organizacao.sql`](./tests/robo_organizacao.sql) monta um Escritório e um Solo descartáveis e confere prazo único e responsável, turnos, etapas, Buscar agora, resumo por membro e a fila de convites; rode-o numa transação desfeita.
+
+## Auditoria e exportação
+
+- O gatilho `auditar()` grava em `auditoria` cada insert, update e delete feito com sessão em prazos, monitoramentos, feriados, configurações (pessoal e da organização), organização, membros e convites. A ação do dev vai em `dev_id`/`dev_email` sempre; a de um membro vai em `membro_id`/`membro_email`, só se o plano incluir auditoria (`plano_tem_auditoria`). O robô, sem sessão, não entra. Num update, `antes` e `depois` guardam só os campos que mudaram; tokens ficam como `•••`.
+- `organizacao_id` vem da própria linha; nas ações do dev gravadas direto (entrar como, bloquear…) é a organização da conta afetada (`completar_auditoria`).
+- Leitura: o dev lê tudo; o Administrador lê a da própria organização, nos planos com auditoria (policy `administrador_le`). Ninguém além do dev grava direto.
+- `alteracoes_do_prazo(prazo)`: o histórico de um prazo para qualquer membro (status, vencimento, responsável, início, dias e observações).
+- `exportar_prazos(org)` (Administrador, Advogado, Leitura) e `exportar_auditoria(org, de, ate)` (Administrador) conferem papel e plano, registram a exportação e valem também na suspensão (ADR-0008). O CSV é montado no navegador.
+
+[`tests/auditoria_exportacao.sql`](./tests/auditoria_exportacao.sql) monta um Escritório e um Solo descartáveis e confere o registro de cada tipo de alteração, os tokens mascarados, quem lê, o histórico do prazo e a exportação por papel, plano e etapa; rode-o numa transação desfeita.
 
 ## Verificar o isolamento (teste automatizado)
 

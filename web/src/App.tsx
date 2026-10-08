@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
 import Layout from './components/Layout'
 import Agenda from './pages/Agenda'
+import Auditoria from './pages/Auditoria'
 import Configuracoes from './pages/Configuracoes'
 import Convite from './pages/Convite'
 import AreaDev from './pages/dev/AreaDev'
@@ -28,6 +29,7 @@ export default function App() {
         <Route path="/historico" element={<Historico />} />
         <Route path="/configuracoes" element={<Configuracoes />} />
         <Route path="/equipe" element={<Equipe />} />
+        <Route path="/auditoria" element={<Auditoria />} />
       </Route>
       <Route path="*" element={<Navigate to="/prazos" replace />} />
     </Routes>

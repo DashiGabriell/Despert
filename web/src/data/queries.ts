@@ -12,8 +12,10 @@ import type {
   MembroComOrganizacao,
   MembroDaEquipe,
   Monitoramento,
+  AlteracaoPrazo,
   PapelMembro,
   Prazo,
+  RegistroAuditoria,
 } from '../lib/database.types'
 import { ausenciaConfiguracao, supabase } from '../lib/supabase'
 
@@ -36,6 +38,8 @@ export const chaves = {
   membros: (orgId: string) => ['membros', orgId] as const,
   convites: (orgId: string) => ['convites', orgId] as const,
   buscasAgora: (orgId: string) => ['buscas-agora', orgId] as const,
+  auditoria: (orgId: string) => ['auditoria', orgId] as const,
+  alteracoesPrazo: (prazoId: string) => ['alteracoes-prazo', prazoId] as const,
 }
 
 /** Configuração global (URL do webhook do n8n): todos leem, só o dev altera. */
@@ -202,6 +206,40 @@ export function useExecucoes(orgId: string, opcoes: { acompanhar?: boolean } = {
     },
     // Enquanto uma busca está em andamento, consulta também por intervalo caso o tempo real atrase.
     refetchInterval: opcoes.acompanhar ? 5000 : false,
+  })
+}
+
+export interface Periodo {
+  de?: string
+  ate?: string
+}
+
+/** Auditoria da organização no período (o RLS só devolve ao Administrador, nos planos com auditoria). */
+export function useAuditoriaDaOrganizacao(orgId: string, periodo: Periodo, ativo = true) {
+  return useQuery({
+    queryKey: [...chaves.auditoria(orgId), periodo.de ?? '', periodo.ate ?? ''],
+    enabled: ativo,
+    queryFn: async (): Promise<RegistroAuditoria[]> => {
+      let consulta = cliente().from('auditoria').select('*').eq('organizacao_id', orgId)
+      if (periodo.de) consulta = consulta.gte('criado_em', periodo.de)
+      if (periodo.ate) consulta = consulta.lt('criado_em', periodo.ate)
+      const { data, error } = await consulta.order('criado_em', { ascending: false }).limit(500)
+      if (error) throw error
+      return data
+    },
+  })
+}
+
+/** Quem cumpriu, mudou vencimento ou responsável (o banco recusa nos planos sem auditoria). */
+export function useAlteracoesDoPrazo(prazoId: string, ativo = true) {
+  return useQuery({
+    queryKey: chaves.alteracoesPrazo(prazoId),
+    enabled: ativo,
+    queryFn: async (): Promise<AlteracaoPrazo[]> => {
+      const { data, error } = await cliente().rpc('alteracoes_do_prazo', { prazo: prazoId })
+      if (error) throw error
+      return data
+    },
   })
 }
 
@@ -413,6 +451,33 @@ export function useRemoverFeriado(orgId: string) {
         .eq('organizacao_id', orgId)
         .eq('data', data)
       if (error) throw error
+    },
+    onSuccess: invalidar,
+  })
+}
+
+// ------------------------------------------------------------------ exportação
+// O banco confere papel e plano e registra a exportação na auditoria.
+
+export function useExportarPrazos(orgId: string) {
+  const invalidar = useInvalidar(chaves.auditoria(orgId))
+  return useMutation({
+    mutationFn: async (): Promise<Prazo[]> => {
+      const { data, error } = await cliente().rpc('exportar_prazos', { org: orgId })
+      if (error) throw error
+      return data
+    },
+    onSuccess: invalidar,
+  })
+}
+
+export function useExportarAuditoria(orgId: string) {
+  const invalidar = useInvalidar(chaves.auditoria(orgId))
+  return useMutation({
+    mutationFn: async (periodo: Periodo): Promise<RegistroAuditoria[]> => {
+      const { data, error } = await cliente().rpc('exportar_auditoria', { org: orgId, ...periodo })
+      if (error) throw error
+      return data
     },
     onSuccess: invalidar,
   })

@@ -1,6 +1,26 @@
-import type { Prazo } from '../lib/database.types'
+import type { Prazo, RegistroAuditoria } from '../lib/database.types'
 
 let sequencia = 0
+
+export function fabricarRegistro(parcial: Partial<RegistroAuditoria> = {}): RegistroAuditoria {
+  sequencia++
+  return {
+    id: sequencia,
+    criado_em: '2026-10-06T13:30:00Z',
+    organizacao_id: 'org-1',
+    dev_id: null,
+    dev_email: null,
+    membro_id: 'bruno-1',
+    membro_email: 'bruno@exemplo.com',
+    acao: 'update:prazos',
+    alvo_user_id: null,
+    alvo_email: null,
+    detalhe: {},
+    antes: null,
+    depois: null,
+    ...parcial,
+  }
+}
 
 export function fabricarPrazo(parcial: Partial<Prazo> = {}): Prazo {
   sequencia++

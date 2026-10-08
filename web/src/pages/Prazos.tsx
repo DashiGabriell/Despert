@@ -5,12 +5,21 @@ import Indicadores from '../components/Indicadores'
 import TabelaPrazos from '../components/TabelaPrazos'
 import { alertaErro, botaoPequeno, campo } from '../components/ui'
 import { usePlano } from '../data/plano'
-import { useAtualizarPrazo, useConfiguracaoSistema, useMonitoramentos, usePrazos } from '../data/queries'
+import {
+  useAtualizarPrazo,
+  useConfiguracaoSistema,
+  useExportarPrazos,
+  useMembros,
+  useMonitoramentos,
+  usePrazos,
+} from '../data/queries'
 import { useFiltroResponsavel } from '../data/responsaveis'
+import { csvDePrazos, nomeDoArquivo } from '../domain/auditoria'
 import { filtrarPorResponsavel, filtrarPrazos, type FiltroRapido, type FiltroStatus } from '../domain/filtros'
 import { contarIndicadores } from '../domain/indicadores'
 import { useUserId } from '../lib/auth-context'
 import type { Prazo } from '../lib/database.types'
+import { baixarArquivo } from '../lib/download'
 import { useLayout } from '../lib/layout-context'
 import { useOrganizacaoId, usePode } from '../lib/organizacao-context'
 import { mensagemDeErro, useToast } from '../lib/toast-context'
@@ -35,7 +44,10 @@ export default function Prazos() {
   const atualizar = useAtualizarPrazo(orgId)
   const filtroResponsavel = useFiltroResponsavel(orgId, eu)
   const permite = usePode()
-  const { escrita } = usePlano()
+  const { escrita, limites } = usePlano()
+  const membros = useMembros(orgId)
+  const exportar = useExportarPrazos(orgId)
+  const podeExportar = permite('exportar_relatorios') && limites.auditoria
 
   const [busca, setBusca] = useState('')
   const [status, setStatus] = useState<FiltroStatus>('abertos')
@@ -83,6 +95,23 @@ export default function Prazos() {
         onError: (erro) => avisar(`Não foi possível atualizar: ${mensagemDeErro(erro)}`, 'erro'),
       },
     )
+  }
+
+  function exportarCsv() {
+    exportar.mutate(undefined, {
+      onSuccess: (dados) => {
+        const filtrados = filtrarPrazos(filtrarPorResponsavel(dados, filtroResponsavel.responsavel), {
+          busca,
+          status,
+          rapido,
+          hoje,
+        })
+        const emails = new Map((membros.data ?? []).map((m) => [m.user_id, m.email]))
+        baixarArquivo(nomeDoArquivo('prazos', hoje), csvDePrazos(filtrados, emails))
+        avisar(filtrados.length === 1 ? '1 prazo exportado.' : `${filtrados.length} prazos exportados.`, 'ok')
+      },
+      onError: (erro) => avisar(`Não foi possível exportar: ${mensagemDeErro(erro)}`, 'erro'),
+    })
   }
 
   return (
@@ -138,6 +167,17 @@ export default function Prazos() {
           <span className="ml-auto text-sm text-muted">
             {lista.length} {lista.length === 1 ? 'prazo' : 'prazos'}
           </span>
+          {podeExportar && (
+            <button
+              type="button"
+              className={botaoPequeno}
+              disabled={exportar.isPending || todos.length === 0}
+              title="Baixa os prazos com os filtros atuais, para abrir no Excel."
+              onClick={exportarCsv}
+            >
+              {exportar.isPending ? 'Exportando…' : 'Exportar CSV'}
+            </button>
+          )}
         </div>
 
         <TabelaPrazos

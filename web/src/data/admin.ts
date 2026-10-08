@@ -87,6 +87,7 @@ export function useAuditoria() {
       const { data, error } = await cliente()
         .from('auditoria')
         .select('*')
+        .is('membro_id', null)
         .order('criado_em', { ascending: false })
         .limit(300)
       if (error) throw error

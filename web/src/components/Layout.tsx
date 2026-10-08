@@ -28,6 +28,7 @@ import type { ContextoLayout } from '../lib/layout-context'
 import { OrganizacaoContext, useOrganizacaoId, usePertenca, usePode } from '../lib/organizacao-context'
 import { ausenciaConfiguracao } from '../lib/supabase'
 import { mensagemDeErro, useToast } from '../lib/toast-context'
+import AlteracoesPrazo from './AlteracoesPrazo'
 import BuscaAgora from './BuscaAgora'
 import ModalNovoPrazo from './ModalNovoPrazo'
 import ModalPrazo from './ModalPrazo'
@@ -42,6 +43,7 @@ const TITULOS: Record<string, string> = {
   '/historico': 'Histórico de execuções',
   '/configuracoes': 'Configurações',
   '/equipe': 'Equipe',
+  '/auditoria': 'Auditoria',
 }
 
 function Icone({ d }: { d: string }) {
@@ -85,6 +87,12 @@ const ITEM_EQUIPE = {
   to: '/equipe',
   label: 'Equipe',
   d: 'M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75',
+}
+
+const ITEM_AUDITORIA = {
+  to: '/auditoria',
+  label: 'Auditoria',
+  d: 'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10zM9 12l2 2 4-4',
 }
 
 type ModalAberto = { tipo: 'prazo'; id: string } | { tipo: 'novo'; data?: DataISO } | null
@@ -258,7 +266,11 @@ function AreaDaOrganizacao({
   const criar = useCriarPrazo(orgId, userId)
   const plano = usePlano()
   const podeCriar = plano.escrita && permite('editar_prazo')
-  const itens = permite('gerenciar_equipe') && plano.limites.papeis ? [...ITENS, ITEM_EQUIPE] : ITENS
+  const itens = [
+    ...ITENS,
+    ...(permite('gerenciar_equipe') && plano.limites.papeis ? [ITEM_EQUIPE] : []),
+    ...(permite('ver_auditoria') && plano.limites.auditoria ? [ITEM_AUDITORIA] : []),
+  ]
 
   const [modal, setModal] = useState<ModalAberto>(null)
   const fechar = useCallback(() => setModal(null), [])
@@ -421,6 +433,11 @@ function AreaDaOrganizacao({
           }}
           membros={(membros.data ?? []).length > 1 ? membros.data : undefined}
           eu={userId}
+          alteracoes={
+            plano.limites.auditoria ? (
+              <AlteracoesPrazo prazoId={prazoAberto.id} membros={membros.data ?? []} />
+            ) : undefined
+          }
           onFechar={fechar}
           onSalvar={async (dados) => {
             await atualizar.mutateAsync({ id: prazoAberto.id, dados })

@@ -23,6 +23,11 @@ function abrir(prazo = fabricarPrazo(), extras: Partial<Parameters<typeof ModalP
 }
 
 describe('ModalPrazo', () => {
+  it('mostra o histórico de alterações quando recebido (planos com auditoria)', () => {
+    abrir(fabricarPrazo(), { alteracoes: <p>Histórico de teste</p> })
+    expect(screen.getByText('Histórico de teste')).toBeInTheDocument()
+  })
+
   it('exibe datas, origem, partes, teor e o link para o documento', () => {
     abrir()
     expect(screen.getByRole('dialog')).toBeInTheDocument()
