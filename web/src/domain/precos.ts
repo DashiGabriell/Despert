@@ -1,7 +1,7 @@
 import type { Plano } from '../lib/database.types'
 import { LIMITES_PADRAO, PLANOS, type Limites } from './planos'
 
-/** Preço mensal de lançamento (ADR-0009). Cobrança manual, sem plano anual. */
+/** Preço mensal de lançamento (ADR-0009). O checkout cobra este valor; não há plano anual. */
 export const PRECO_MENSAL: Record<Plano, number> = {
   solo: 79.9,
   escritorio: 397.9,

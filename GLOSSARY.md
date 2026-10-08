@@ -101,7 +101,7 @@ O que um membro pode fazer na organização: Administrador, Advogado, Assistente
 _Avoid_: perfil, permissão, cargo
 
 **Administrador**:
-Papel que gerencia a equipe, os feriados e as configurações da organização, além de tudo o que o Advogado faz. Não gerencia plano nem cobrança, mas acompanha em Configurações o plano e a situação da organização (teste, ativa ou etapa da carência); os outros papéis não veem.
+Papel que gerencia a equipe, os feriados e as configurações da organização, além de tudo o que o Advogado faz. Contrata e renova o plano em `/checkout`. Acompanha em Configurações o plano e a situação da organização (teste, ativa ou etapa da carência); os outros papéis não veem.
 _Avoid_: dono, titular, admin do sistema
 
 **Advogado**:
@@ -119,7 +119,7 @@ _Avoid_: visualizador, observador, convidado
 ### Plano
 
 **Plano**:
-O pacote contratado pela organização — Solo, Escritório ou Corporativo — que define seus limites de uso. Só o dev atribui e ajusta.
+O pacote contratado pela organização — Solo, Escritório ou Corporativo — que define seus limites de uso. O Administrador contrata a mensalidade; o dev ainda ajusta limites e pode registrar um pagamento à parte.
 _Avoid_: assinatura, licença, pacote
 
 **Limite**:

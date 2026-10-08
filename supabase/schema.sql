@@ -1896,6 +1896,82 @@ revoke all on function public.admin_metricas() from public, anon;
 grant execute on function public.admin_listar_contas() to authenticated;
 grant execute on function public.admin_metricas() to authenticated;
 
+-- ============================ checkout Asaas (ADR-0010) ============================
+-- Espelho de estenderPagamento em web/src/domain/planos.ts: mudar um exige mudar o outro.
+create or replace function public.estender_pagamento(pago_ate date, hoje date, meses integer)
+returns date
+language sql
+immutable
+as $$
+  select ((case when pago_ate is not null and pago_ate >= hoje then pago_ate else hoje end)
+    + make_interval(months => meses))::date
+$$;
+
+create table if not exists public.checkouts (
+  id              uuid primary key default gen_random_uuid(),
+  organizacao_id  uuid not null references public.organizacoes (id) on delete cascade,
+  plano           text not null check (plano in ('solo', 'escritorio', 'corporativo')),
+  valor           numeric(10, 2) not null,
+  asaas_id        text not null unique,
+  evento_pago_id  text unique,
+  situacao        text not null default 'ativo' check (situacao in ('ativo', 'pago', 'cancelado', 'expirado')),
+  criado_em       timestamptz not null default now()
+);
+alter table public.checkouts enable row level security;
+
+drop policy if exists "membro_le" on public.checkouts;
+create policy "membro_le" on public.checkouts
+  for select to authenticated using (public.membro_de(organizacao_id));
+
+drop policy if exists "dev_acesso_total" on public.checkouts;
+create policy "dev_acesso_total" on public.checkouts
+  for all to authenticated
+  using ((select public.is_dev()))
+  with check ((select public.is_dev()));
+
+-- O webhook (service_role) confirma o pagamento uma vez. O retorno do navegador não chama isto.
+create or replace function public.registrar_checkout_pago(p_asaas_id text, p_evento_id text)
+returns text
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  c public.checkouts%rowtype;
+  hoje date := (now() at time zone 'America/Sao_Paulo')::date;
+  base date;
+  novo date;
+begin
+  if p_asaas_id is null or p_asaas_id = '' or p_evento_id is null or p_evento_id = '' then
+    return 'invalido';
+  end if;
+  select * into c from public.checkouts where asaas_id = p_asaas_id for update;
+  if not found then
+    return 'desconhecido';
+  end if;
+  if c.situacao = 'pago' or c.evento_pago_id = p_evento_id then
+    return 'ja_registrado';
+  end if;
+
+  select pago_ate into base from public.organizacoes where id = c.organizacao_id for update;
+  novo := public.estender_pagamento(base, hoje, 1);
+
+  update public.organizacoes
+    set plano = c.plano, situacao = 'ativa', pago_ate = novo
+    where id = c.organizacao_id;
+
+  update public.checkouts
+    set situacao = 'pago', evento_pago_id = p_evento_id
+    where id = c.id;
+
+  return 'registrado';
+end $$;
+
+revoke all on function public.estender_pagamento(date, date, integer) from public, anon, authenticated;
+revoke all on function public.registrar_checkout_pago(text, text) from public, anon, authenticated;
+grant execute on function public.estender_pagamento(date, date, integer) to service_role;
+grant execute on function public.registrar_checkout_pago(text, text) to service_role;
+
 -- ============================ conta dev ============================
 -- Promove a conta dev do projeto (idempotente). Depois de rodar, recarregue o site.
 update auth.users

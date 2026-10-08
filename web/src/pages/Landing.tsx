@@ -30,7 +30,7 @@ const PERGUNTAS: readonly [string, string][] = [
     'O que acontece quando o teste termina?',
     'Você tem 15 dias para regularizar: nos 5 primeiros tudo funciona, com aviso; depois a conta fica somente leitura, com o robô ainda buscando e avisando. Passado o dia 15, o robô para e você continua lendo e exportando seus dados. Nada é apagado.',
   ],
-  ['Como é o pagamento?', 'Mensal, por Pix ou boleto. Ainda não há plano anual.'],
+    ['Como é o pagamento?', 'Mensal, por Pix ou cartão, na página do Asaas. Ainda não há plano anual.'],
 ]
 
 function Selo({ className = '' }: { className?: string }) {
@@ -171,8 +171,8 @@ function Planos() {
       <div className="max-w-[40rem]">
         <h2 className="text-4xl leading-tight font-bold text-balance text-navy sm:text-5xl">Planos</h2>
         <p className="mt-4 text-lg leading-relaxed text-ink/85">
-          Todo cadastro começa com 7 dias grátis nos limites do Solo. Depois, pagamento mensal por Pix ou boleto. Os
-          planos com equipe são liberados pela equipe Despert depois do cadastro.
+          Todo cadastro começa com 7 dias grátis nos limites do Solo. Depois, o Administrador contrata a mensalidade
+          por Pix ou cartão.
         </p>
       </div>
 

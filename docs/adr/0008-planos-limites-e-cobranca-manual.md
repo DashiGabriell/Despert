@@ -4,6 +4,8 @@ status: accepted
 
 # Planos com limites ajustáveis pelo dev e cobrança manual
 
+A contratação mensal passou ao Checkout do Asaas no [ADR-0010](./0010-checkout-asaas.md). Limites, teste, carência e o registro manual do dev continuam neste ADR.
+
 Cada organização tem um **plano** (Solo, Escritório ou Corporativo) que define os limites de uso. Planos e cobrança existem só no painel dev: o Administrador da organização não escolhe nem paga pelo app. No lançamento a cobrança é manual (Pix ou boleto enviado fora do app) e o dev libera o plano no painel; o plano dá os limites padrão e o dev pode sobrescrever qualquer um deles por organização, para negociações caso a caso.
 
 ## Limites padrão

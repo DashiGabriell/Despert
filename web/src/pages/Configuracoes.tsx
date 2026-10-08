@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react'
+import { Link } from 'react-router-dom'
 import {
   alertaAviso,
   alertaErro,
@@ -144,6 +145,9 @@ function SeuPlano() {
         </div>
       </dl>
       {resumo.detalhe && <p className={`${dica} mt-3`}>{resumo.detalhe}</p>}
+      <Link to="/checkout" className={`${botaoPrimario} mt-5`}>
+        Contratar ou renovar
+      </Link>
     </section>
   )
 }

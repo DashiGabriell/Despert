@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { pode } from '../domain/permissoes'
@@ -71,6 +72,14 @@ const EQUIPE: MembroDaEquipe[] = [
   { user_id: 'bruno-1', email: 'bruno@exemplo.com', papel: 'advogado', criado_em: '' },
 ]
 
+function mostrar() {
+  return render(
+    <MemoryRouter>
+      <Configuracoes />
+    </MemoryRouter>,
+  )
+}
+
 describe('tela de Configurações', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -81,33 +90,34 @@ describe('tela de Configurações', () => {
 
   it('Administrador acompanha o plano, a situação e o vencimento da mensalidade', () => {
     organizacao = { ...ORGANIZACAO, pago_ate: '2026-11-10' }
-    render(<Configuracoes />)
+    mostrar()
     const plano = screen.getByRole('region', { name: 'Seu plano' })
     expect(plano).toHaveTextContent('Escritório')
     expect(plano).toHaveTextContent('Ativa')
     expect(plano).toHaveTextContent('Vencimento da mensalidade10/11/2026')
+    expect(screen.getByRole('link', { name: 'Contratar ou renovar' })).toHaveAttribute('href', '/checkout')
   })
 
   it('no teste mostra quantos dias faltam; na carência, o prazo da etapa', () => {
     organizacao = { ...ORGANIZACAO, plano: 'solo', situacao: 'teste', teste_iniciado_em: '2026-10-02T12:00:00Z' }
-    const { unmount } = render(<Configuracoes />)
+    const { unmount } = mostrar()
     expect(screen.getByRole('region', { name: 'Seu plano' })).toHaveTextContent(
       /Solo.*Período de teste.*Fim do teste08\/10\/2026.*Faltam 3 dias de teste \(até 08\/10\/2026\)\./,
     )
     unmount()
     organizacao = { ...ORGANIZACAO, pago_ate: '2026-09-26' }
-    render(<Configuracoes />)
+    mostrar()
     expect(screen.getByRole('region', { name: 'Seu plano' })).toHaveTextContent(/Somente leitura.*por mais 6 dias/)
   })
 
   it.each(['advogado', 'assistente', 'leitura'] as const)('%s não vê o plano', (p) => {
     papel = p
-    render(<Configuracoes />)
+    mostrar()
     expect(screen.queryByRole('region', { name: 'Seu plano' })).not.toBeInTheDocument()
   })
 
   it('Administrador altera o robô da organização e os feriados', async () => {
-    render(<Configuracoes />)
+    mostrar()
     expect(screen.getByLabelText('Dias para trás')).toHaveValue(7)
     expect(screen.getByLabelText('Data')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Remover' })).toBeEnabled()
@@ -123,7 +133,7 @@ describe('tela de Configurações', () => {
 
   it.each(['advogado', 'assistente', 'leitura'] as const)('%s só vê o resumo do robô e dos feriados', (p) => {
     papel = p
-    render(<Configuracoes />)
+    mostrar()
     expect(screen.queryByLabelText('Dias para trás')).not.toBeInTheDocument()
     expect(screen.queryByLabelText('Token de segurança')).not.toBeInTheDocument()
     expect(screen.getByText(/Só o Administrador da organização altera essas configurações/)).toBeInTheDocument()
@@ -139,13 +149,13 @@ describe('tela de Configurações', () => {
     ['leitura', 'todos'],
   ] as const)('o resumo diário de %s começa em "%s"', (p, escopo) => {
     papel = p
-    render(<Configuracoes />)
+    mostrar()
     expect(screen.getByLabelText('Resumo diário')).toHaveValue(escopo)
   })
 
   it('cada pessoa salva os próprios alertas, inclusive o escopo do resumo', async () => {
     papel = 'leitura'
-    render(<Configuracoes />)
+    mostrar()
     await userEvent.selectOptions(screen.getByLabelText('Resumo diário'), 'meus')
     await userEvent.click(screen.getByRole('button', { name: 'Salvar alertas' }))
     expect(salvarPessoal).toHaveBeenCalledWith(
@@ -156,7 +166,7 @@ describe('tela de Configurações', () => {
 
   it('no Solo não pergunta o escopo do resumo', () => {
     membros = EQUIPE.slice(0, 1)
-    render(<Configuracoes />)
+    mostrar()
     expect(screen.queryByLabelText('Resumo diário')).not.toBeInTheDocument()
   })
 })

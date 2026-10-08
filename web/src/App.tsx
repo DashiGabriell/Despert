@@ -4,6 +4,8 @@ import { rotaInicial } from './domain/acesso'
 import { useAuth } from './lib/auth-context'
 import Agenda from './pages/Agenda'
 import Auditoria from './pages/Auditoria'
+import Checkout from './pages/Checkout'
+import CheckoutRetorno from './pages/CheckoutRetorno'
 import Configuracoes from './pages/Configuracoes'
 import Convite from './pages/Convite'
 import AreaDev from './pages/dev/AreaDev'
@@ -39,6 +41,8 @@ export default function App() {
         <Route path="/monitoramento" element={<Monitoramento />} />
         <Route path="/historico" element={<Historico />} />
         <Route path="/configuracoes" element={<Configuracoes />} />
+        <Route path="/checkout" element={<Checkout />} />
+        <Route path="/checkout/retorno" element={<CheckoutRetorno />} />
         <Route path="/equipe" element={<Equipe />} />
         <Route path="/auditoria" element={<Auditoria />} />
       </Route>
