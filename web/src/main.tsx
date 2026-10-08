@@ -6,10 +6,13 @@ import './index.css'
 import App from './App.tsx'
 import AuthProvider from './components/AuthProvider.tsx'
 import ToastProvider from './components/ToastProvider.tsx'
+import { iniciarInstalacao, registrarServiceWorker } from './lib/pwa.ts'
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false } },
 })
+
+iniciarInstalacao()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
@@ -24,3 +27,5 @@ createRoot(document.getElementById('root')!).render(
     </QueryClientProvider>
   </StrictMode>,
 )
+
+registrarServiceWorker()
