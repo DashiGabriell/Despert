@@ -18,7 +18,9 @@ function tokensIguais(esperado: string, recebido: string): boolean {
   const a = new TextEncoder().encode(esperado)
   const b = new TextEncoder().encode(recebido)
   if (a.length === 0 || a.length !== b.length) return false
-  return crypto.subtle.timingSafeEqual(a, b)
+  let diferenca = 0
+  for (let i = 0; i < a.length; i++) diferenca |= a[i] ^ b[i]
+  return diferenca === 0
 }
 
 Deno.serve(async (req) => {
