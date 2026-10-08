@@ -52,7 +52,8 @@ function sandbox(chave: string): boolean {
 function linkConfiavel(link: string, emSandbox: boolean): boolean {
   try {
     const url = new URL(link)
-    return url.protocol === 'https:' && url.hostname === (emSandbox ? 'sandbox.asaas.com' : 'asaas.com')
+    const hosts = emSandbox ? ['sandbox.asaas.com'] : ['asaas.com', 'www.asaas.com']
+    return url.protocol === 'https:' && hosts.includes(url.hostname)
   } catch {
     return false
   }
