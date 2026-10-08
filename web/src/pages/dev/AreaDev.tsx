@@ -1,7 +1,11 @@
-import { Navigate, NavLink, Outlet, useNavigate } from 'react-router-dom'
+import { useState } from 'react'
+import { Navigate, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import BotaoInstalarApp from '../../components/InstalarApp'
+import { BarraAbas, BotaoFolha, FolhaApp, LinkFolha } from '../../components/NavegacaoApp'
 import { alertaAviso, botaoPequeno } from '../../components/ui'
 import { MODOS_DEV, rotaDev, type ModoDev } from '../../domain/acesso'
 import { useAuth } from '../../lib/auth-context'
+import { ICONE_SAIR, useRolagemAoTopo } from '../../lib/navegacao'
 import { ausenciaConfiguracao } from '../../lib/supabase'
 
 const ICONES: Record<ModoDev, string> = {
@@ -13,6 +17,10 @@ const ICONES: Record<ModoDev, string> = {
   n8n: 'M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71',
   auditoria: 'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10zM9 12l2 2 4-4',
 }
+
+/** No celular estes modos ficam na barra de abas; o resto mora na folha "Mais". */
+const ABAS_CELULAR: readonly ModoDev[] = ['visao-geral', 'usuarios', 'organizacoes', 'execucoes']
+const ROTULO_CURTO: Partial<Record<ModoDev, string>> = { 'visao-geral': 'Visão', organizacoes: 'Orgs' }
 
 function Icone({ d }: { d: string }) {
   return (
@@ -45,19 +53,37 @@ export default function AreaDev() {
 function MolduraDev({ email }: { email: string }) {
   const { sair, atuacao, encerrarAtuacao } = useAuth()
   const navigate = useNavigate()
+  const { pathname } = useLocation()
+  useRolagemAoTopo()
+  const [maisAberta, setMaisAberta] = useState(false)
+  const fecharMais = () => setMaisAberta(false)
+  const modosDaFolha = MODOS_DEV.filter((item) => !ABAS_CELULAR.includes(item.modo))
 
   return (
     <div className="grid min-h-dvh grid-cols-1 md:grid-cols-[auto_minmax(0,1fr)]">
-      <aside className="ds-sidebar">
+      <div className="app-topo md:hidden">
+        <span className="ds-marca size-9 rounded-[10px]">D</span>
+        <span className="min-w-0 leading-tight">
+          <span className="block font-display text-xl font-bold text-navy">Despert</span>
+          <span className="block text-[11px] tracking-wider text-muted uppercase">Painel dev</span>
+        </span>
+        <button
+          type="button"
+          className="ml-auto grid size-11 place-items-center rounded-full"
+          aria-label="Conta e mais opções"
+          onClick={() => setMaisAberta(true)}
+        >
+          <span className="ds-avatar">{(email[0] ?? '?').toUpperCase()}</span>
+        </button>
+      </div>
+
+      <aside className="ds-sidebar max-md:hidden">
         <div className="ds-sb-cabeca flex items-center gap-2.5">
           <span className="ds-marca">D</span>
           <span className="ds-sb-texto leading-tight">
             <span className="block font-display text-2xl font-bold text-navy">Despert</span>
             <span className="block text-[11px] tracking-wider text-muted uppercase">Painel dev</span>
           </span>
-          <button type="button" onClick={() => void sair()} className={`${botaoPequeno} ml-auto md:hidden`}>
-            Sair
-          </button>
         </div>
 
         <nav className="flex gap-1 overflow-x-auto md:flex-col md:overflow-visible" aria-label="Painel dev">
@@ -81,13 +107,13 @@ function MolduraDev({ email }: { email: string }) {
             </span>
           </div>
           <button type="button" onClick={() => void sair()} className="ds-sb-logout" title="Sair">
-            <Icone d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" />
+            <Icone d={ICONE_SAIR} />
             <span className="ds-sb-texto">Sair</span>
           </button>
         </div>
       </aside>
 
-      <main className="min-w-0 px-4 py-5 md:px-8 md:py-8">
+      <main className="com-abas min-w-0 px-4 py-5 md:px-8 md:py-8">
         {ausenciaConfiguracao && <div className={`${alertaAviso} mb-5`}>{ausenciaConfiguracao}</div>}
         {atuacao && (
           <div role="status" className={`${alertaAviso} mb-5 flex flex-wrap items-center justify-between gap-3`}>
@@ -106,6 +132,46 @@ function MolduraDev({ email }: { email: string }) {
         )}
         <Outlet />
       </main>
+
+      <BarraAbas
+        rotulo="Painel dev no celular"
+        abas={ABAS_CELULAR.map((modo) => {
+          const rotulo = MODOS_DEV.find((m) => m.modo === modo)!.rotulo
+          return {
+            to: rotaDev(modo),
+            rotulo: ROTULO_CURTO[modo] ?? rotulo,
+            rotuloCompleto: ROTULO_CURTO[modo] ? rotulo : undefined,
+            d: ICONES[modo],
+          }
+        })}
+        maisAberta={maisAberta}
+        maisAtiva={modosDaFolha.some((item) => pathname === rotaDev(item.modo))}
+        onMais={() => setMaisAberta(true)}
+      />
+
+      <FolhaApp
+        aberta={maisAberta}
+        onFechar={fecharMais}
+        titulo="Painel dev"
+        subtitulo={email}
+        icone={<span className="ds-avatar size-11 text-base">{(email[0] ?? '?').toUpperCase()}</span>}
+      >
+        <nav className="app-folha-grupo" aria-label="Mais ferramentas">
+          {modosDaFolha.map((item) => (
+            <LinkFolha
+              key={item.modo}
+              to={rotaDev(item.modo)}
+              rotulo={item.rotulo}
+              d={ICONES[item.modo]}
+              onClick={fecharMais}
+            />
+          ))}
+        </nav>
+        <div className="app-folha-grupo">
+          <BotaoInstalarApp />
+          <BotaoFolha rotulo="Sair" d={ICONE_SAIR} perigo onClick={() => void sair()} />
+        </div>
+      </FolhaApp>
     </div>
   )
 }

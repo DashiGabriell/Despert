@@ -31,7 +31,7 @@ export default function TabelaPrazos({
   const colunas = responsaveis ? 8 : 7
   return (
     <div className="overflow-x-auto">
-      <table className={tabela}>
+      <table className={`${tabela} tabela-prazos`}>
         <thead>
           <tr>
             <th>Situação</th>
@@ -61,36 +61,37 @@ export default function TabelaPrazos({
               <tr
                 key={prazo.id}
                 onClick={() => onAbrir(prazo)}
-                className={`ds-linha-clicavel ${aberto ? '' : '[&>td]:text-muted'} ${conferir ? '[&>td:first-child]:shadow-[inset_3px_0_0_var(--color-gold)]' : ''}`}
+                data-conferir={conferir || undefined}
+                className={`ds-linha-clicavel ${aberto ? '' : '[&>td]:text-muted'} ${conferir ? 'md:[&>td:first-child]:shadow-[inset_3px_0_0_var(--color-gold)]' : ''}`}
               >
-                <td>
+                <td data-area="selo">
                   <SeloPrazo prazo={prazo} hoje={hoje} />
                 </td>
-                <td>
+                <td data-area="venc">
                   <strong>{formatarData(prazo.vencimento)}</strong>
                   {prazo.data_publicacao && (
                     <div className="mt-0.5 text-xs text-muted">Publ. {formatarData(prazo.data_publicacao)}</div>
                   )}
                 </td>
-                <td>
+                <td data-area="proc">
                   <span className="font-mono text-[13px]">{prazo.processo || '—'}</span>
                   {prazo.classe && <div className="mt-0.5 text-xs text-muted">{prazo.classe}</div>}
                 </td>
-                <td>
+                <td data-area="trib">
                   {prazo.tribunal}
                   {prazo.orgao && <div className="mt-0.5 text-xs text-muted">{prazo.orgao}</div>}
                 </td>
-                <td>{prazo.tipo}</td>
-                <td className="whitespace-nowrap">
+                <td data-area="tipo">{prazo.tipo}</td>
+                <td data-area="prazo" className="whitespace-nowrap">
                   {prazo.prazo_dias ? `${prazo.prazo_dias} dias` : '—'}
                   {conferir && <div className="text-xs font-semibold text-alert">conferir</div>}
                 </td>
                 {responsaveis && (
-                  <td className="whitespace-nowrap">
+                  <td data-area="resp" className="whitespace-nowrap">
                     {prazo.responsavel_id ? (responsaveis.get(prazo.responsavel_id) ?? 'Fora da equipe') : '—'}
                   </td>
                 )}
-                <td className="text-right">
+                <td data-area="acao" className="text-right">
                   {aberto && podeCumprir && (
                     <button
                       type="button"

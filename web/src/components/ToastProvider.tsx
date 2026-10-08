@@ -30,7 +30,7 @@ export default function ToastProvider({ children }: { children: ReactNode }) {
     <ToastContext.Provider value={avisar}>
       {children}
       <div
-        className="fixed right-5 bottom-5 z-[100] flex max-w-sm flex-col gap-2"
+        className="fixed inset-x-3 top-[calc(var(--safe-top)+0.75rem)] z-[100] flex flex-col gap-2 md:inset-x-auto md:top-auto md:right-5 md:bottom-5 md:max-w-sm"
         role="status"
         aria-live="polite"
       >

@@ -146,9 +146,9 @@ function TelaAuditoria() {
             {lista.map((r) => (
               <tr key={r.id}>
                 <td className="whitespace-nowrap">{formatarDataHora(r.criado_em)}</td>
-                <td className="break-all">{rotuloDoAutor(r)}</td>
-                <td>{descreverAcao(r.acao)}</td>
-                <td className="text-xs text-muted">{descreverRegistro(r, nomes) || '—'}</td>
+                <td data-label="Autor" className="break-all">{rotuloDoAutor(r)}</td>
+                <td data-label="Ação">{descreverAcao(r.acao)}</td>
+                <td data-label="Alterações" className="text-xs text-muted">{descreverRegistro(r, nomes) || '—'}</td>
               </tr>
             ))}
           </tbody>

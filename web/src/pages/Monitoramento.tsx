@@ -295,7 +295,7 @@ export default function Monitoramento() {
                   m.tipo === 'oab' ? `OAB ${m.oab_numero}/${m.oab_uf}` : (m.numero_processo ?? '')
                 return (
                   <tr key={m.id} className={m.ativo ? '' : '[&>td]:text-muted'}>
-                    <td>
+                    <td data-label="Ativo">
                       <label className="ds-switch">
                         <input
                           type="checkbox"
@@ -316,7 +316,7 @@ export default function Monitoramento() {
                         <span aria-hidden />
                       </label>
                     </td>
-                    <td>
+                    <td data-titulo>
                       {m.tipo === 'oab' ? (
                         <strong>{nome}</strong>
                       ) : (
@@ -326,8 +326,12 @@ export default function Monitoramento() {
                         </>
                       )}
                     </td>
-                    {equipe && <td className="whitespace-nowrap">{nomes.get(m.user_id) ?? 'Fora da equipe'}</td>}
-                    <td>{m.descricao}</td>
+                    {equipe && (
+                      <td data-label="Advogado(a)" className="whitespace-nowrap">
+                        {nomes.get(m.user_id) ?? 'Fora da equipe'}
+                      </td>
+                    )}
+                    <td data-label="Descrição">{m.descricao}</td>
                     <td className={`text-right`}>
                       <button
                         type="button"

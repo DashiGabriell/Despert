@@ -12,9 +12,9 @@ import { mensagemDeErro } from '../lib/toast-context'
 
 function Moldura({ children }: { children: ReactNode }) {
   return (
-    <main className="grid min-h-dvh place-items-center bg-secondary/40 p-5">
-      <div className="ds-card ds-entrar w-full max-w-md p-8 shadow-2xl">
-        <div className="mb-6 flex items-center gap-3">
+    <main className="grid min-h-dvh place-items-center bg-secondary/40 p-5 max-md:place-items-stretch max-md:bg-transparent max-md:p-0">
+      <div className="ds-card ds-entrar w-full max-w-md p-8 shadow-2xl max-md:max-w-none max-md:rounded-none max-md:border-0 max-md:px-6 max-md:pt-[calc(var(--safe-top)+2.5rem)] max-md:pb-[calc(2rem+var(--safe-bottom))] max-md:shadow-none">
+        <div className="mb-6 flex items-center gap-3 max-md:mb-8">
           <img src="/logo-despert-256.png" alt="Despert" className="size-12 shrink-0 object-contain" />
           <span className="font-display text-2xl font-bold text-navy">Despert</span>
         </div>

@@ -118,8 +118,12 @@ export default function VisaoGeral() {
               {falhas.map((x) => (
                 <tr key={x.id}>
                   <td className="whitespace-nowrap">{formatarDataHora(x.executado_em)}</td>
-                  <td>{x.user_id ? (emailPorId.get(x.user_id) ?? x.user_id) : 'Geral (antes de identificar a conta)'}</td>
-                  <td className="max-w-md text-xs break-words text-muted">{(x.detalhe ?? '').slice(0, 300)}</td>
+                  <td data-label="Conta">
+                    {x.user_id ? (emailPorId.get(x.user_id) ?? x.user_id) : 'Geral (antes de identificar a conta)'}
+                  </td>
+                  <td data-label="Detalhe" className="max-w-md text-xs break-words text-muted">
+                    {(x.detalhe ?? '').slice(0, 300)}
+                  </td>
                 </tr>
               ))}
             </tbody>

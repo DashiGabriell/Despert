@@ -30,8 +30,11 @@ import { ausenciaConfiguracao } from '../lib/supabase'
 import { mensagemDeErro, useToast } from '../lib/toast-context'
 import AlteracoesPrazo from './AlteracoesPrazo'
 import BuscaAgora from './BuscaAgora'
+import BotaoInstalarApp from './InstalarApp'
 import ModalNovoPrazo from './ModalNovoPrazo'
 import ModalPrazo from './ModalPrazo'
+import { ICONE_SAIR, useRolagemAoTopo } from '../lib/navegacao'
+import { BarraAbas, BotaoFolha, FolhaApp, LinkFolha } from './NavegacaoApp'
 import { alertaAviso, alertaErro, botao, botaoPequeno, campo } from './ui'
 
 const CHAVE_MENU_RECOLHIDO = 'despert:menu-recolhido'
@@ -94,6 +97,11 @@ const ITEM_AUDITORIA = {
   label: 'Auditoria',
   d: 'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10zM9 12l2 2 4-4',
 }
+
+/** No celular estas ficam na barra de abas; o resto mora na folha "Mais". */
+const ABAS_CELULAR = new Set(['/prazos', '/agenda', '/monitoramento'])
+const ROTULO_CURTO: Record<string, string> = { '/monitoramento': 'Monitorar' }
+const ICONE_NOVO = 'M12 5v14M5 12h14'
 
 type ModalAberto = { tipo: 'prazo'; id: string } | { tipo: 'novo'; data?: DataISO } | null
 
@@ -210,19 +218,23 @@ function AreaLogada() {
 function SeletorOrganizacao({
   pertencas,
   onTrocar,
+  id = 'seletor-organizacao',
+  className = 'ds-sb-texto mb-3 px-1',
 }: {
   pertencas: readonly MembroComOrganizacao[]
   onTrocar: (orgId: string) => void
+  id?: string
+  className?: string
 }) {
   const orgId = useOrganizacaoId()
   if (pertencas.length < 2) return null
   return (
-    <div className="ds-sb-texto mb-3 px-1">
-      <label htmlFor="seletor-organizacao" className="mb-1 block text-[11px] font-semibold tracking-wide text-muted uppercase">
+    <div className={className}>
+      <label htmlFor={id} className="mb-1 block text-[11px] font-semibold tracking-wide text-muted uppercase">
         Organização
       </label>
       <select
-        id="seletor-organizacao"
+        id={id}
         className={`${campo} py-1.5 text-sm`}
         value={orgId}
         onChange={(e) => onTrocar(e.target.value)}
@@ -272,6 +284,10 @@ function AreaDaOrganizacao({
     ...(permite('ver_auditoria') && plano.limites.auditoria ? [ITEM_AUDITORIA] : []),
   ]
 
+  const pertenca = usePertenca()
+  useRolagemAoTopo()
+  const [maisAberta, setMaisAberta] = useState(false)
+  const fecharMais = () => setMaisAberta(false)
   const [modal, setModal] = useState<ModalAberto>(null)
   const fechar = useCallback(() => setModal(null), [])
   const [recolhida, setRecolhida] = useState(() => localStorage.getItem(CHAVE_MENU_RECOLHIDO) === '1')
@@ -305,10 +321,28 @@ function AreaDaOrganizacao({
   const ultima = execucoes.data?.[0]
   const prazoAberto =
     modal?.tipo === 'prazo' ? (prazos.data ?? []).find((p) => p.id === modal.id) : undefined
+  const nomeOrganizacao = pertenca.organizacao.nome || 'Despert'
+  const itensDaFolha = itens.filter((item) => !ABAS_CELULAR.has(item.to))
 
   return (
     <div className="grid min-h-dvh grid-cols-1 md:grid-cols-[auto_minmax(0,1fr)]">
-      <aside className="ds-sidebar" data-recolhida={recolhida}>
+      <div className="app-topo md:hidden">
+        <img src="/logo-despert-256.png" alt="" className="size-9 shrink-0 object-contain" />
+        <span className="min-w-0 leading-tight">
+          <span className="block font-display text-xl font-bold text-navy">Despert</span>
+          <span className="block truncate text-[11px] tracking-wider text-muted uppercase">{nomeOrganizacao}</span>
+        </span>
+        <button
+          type="button"
+          className="ml-auto grid size-11 place-items-center rounded-full"
+          aria-label="Conta e mais opções"
+          onClick={() => setMaisAberta(true)}
+        >
+          <span className="ds-avatar">{(email[0] ?? '?').toUpperCase()}</span>
+        </button>
+      </div>
+
+      <aside className="ds-sidebar max-md:hidden" data-recolhida={recolhida}>
         <div className="ds-sb-cabeca flex items-center gap-2.5">
           <img src="/logo-despert-256.png" alt="Despert" className="size-11 shrink-0 object-contain" />
           <span className="ds-sb-texto leading-tight" aria-hidden>
@@ -323,9 +357,6 @@ function AreaDaOrganizacao({
             title={recolhida ? 'Expandir menu' : 'Recolher menu'}
           >
             <Icone d="M15 18l-6-6 6-6" />
-          </button>
-          <button type="button" onClick={() => void sair()} className={`${botaoPequeno} ml-auto md:hidden`}>
-            Sair
           </button>
         </div>
 
@@ -363,14 +394,14 @@ function AreaDaOrganizacao({
         </div>
       </aside>
 
-      <main className="min-w-0 px-4 py-5 md:px-8 md:py-8">
+      <main className="com-abas min-w-0 px-4 py-5 md:px-8 md:py-8">
         {ausenciaConfiguracao && <div className={`${alertaAviso} mb-5`}>{ausenciaConfiguracao}</div>}
         {atuacao && <FaixaAtuacao atuacao={atuacao} />}
         <FaixaEtapa />
 
-        <header className="mb-7 flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <h1 className="text-4xl leading-tight font-bold text-navy">{TITULOS[pathname] ?? 'Despert'}</h1>
+        <header className="mb-6 flex flex-wrap items-end justify-between gap-3 md:mb-7">
+          <div className="min-w-0">
+            <h1 className="text-[2rem] leading-tight font-bold text-navy md:text-4xl">{TITULOS[pathname] ?? 'Despert'}</h1>
             <p className="mt-1 text-sm text-muted">
               {ultima ? (
                 <>
@@ -388,11 +419,11 @@ function AreaDaOrganizacao({
               )}
             </p>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2 max-md:w-full max-md:[&>*]:flex-1">
             {permite('editar_prazo') && (
               <button
                 type="button"
-                className={botao}
+                className={`${botao} max-md:hidden`}
                 disabled={!plano.escrita}
                 title={plano.escrita ? undefined : 'Organização em modo somente leitura.'}
                 onClick={() => contexto.novoPrazo()}
@@ -418,6 +449,59 @@ function AreaDaOrganizacao({
           <Outlet context={contexto} />
         </div>
       </main>
+
+      <BarraAbas
+        rotulo="Navegação principal"
+        abas={itens
+          .filter((item) => ABAS_CELULAR.has(item.to))
+          .map((item) => ({
+            to: item.to,
+            rotulo: ROTULO_CURTO[item.to] ?? item.label,
+            rotuloCompleto: ROTULO_CURTO[item.to] ? item.label : undefined,
+            d: item.d,
+            contador: item.to === '/prazos' ? criticos : undefined,
+          }))}
+        acao={
+          permite('editar_prazo')
+            ? {
+                rotulo: 'Novo prazo',
+                d: ICONE_NOVO,
+                onClick: () => contexto.novoPrazo(),
+                desabilitada: !plano.escrita,
+              }
+            : undefined
+        }
+        maisAberta={maisAberta}
+        maisAtiva={itensDaFolha.some((item) => item.to === pathname)}
+        onMais={() => setMaisAberta(true)}
+      />
+
+      <FolhaApp
+        aberta={maisAberta}
+        onFechar={fecharMais}
+        titulo={nomeOrganizacao}
+        subtitulo={`${email} · ${ROTULO_PAPEL[pertenca.papel]}`}
+        icone={<span className="ds-avatar size-11 text-base">{(email[0] ?? '?').toUpperCase()}</span>}
+      >
+        <nav className="app-folha-grupo" aria-label="Mais seções">
+          {itensDaFolha.map((item) => (
+            <LinkFolha key={item.to} to={item.to} rotulo={item.label} d={item.d} onClick={fecharMais} />
+          ))}
+        </nav>
+        <SeletorOrganizacao
+          pertencas={pertencas}
+          onTrocar={(id) => {
+            onTrocar(id)
+            fecharMais()
+          }}
+          id="seletor-organizacao-folha"
+          className=""
+        />
+        <div className="app-folha-grupo">
+          <BotaoInstalarApp />
+          <BotaoFolha rotulo="Sair" d={ICONE_SAIR} perigo onClick={() => void sair()} />
+        </div>
+      </FolhaApp>
 
       {prazoAberto && (
         <ModalPrazo

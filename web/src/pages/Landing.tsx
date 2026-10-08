@@ -309,8 +309,8 @@ function Perguntas() {
 export default function Landing() {
   return (
     <div className="lp min-h-dvh">
-      <header className="sticky top-0 z-30 border-b border-line/70 bg-surface">
-        <nav aria-label="Principal" className="mx-auto flex max-w-6xl items-center gap-6 px-5 py-3">
+      <header className="sticky top-0 z-30 border-b border-line/70 bg-surface pt-[var(--safe-top)]">
+        <nav aria-label="Principal" className="mx-auto flex max-w-6xl items-center gap-6 px-5 py-3 max-md:py-2.5">
           <Link to="/" className="mr-auto flex items-center gap-2.5" aria-label="Despert, início">
             <Selo className="size-10" />
             <span className="font-display text-2xl font-bold text-navy">Despert</span>
@@ -358,7 +358,7 @@ export default function Landing() {
         </section>
       </main>
 
-      <footer className="border-t border-line">
+      <footer className="border-t border-line max-md:pb-[calc(5rem+var(--safe-bottom))]">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-3 px-5 py-6 text-sm text-muted">
           <Selo className="size-7" />
           <span className="mr-auto">© {new Date().getFullYear()} Despert · Monitor de prazos · DJEN</span>
@@ -367,6 +367,16 @@ export default function Landing() {
           </Link>
         </div>
       </footer>
+
+      <div className="fixed inset-x-0 bottom-0 z-30 flex items-center gap-3 border-t border-line bg-white/90 px-4 pt-3 pb-[calc(0.75rem+var(--safe-bottom))] backdrop-blur-xl md:hidden">
+        <p className="min-w-0 text-xs leading-snug text-muted">
+          <strong className="block text-sm text-ink">7 dias grátis</strong>
+          sem cartão de crédito
+        </p>
+        <Link to={CADASTRO} className="ds-btn ds-btn-primary ml-auto shrink-0 px-5">
+          Começar teste grátis
+        </Link>
+      </div>
     </div>
   )
 }

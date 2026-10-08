@@ -134,23 +134,23 @@ export default function Organizacoes() {
                         {ROTULO_TIPO[o.rotulo]} · {o.administrador_email ?? 'sem administrador'}
                       </div>
                     </td>
-                    <td>
+                    <td data-label="Plano">
                       {ROTULO_PLANO[o.plano]}
                       {ajustado && <span className="ds-badge ds-badge-navy ml-1.5">ajustado</span>}
                     </td>
-                    <td>
+                    <td data-label="Situação">
                       <span className={`ds-badge ${corEtapa}`}>{textoEtapa}</span>
                       <div className="mt-1 text-xs text-muted">
                         {fim ? `${o.situacao === 'teste' ? 'Teste até' : 'Pago até'} ${formatarData(fim)}` : 'Sem vencimento'}
                       </div>
                     </td>
-                    <td>
+                    <td data-label="Usuários">
                       {o.qtd_membros} / {limites.usuarios}
                     </td>
-                    <td>
+                    <td data-label="OABs">
                       {o.oabs_ativas} / {limiteDe('oabs', limites, o.qtd_advogados)}
                     </td>
-                    <td>
+                    <td data-label="Processos">
                       {o.processos_ativos} / {limites.processos}
                     </td>
                     <td className="text-right">

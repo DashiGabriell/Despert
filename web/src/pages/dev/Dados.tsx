@@ -163,10 +163,10 @@ function Prazos({ orgId }: { orgId: string }) {
           {lista.map((p) => (
             <tr key={p.id}>
               <td className="whitespace-nowrap">{formatarData(p.vencimento)}</td>
-              <td className="font-mono text-[13px]">{p.processo ?? '—'}</td>
-              <td>{p.tribunal ?? '—'}</td>
-              <td>{p.tipo ?? '—'}</td>
-              <td>{ROTULO_STATUS[p.status]}</td>
+              <td data-label="Processo" className="font-mono text-[13px]">{p.processo ?? '—'}</td>
+              <td data-label="Tribunal">{p.tribunal ?? '—'}</td>
+              <td data-label="Tipo">{p.tipo ?? '—'}</td>
+              <td data-label="Status">{ROTULO_STATUS[p.status]}</td>
             </tr>
           ))}
         </tbody>
@@ -195,12 +195,12 @@ function Monitoramentos({ orgId }: { orgId: string }) {
           {monitoramentos.isSuccess && lista.length === 0 && <Vazio colunas={4} texto="Nenhum monitoramento." />}
           {lista.map((m) => (
             <tr key={m.id}>
-              <td>{m.tipo === 'oab' ? 'OAB' : 'Processo'}</td>
-              <td className="font-mono text-[13px]">
+              <td data-label="Tipo">{m.tipo === 'oab' ? 'OAB' : 'Processo'}</td>
+              <td data-titulo className="font-mono text-[13px]">
                 {m.tipo === 'oab' ? `${m.oab_numero ?? ''}/${m.oab_uf ?? ''}` : (m.numero_processo ?? '—')}
               </td>
-              <td>{m.descricao || '—'}</td>
-              <td>
+              <td data-label="Descrição">{m.descricao || '—'}</td>
+              <td data-label="Situação">
                 {m.ativo ? (
                   <span className="ds-badge ds-badge-success">Ativo</span>
                 ) : (
@@ -234,7 +234,7 @@ function Feriados({ orgId }: { orgId: string }) {
           {lista.map((f) => (
             <tr key={f.data}>
               <td className="whitespace-nowrap">{formatarData(f.data)}</td>
-              <td>{f.descricao}</td>
+              <td data-label="Descrição">{f.descricao}</td>
             </tr>
           ))}
         </tbody>
@@ -298,17 +298,19 @@ function Execucoes({ orgId }: { orgId: string }) {
           {lista.map((x) => (
             <tr key={x.id}>
               <td className="whitespace-nowrap">{formatarDataHora(x.executado_em)}</td>
-              <td>{x.origem ?? '—'}</td>
-              <td>{x.encontradas}</td>
-              <td>{x.novas}</td>
-              <td>
+              <td data-label="Origem">{x.origem ?? '—'}</td>
+              <td data-label="Encontradas">{x.encontradas}</td>
+              <td data-label="Novas">{x.novas}</td>
+              <td data-label="Status">
                 {x.status === 'ok' ? (
                   <span className="ds-badge ds-badge-success">OK</span>
                 ) : (
                   <span className="ds-badge ds-badge-destructive">Falha</span>
                 )}
               </td>
-              <td className="max-w-md text-xs break-words text-muted">{(x.detalhe ?? '').slice(0, 300)}</td>
+              <td data-label="Detalhe" className="max-w-md text-xs break-words text-muted">
+                {(x.detalhe ?? '').slice(0, 300)}
+              </td>
             </tr>
           ))}
         </tbody>

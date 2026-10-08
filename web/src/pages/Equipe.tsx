@@ -227,7 +227,7 @@ function TelaEquipe() {
                         <strong>{nomeDoMembro(m, eu)}</strong>
                         <div className="text-xs text-muted">{m.email}</div>
                       </td>
-                      <td>
+                      <td data-label="Papel">
                         {souEu ? (
                           ROTULO_PAPEL[m.papel]
                         ) : (
@@ -266,7 +266,7 @@ function TelaEquipe() {
                           </select>
                         )}
                       </td>
-                      <td className="whitespace-nowrap">{formatarDataHora(m.criado_em)}</td>
+                      <td data-label="Desde" className="whitespace-nowrap">{formatarDataHora(m.criado_em)}</td>
                       <td className="text-right">
                         {!souEu && (
                           <button
@@ -329,8 +329,8 @@ function TelaEquipe() {
                   return (
                     <tr key={c.id} className={expirado ? '[&>td]:text-muted' : ''}>
                       <td>{c.email}</td>
-                      <td>{ROTULO_PAPEL[c.papel]}</td>
-                      <td className="whitespace-nowrap">
+                      <td data-label="Papel">{ROTULO_PAPEL[c.papel]}</td>
+                      <td data-label="Situação" className="whitespace-nowrap">
                         {expirado ? 'Expirado' : `Vale até ${formatarDataHora(c.expira_em)}`}
                         {!expirado && (
                           <span className="block text-sm text-muted">

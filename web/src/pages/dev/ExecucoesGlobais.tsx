@@ -91,18 +91,22 @@ export default function ExecucoesGlobais() {
             {lista.map((x) => (
               <tr key={x.id}>
                 <td className="whitespace-nowrap">{formatarDataHora(x.executado_em)}</td>
-                <td className="break-all">{x.user_id ? (emailPorId.get(x.user_id) ?? x.user_id) : 'Geral'}</td>
-                <td>{x.origem ?? '—'}</td>
-                <td>{x.encontradas}</td>
-                <td>{x.novas}</td>
-                <td>
+                <td data-label="Conta" className="break-all">
+                  {x.user_id ? (emailPorId.get(x.user_id) ?? x.user_id) : 'Geral'}
+                </td>
+                <td data-label="Origem">{x.origem ?? '—'}</td>
+                <td data-label="Encontradas">{x.encontradas}</td>
+                <td data-label="Novas">{x.novas}</td>
+                <td data-label="Status">
                   {x.status === 'ok' ? (
                     <span className="ds-badge ds-badge-success">OK</span>
                   ) : (
                     <span className="ds-badge ds-badge-destructive">Falha</span>
                   )}
                 </td>
-                <td className="max-w-md text-xs break-words text-muted">{(x.detalhe ?? '').slice(0, 300)}</td>
+                <td data-label="Detalhe" className="max-w-md text-xs break-words text-muted">
+                  {(x.detalhe ?? '').slice(0, 300)}
+                </td>
               </tr>
             ))}
           </tbody>

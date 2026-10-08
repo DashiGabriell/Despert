@@ -464,7 +464,7 @@ function Feriados({ orgId, podeAlterar }: { orgId: string; podeAlterar: boolean 
             {lista.map((f) => (
               <tr key={f.data}>
                 <td className="whitespace-nowrap">{formatarData(f.data)}</td>
-                <td>{f.descricao}</td>
+                <td data-label="Descrição">{f.descricao}</td>
                 {podeAlterar && (
                   <td className="text-right">
                     <button

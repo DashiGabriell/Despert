@@ -1,6 +1,7 @@
 import type { AuthError } from '@supabase/supabase-js'
 import { useState, type FormEvent } from 'react'
 import { Link, Navigate, useSearchParams } from 'react-router-dom'
+import BotaoInstalarApp from '../components/InstalarApp'
 import { alertaAviso, alertaErro, alertaOk, botaoPrimario, campo, rotulo } from '../components/ui'
 import { rotaInicial } from '../domain/acesso'
 import { useAuth } from '../lib/auth-context'
@@ -66,7 +67,7 @@ export default function Login() {
   }
 
   return (
-    <main className="relative isolate grid min-h-dvh place-items-center overflow-hidden p-5">
+    <main className="relative isolate grid min-h-dvh place-items-center overflow-hidden p-5 max-md:items-end max-md:p-0 max-md:pt-[calc(var(--safe-top)+5rem)]">
       {/* scale-105 esconde as bordas claras que o blur cria nas extremidades da imagem */}
       <div
         aria-hidden
@@ -74,11 +75,12 @@ export default function Login() {
       />
       <form
         onSubmit={enviar}
-        className="ds-card ds-entrar w-full max-w-sm p-8 shadow-2xl"
+        className="ds-card ds-entrar w-full max-w-sm p-8 shadow-2xl max-md:max-w-none max-md:animate-[app-folha-sobe_0.45s_cubic-bezier(0.22,1,0.36,1)_both] max-md:rounded-t-[28px] max-md:rounded-b-none max-md:border-0 max-md:px-6 max-md:pt-3 max-md:pb-[calc(1.75rem+var(--safe-bottom))] motion-reduce:animate-none"
         aria-label={modo === 'entrar' ? 'Entrar' : 'Criar conta'}
       >
-        <Link to="/" className="mb-7 flex items-center gap-3" aria-label="Despert, página inicial">
-          <img src="/logo-despert-256.png" alt="" className="size-16 shrink-0 object-contain" />
+        <span aria-hidden className="mx-auto mb-5 block h-[5px] w-10 rounded-full bg-muted/35 md:hidden" />
+        <Link to="/" className="mb-6 flex items-center gap-3 md:mb-7" aria-label="Despert, página inicial">
+          <img src="/logo-despert-256.png" alt="" className="size-14 shrink-0 object-contain md:size-16" />
           <span aria-hidden>
             <span className="block font-display text-3xl leading-tight font-bold text-navy">Despert</span>
             <span className="block text-[11px] tracking-wider text-muted uppercase">Monitor de prazos · DJEN</span>
@@ -151,6 +153,7 @@ export default function Login() {
             {modo === 'entrar' ? 'Criar conta' : 'Entrar'}
           </button>
         </p>
+        <BotaoInstalarApp estilo="botao" className="mt-5 w-full md:hidden" />
       </form>
     </main>
   )

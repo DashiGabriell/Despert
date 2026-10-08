@@ -56,19 +56,19 @@ export default function Historico() {
             {lista.map((x) => (
               <tr key={x.id}>
                 <td className={`whitespace-nowrap`}>{formatarDataHora(x.executado_em)}</td>
-                <td>{ORIGENS[x.origem ?? ''] ?? x.origem ?? '—'}</td>
-                <td>{x.encontradas}</td>
-                <td>
+                <td data-label="Origem">{ORIGENS[x.origem ?? ''] ?? x.origem ?? '—'}</td>
+                <td data-label="Encontradas">{x.encontradas}</td>
+                <td data-label="Novas">
                   <strong>{x.novas}</strong>
                 </td>
-                <td>
+                <td data-label="Status">
                   {x.status === 'ok' ? (
                     <span className="ds-badge ds-badge-success">OK</span>
                   ) : (
                     <span className="ds-badge ds-badge-destructive">Falha</span>
                   )}
                 </td>
-                <td className={`max-w-md text-xs break-words text-muted`}>
+                <td data-label="Detalhe" className={`max-w-md text-xs break-words text-muted`}>
                   {(x.detalhe ?? '').slice(0, 300)}
                 </td>
               </tr>

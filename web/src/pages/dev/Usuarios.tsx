@@ -97,16 +97,20 @@ export default function Usuarios() {
                       {!c.confirmado && <span className="ds-badge ds-badge-warning">e-mail não confirmado</span>}
                     </div>
                   </td>
-                  <td className="whitespace-nowrap">{formatarDataHora(c.criado_em)}</td>
-                  <td className="whitespace-nowrap">{c.ultimo_acesso ? formatarDataHora(c.ultimo_acesso) : '—'}</td>
-                  <td>{c.monitoramentos_ativos}</td>
-                  <td>
+                  <td data-label="Criada em" className="whitespace-nowrap">
+                    {formatarDataHora(c.criado_em)}
+                  </td>
+                  <td data-label="Último acesso" className="whitespace-nowrap">
+                    {c.ultimo_acesso ? formatarDataHora(c.ultimo_acesso) : '—'}
+                  </td>
+                  <td data-label="Monitoramentos">{c.monitoramentos_ativos}</td>
+                  <td data-label="Prazos abertos">
                     {c.prazos_abertos}
                     {c.prazos_vencidos > 0 && (
                       <span className="ml-1.5 text-xs font-semibold text-danger">({c.prazos_vencidos} vencidos)</span>
                     )}
                   </td>
-                  <td className="whitespace-nowrap">
+                  <td data-label="Última execução" className="whitespace-nowrap">
                     {c.ultima_execucao ? (
                       <>
                         {formatarDataHora(c.ultima_execucao)}{' '}

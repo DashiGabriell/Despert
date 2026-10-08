@@ -66,10 +66,12 @@ export default function Auditoria() {
             {lista.map((r) => (
               <tr key={r.id}>
                 <td className="whitespace-nowrap">{formatarDataHora(r.criado_em)}</td>
-                <td className="break-all">{r.dev_email ?? '—'}</td>
-                <td>{descreverAcao(r.acao)}</td>
-                <td className="break-all">{r.alvo_email ?? (r.alvo_user_id ? r.alvo_user_id : '—')}</td>
-                <td className="text-xs text-muted">{resumirDetalhe(r.detalhe) || '—'}</td>
+                <td data-label="Dev" className="break-all">{r.dev_email ?? '—'}</td>
+                <td data-label="Ação">{descreverAcao(r.acao)}</td>
+                <td data-label="Conta afetada" className="break-all">
+                  {r.alvo_email ?? (r.alvo_user_id ? r.alvo_user_id : '—')}
+                </td>
+                <td data-label="Detalhe" className="text-xs text-muted">{resumirDetalhe(r.detalhe) || '—'}</td>
               </tr>
             ))}
           </tbody>

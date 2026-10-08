@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -230,7 +230,7 @@ describe('acesso dev', () => {
     renderizar('/dashitecnology')
     expect(await screen.findByRole('heading', { name: 'Visão geral' })).toBeInTheDocument()
     for (const modo of ['Visão geral', 'Usuários', 'Dados', 'Execuções', 'n8n', 'Auditoria']) {
-      expect(screen.getByRole('link', { name: modo })).toBeInTheDocument()
+      expect(screen.getAllByRole('link', { name: modo }).length).toBeGreaterThan(0)
     }
     expect(screen.getByText(/O robô não está conectado/)).toBeInTheDocument()
   })
@@ -341,7 +341,28 @@ describe('equipe e organizações', () => {
     renderizar('/prazos')
     expect(await screen.findByRole('heading', { name: 'Prazos' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Prazo manual/ }) !== null).toBe(ve)
+    expect(screen.queryByRole('button', { name: 'Novo prazo' }) !== null).toBe(ve)
     expect(screen.queryByRole('button', { name: /Buscar agora/ }) !== null).toBe(ve)
+  })
+
+  it('no celular, "Mais" abre a folha com as outras seções, a conta e o Sair', async () => {
+    pertencas = [pertenca('org-1', 'Escritório da Ana', 'administrador', 'escritorio')]
+    renderizar('/prazos')
+    expect(await screen.findByRole('heading', { name: 'Prazos' })).toBeInTheDocument()
+    const abas = screen.getByRole('navigation', { name: 'Navegação principal' })
+    expect(within(abas).queryByRole('link', { name: 'Histórico' })).not.toBeInTheDocument()
+
+    await userEvent.click(within(abas).getByRole('button', { name: 'Mais' }))
+    const secoes = screen.getByRole('navigation', { name: 'Mais seções' })
+    for (const secao of ['Histórico', 'Configurações', 'Equipe']) {
+      expect(within(secoes).getByRole('link', { name: secao })).toBeInTheDocument()
+    }
+    expect(within(secoes).queryByRole('link', { name: 'Prazos' })).not.toBeInTheDocument()
+    expect(screen.getByText('Escritório da Ana', { selector: 'strong' })).toBeInTheDocument()
+
+    await userEvent.click(within(secoes).getByRole('link', { name: 'Configurações' }))
+    expect(await screen.findByRole('heading', { name: 'Configurações' })).toBeInTheDocument()
+    expect(screen.queryByRole('navigation', { name: 'Mais seções' })).not.toBeInTheDocument()
   })
 
   it('quem está em duas organizações troca entre elas e vê só os dados da ativa', async () => {

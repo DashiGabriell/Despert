@@ -1,0 +1,592 @@
+/*
+ * Experiência de app no celular e no app instalado (PWA): só aparência.
+ * Barra de abas, folha "Mais", modais como folha inferior, tabelas como cartões
+ * e alvos de toque de 44px. No desktop nada aqui muda o layout.
+ */
+
+:root {
+  --tabbar-h: 62px;
+  --app-topo-h: 56px;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  a,
+  button,
+  label,
+  summary,
+  select,
+  input,
+  textarea {
+    touch-action: manipulation;
+  }
+
+  ::selection {
+    background: hsl(var(--primary));
+    color: #fff;
+  }
+}
+
+@layer components {
+  /* ------------------------------------------------------------ topo do app */
+  .app-topo {
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    min-height: calc(var(--app-topo-h) + var(--safe-top));
+    padding: var(--safe-top) calc(1rem + var(--safe-right)) 0 calc(1rem + var(--safe-left));
+    border-bottom: 1px solid hsl(var(--border));
+    background: hsl(var(--background) / 0.88);
+    -webkit-backdrop-filter: saturate(180%) blur(16px);
+    backdrop-filter: saturate(180%) blur(16px);
+  }
+
+  /* ------------------------------------------------------------ barra de abas */
+  .app-abas {
+    position: fixed;
+    inset-inline: 0;
+    bottom: 0;
+    z-index: 40;
+    display: flex;
+    align-items: stretch;
+    gap: 0.125rem;
+    min-height: calc(var(--tabbar-h) + var(--safe-bottom));
+    padding: 0.3rem calc(0.4rem + var(--safe-right)) calc(0.3rem + var(--safe-bottom))
+      calc(0.4rem + var(--safe-left));
+    border-top: 1px solid hsl(var(--border));
+    background: hsl(0 0% 100% / 0.9);
+    -webkit-backdrop-filter: saturate(180%) blur(18px);
+    backdrop-filter: saturate(180%) blur(18px);
+    user-select: none;
+  }
+
+  .app-aba {
+    position: relative;
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.15rem;
+    padding: 0;
+    border: none;
+    background: transparent;
+    color: hsl(var(--muted-foreground));
+    font: inherit;
+    font-size: clamp(0.625rem, 2.8vw, 0.6875rem);
+    font-weight: 600;
+    cursor: pointer;
+    transition:
+      color 0.15s ease,
+      transform 0.12s ease;
+  }
+
+  .app-aba:active {
+    transform: scale(0.92);
+  }
+
+  .app-aba-icone {
+    display: grid;
+    place-items: center;
+    width: 52px;
+    height: 30px;
+    border-radius: 999px;
+    transition: background 0.2s ease;
+  }
+
+  .app-aba-icone svg {
+    width: 22px;
+    height: 22px;
+  }
+
+  .app-aba-rotulo {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .app-aba[aria-current='page'],
+  .app-aba[aria-expanded='true'],
+  .app-aba[data-ativa='true'] {
+    color: hsl(var(--primary));
+  }
+
+  .app-aba[aria-current='page'] .app-aba-icone,
+  .app-aba[aria-expanded='true'] .app-aba-icone,
+  .app-aba[data-ativa='true'] .app-aba-icone {
+    background: hsl(var(--primary) / 0.12);
+  }
+
+  .app-aba-contador {
+    position: absolute;
+    top: 0;
+    left: calc(50% + 6px);
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    border: 2px solid #fff;
+    border-radius: 999px;
+    background: hsl(var(--destructive));
+    color: #fff;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    line-height: 14px;
+    text-align: center;
+    box-sizing: content-box;
+  }
+
+  /* ação principal (novo prazo) em destaque, no plástico vinho */
+  .app-aba-acao .app-aba-icone {
+    width: 50px;
+    height: 50px;
+    margin-top: -20px;
+    border-radius: 18px;
+    background-color: #8b1e2d;
+    background-image:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.32) 0%, rgba(255, 255, 255, 0) 42%),
+      var(--btn-3d-primary);
+    box-shadow:
+      var(--plastic-raised),
+      0 0 0 4px hsl(var(--background));
+    color: #fff;
+  }
+
+  .app-aba-acao:active .app-aba-icone {
+    box-shadow:
+      var(--plastic-pressed),
+      0 0 0 4px hsl(var(--background));
+  }
+
+  .app-aba-acao:disabled {
+    opacity: 0.5;
+  }
+
+  .app-aba-acao .app-aba-icone svg {
+    width: 26px;
+    height: 26px;
+  }
+
+  /* ------------------------------------------------------------ folha inferior */
+  .app-folha {
+    position: fixed;
+    inset: auto 0 0;
+    width: 100%;
+    max-width: 100%;
+    max-height: 88dvh;
+    margin: 0;
+    padding: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    border: none;
+    border-radius: 24px 24px 0 0;
+    background: var(--surface-3d);
+    color: hsl(var(--foreground));
+    transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .app-folha[open] {
+    animation: app-folha-sobe 0.34s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .app-folha-corpo {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    padding: 0 calc(1.25rem + var(--safe-right)) calc(1.25rem + var(--safe-bottom))
+      calc(1.25rem + var(--safe-left));
+  }
+
+  .app-folha::backdrop {
+    background: rgb(20 18 16 / 0.5);
+    animation: ds-overlay-in 0.25s ease;
+  }
+
+  .app-folha-topo {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    padding-top: 0.6rem;
+    touch-action: none;
+    cursor: grab;
+  }
+
+  .app-folha-alca {
+    align-self: center;
+    width: 40px;
+    height: 5px;
+    border-radius: 999px;
+    background: hsl(var(--muted-foreground) / 0.35);
+  }
+
+  .app-folha-grupo {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+
+  .app-folha-link {
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+    width: 100%;
+    min-height: 52px;
+    padding: 0 0.75rem 0 1rem;
+    border: 1px solid hsl(var(--border));
+    border-radius: calc(var(--radius) - 4px);
+    background: hsl(var(--card));
+    color: hsl(var(--foreground));
+    font-weight: 600;
+    text-align: left;
+    cursor: pointer;
+    transition: transform 0.12s ease;
+  }
+
+  .app-folha-link:active {
+    transform: scale(0.98);
+  }
+
+  .app-folha-link[aria-current='page'] {
+    border-color: hsl(var(--primary) / 0.5);
+    background: hsl(var(--primary) / 0.07);
+    color: hsl(var(--primary));
+  }
+
+  .app-folha-link-icone {
+    display: grid;
+    flex-shrink: 0;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 10px;
+    background: hsl(var(--primary) / 0.1);
+    color: hsl(var(--primary));
+  }
+
+  .app-folha-link-icone svg,
+  .app-folha-seta {
+    width: 18px;
+    height: 18px;
+  }
+
+  .app-folha-seta {
+    flex-shrink: 0;
+    margin-left: auto;
+    color: hsl(var(--muted-foreground));
+  }
+
+  .ds-dialog-alca {
+    display: none;
+  }
+
+  @keyframes app-folha-sobe {
+    from {
+      transform: translateY(100%);
+    }
+  }
+}
+
+/* ------------------------------------------------------------ só no celular */
+@media (width < 48rem) {
+  @layer components {
+    .com-abas {
+      padding-bottom: calc(var(--tabbar-h) + var(--safe-bottom) + 0.75rem);
+    }
+
+    /* modal vira folha que sobe de baixo */
+    .ds-dialog-overlay {
+      place-items: end stretch;
+      padding: 0;
+    }
+
+    .ds-dialog {
+      width: 100%;
+      max-width: none;
+      max-height: 92dvh;
+      border: none;
+      border-radius: 24px 24px 0 0;
+      padding-bottom: var(--safe-bottom);
+      animation: app-folha-sobe 0.34s cubic-bezier(0.22, 1, 0.36, 1) both;
+    }
+
+    .ds-dialog-alca {
+      display: block;
+      align-self: center;
+      flex-shrink: 0;
+      width: 40px;
+      height: 5px;
+      margin-top: 0.6rem;
+      border-radius: 999px;
+      background: hsl(var(--muted-foreground) / 0.35);
+    }
+
+    /* tabela vira lista agrupada; o rótulo vem do data-label de cada célula */
+    .ds-table thead {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+    }
+
+    .ds-table,
+    .ds-table tbody {
+      display: block;
+    }
+
+    .ds-table tbody tr {
+      display: flex;
+      flex-direction: column;
+      padding: 0.75rem 1rem;
+      border-bottom: 1px solid hsl(var(--border));
+    }
+
+    .ds-table tbody tr:last-child {
+      border-bottom: none;
+    }
+
+    .ds-table tbody td,
+    .ds-table tbody tr:last-child td {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.25rem 1rem;
+      max-width: none;
+      min-height: 2rem;
+      padding: 0.2rem 0;
+      border-bottom: none;
+      text-align: right;
+      white-space: normal;
+    }
+
+    .ds-table tbody td[data-label]::before {
+      content: attr(data-label);
+      flex-shrink: 0;
+      color: hsl(var(--muted-foreground));
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-align: left;
+      text-transform: uppercase;
+    }
+
+    /* título do cartão: a primeira célula sem rótulo, ou a marcada com data-titulo */
+    .ds-table tbody td:first-child:not([data-label]),
+    .ds-table tbody td[data-titulo] {
+      display: block;
+      padding-bottom: 0.35rem;
+      font-size: 1rem;
+      font-weight: 600;
+      text-align: left;
+    }
+
+    .ds-table tbody td[data-titulo] {
+      order: -1;
+    }
+
+    .ds-table tbody td:not(:first-child):not([data-label]):not([data-titulo]) {
+      justify-content: flex-end;
+      padding-top: 0.5rem;
+    }
+
+    .ds-table tbody td:empty {
+      display: none;
+    }
+
+    .ds-table tbody td[colspan] {
+      justify-content: center;
+      text-align: center;
+    }
+
+    .ds-table tbody tr:has(> td[colspan]) {
+      padding: 0.5rem 1rem;
+    }
+
+    .ds-table tbody tr:has(> td[colspan]) td {
+      font-weight: 400;
+    }
+
+    /* prazo vira cartão compacto: selo e vencimento no alto, o processo, e a ação à direita */
+    .ds-table.tabela-prazos tbody tr:not(:has(> td[colspan])) {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      grid-template-areas:
+        'selo venc'
+        'proc proc'
+        'trib trib'
+        'tipo acao'
+        'prazo acao'
+        'resp acao';
+      gap: 0.2rem 0.75rem;
+      padding: 0.9rem 1rem;
+    }
+
+    .ds-table.tabela-prazos tbody tr[data-conferir] {
+      box-shadow: inset 3px 0 0 var(--color-gold);
+    }
+
+    .ds-table.tabela-prazos tbody tr > td[data-area] {
+      display: block;
+      min-height: 0;
+      padding: 0;
+      font-size: 0.875rem;
+      font-weight: 400;
+      text-align: left;
+    }
+
+    .ds-table.tabela-prazos tbody tr > td[data-area]::before {
+      display: none;
+    }
+
+    .ds-table.tabela-prazos tbody tr > td[data-area='selo'] {
+      grid-area: selo;
+      padding-bottom: 0.35rem;
+    }
+
+    .ds-table.tabela-prazos tbody tr > td[data-area='venc'] {
+      grid-area: venc;
+      text-align: right;
+    }
+
+    .ds-table.tabela-prazos tbody tr > td[data-area='proc'] {
+      grid-area: proc;
+    }
+
+    .ds-table.tabela-prazos tbody tr > td[data-area='trib'] {
+      grid-area: trib;
+      color: hsl(var(--muted-foreground));
+      font-size: 0.8125rem;
+    }
+
+    .ds-table.tabela-prazos tbody tr > td[data-area='tipo'] {
+      grid-area: tipo;
+      padding-top: 0.35rem;
+      font-weight: 600;
+    }
+
+    .ds-table.tabela-prazos tbody tr > td[data-area='prazo'] {
+      grid-area: prazo;
+      color: hsl(var(--muted-foreground));
+      font-size: 0.8125rem;
+    }
+
+    .ds-table.tabela-prazos tbody tr > td[data-area='resp'] {
+      grid-area: resp;
+      color: hsl(var(--muted-foreground));
+      font-size: 0.8125rem;
+    }
+
+    .ds-table.tabela-prazos tbody tr > td[data-area='resp']::before {
+      display: inline;
+      content: 'Responsável: ';
+    }
+
+    .ds-table.tabela-prazos tbody tr > td[data-area='acao'] {
+      grid-area: acao;
+      align-self: end;
+    }
+
+    .ds-table.tabela-prazos tbody tr > td[data-area='acao']:empty {
+      display: none;
+    }
+  }
+}
+
+/* ------------------------------------------------------------ dedo, não mouse */
+@media (pointer: coarse) {
+  @layer components {
+    .ds-btn,
+    .ds-btn-sm {
+      min-height: 44px;
+    }
+
+    .ds-btn-icon {
+      width: 44px;
+    }
+
+    .ds-input {
+      min-height: 46px;
+      font-size: max(1rem, 16px);
+    }
+
+    .ds-checkbox {
+      width: 22px;
+      height: 22px;
+    }
+
+    .ds-dialog-close {
+      width: 44px;
+      height: 44px;
+    }
+  }
+}
+
+/* hover não existe no toque: evita o efeito grudado depois do toque */
+@media (hover: none) {
+  @layer components {
+    .ds-btn:hover:not(:disabled) {
+      filter: none;
+    }
+
+    .ds-metric:hover {
+      transform: none;
+      border-color: hsl(var(--border));
+      background: var(--surface-3d);
+    }
+
+    .ds-table tbody tr.ds-linha-clicavel:hover > td {
+      background: transparent;
+    }
+
+    .ds-table tbody tr.ds-linha-clicavel:active {
+      transform: scale(0.99);
+    }
+  }
+}
+
+/* instalado: sem quique de navegador nem seleção acidental do casco */
+@media (display-mode: standalone) {
+  html,
+  body {
+    overscroll-behavior-y: none;
+  }
+
+  .app-topo,
+  .app-abas {
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  .app-abas a,
+  .app-topo a {
+    -webkit-touch-callout: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-folha[open],
+  .app-folha::backdrop,
+  .ds-dialog {
+    animation: none;
+  }
+
+  .app-aba,
+  .app-folha,
+  .app-folha-link {
+    transition: none;
+  }
+}
