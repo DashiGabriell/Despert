@@ -4,7 +4,7 @@
  * instantâneo e funcionar sem rede. Dados (Supabase, n8n) nunca passam pelo cache:
  * qualquer requisição de outra origem que não seja fonte segue direto para a rede.
  */
-const VERSAO = 'despert-v2'
+const VERSAO = 'despert-v3'
 const CASCO = `${VERSAO}-casco`
 const RUNTIME = `${VERSAO}-runtime`
 const PRECACHE = [
@@ -64,7 +64,7 @@ async function revalidarEmSegundoPlano(req) {
       if (resp.ok) cache.put(req, resp.clone())
       return resp
     })
-    .catch(() => salvo)
+    .catch(() => salvo ?? Response.error())
   return salvo ?? rede
 }
 
