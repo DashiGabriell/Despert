@@ -292,6 +292,7 @@ describe('resumoDoPlano', () => {
       plano: 'Solo',
       etapa: 'teste',
       situacao: 'Período de teste',
+      vencimento: { rotulo: 'Fim do teste', valor: '08/10/2026' },
       detalhe: 'Faltam 3 dias de teste (até 08/10/2026).',
     })
     const ultimo = resumoDoPlano(
@@ -302,14 +303,32 @@ describe('resumoDoPlano', () => {
     expect(ultimo.detalhe).toBe('Hoje é o último dia do teste.')
   })
 
-  it('ativa em dia não tem detalhe', () => {
-    expect(resumoDoPlano(org({}), HOJE, CARENCIA_PADRAO)).toEqual({
+  it('ativa em dia mostra o vencimento da mensalidade, sem detalhe', () => {
+    expect(resumoDoPlano(org({ pago_ate: '2026-12-31' }), HOJE, CARENCIA_PADRAO)).toEqual({
       plano: 'Escritório',
       etapa: 'ativa',
       situacao: 'Ativa',
+      vencimento: { rotulo: 'Vencimento da mensalidade', valor: '31/12/2026' },
       detalhe: null,
     })
-    expect(resumoDoPlano(org({ pago_ate: '2026-12-31' }), HOJE, CARENCIA_PADRAO).detalhe).toBeNull()
+    expect(resumoDoPlano(org({}), HOJE, CARENCIA_PADRAO).vencimento).toEqual({
+      rotulo: 'Vencimento da mensalidade',
+      valor: 'Sem vencimento',
+    })
+  })
+
+  it('depois do vencimento diz quando venceu (mensalidade ou teste)', () => {
+    expect(resumoDoPlano(org({ pago_ate: '2026-10-03' }), HOJE, CARENCIA_PADRAO).vencimento).toEqual({
+      rotulo: 'Mensalidade venceu em',
+      valor: '03/10/2026',
+    })
+    const testeVencido = resumoDoPlano(
+      org({ plano: 'solo', situacao: 'teste', teste_iniciado_em: '2026-09-25T12:00:00Z' }),
+      HOJE,
+      CARENCIA_PADRAO,
+    )
+    expect(testeVencido.etapa).toBe('aviso')
+    expect(testeVencido.vencimento).toEqual({ rotulo: 'Teste terminou em', valor: '01/10/2026' })
   })
 
   it('carência: aviso, somente leitura e suspensa com o prazo de cada etapa', () => {

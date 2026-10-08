@@ -79,18 +79,20 @@ describe('tela de Configurações', () => {
     organizacao = ORGANIZACAO
   })
 
-  it('Administrador acompanha o plano e a situação', () => {
+  it('Administrador acompanha o plano, a situação e o vencimento da mensalidade', () => {
+    organizacao = { ...ORGANIZACAO, pago_ate: '2026-11-10' }
     render(<Configuracoes />)
     const plano = screen.getByRole('region', { name: 'Seu plano' })
     expect(plano).toHaveTextContent('Escritório')
     expect(plano).toHaveTextContent('Ativa')
+    expect(plano).toHaveTextContent('Vencimento da mensalidade10/11/2026')
   })
 
   it('no teste mostra quantos dias faltam; na carência, o prazo da etapa', () => {
     organizacao = { ...ORGANIZACAO, plano: 'solo', situacao: 'teste', teste_iniciado_em: '2026-10-02T12:00:00Z' }
     const { unmount } = render(<Configuracoes />)
     expect(screen.getByRole('region', { name: 'Seu plano' })).toHaveTextContent(
-      /Solo.*Período de teste.*Faltam 3 dias de teste \(até 08\/10\/2026\)\./,
+      /Solo.*Período de teste.*Fim do teste08\/10\/2026.*Faltam 3 dias de teste \(até 08\/10\/2026\)\./,
     )
     unmount()
     organizacao = { ...ORGANIZACAO, pago_ate: '2026-09-26' }

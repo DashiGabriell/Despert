@@ -314,8 +314,19 @@ export interface ResumoDoPlano {
   plano: string
   etapa: Etapa
   situacao: string
+  /** Fim do teste ou vencimento da mensalidade (`pago_ate`), já formatado. */
+  vencimento: { rotulo: string; valor: string }
   /** Prazo da etapa atual e o que vem depois; `null` quando a organização está em dia. */
   detalhe: string | null
+}
+
+function vencimentoDe(org: DadosDeAcesso, etapa: Etapa, carencia: Carencia): ResumoDoPlano['vencimento'] {
+  const fim = ultimoDiaDeAcesso(org, carencia)
+  const valor = fim ? formatarData(fim) : 'Sem vencimento'
+  if (org.situacao === 'teste') {
+    return { rotulo: etapa === 'teste' ? 'Fim do teste' : 'Teste terminou em', valor }
+  }
+  return { rotulo: etapa === 'ativa' ? 'Vencimento da mensalidade' : 'Mensalidade venceu em', valor }
 }
 
 function emDias(dias: number): string {
@@ -330,7 +341,7 @@ export function resumoDoPlano(
 ): ResumoDoPlano {
   const etapa = etapaDaOrganizacao(org, hoje, carencia)
   const dias = diasAteMudar(org, hoje, carencia) ?? 0
-  const base = { plano: ROTULO_PLANO[org.plano], etapa }
+  const base = { plano: ROTULO_PLANO[org.plano], etapa, vencimento: vencimentoDe(org, etapa, carencia) }
   switch (etapa) {
     case 'teste': {
       const fim = ultimoDiaDeAcesso(org, carencia)

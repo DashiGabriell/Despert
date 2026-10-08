@@ -127,7 +127,7 @@ function SeuPlano() {
       <h2 id="titulo-plano" className="mb-4 text-2xl font-bold text-navy">
         Seu plano
       </h2>
-      <dl className="grid grid-cols-1 gap-x-5 gap-y-3 text-sm sm:grid-cols-2">
+      <dl className="grid grid-cols-1 gap-x-5 gap-y-3 text-sm sm:grid-cols-3">
         <div>
           <dt className="text-[11px] font-semibold tracking-wide text-muted uppercase">Plano</dt>
           <dd className="mt-0.5 text-base font-semibold text-ink">{resumo.plano}</dd>
@@ -137,6 +137,10 @@ function SeuPlano() {
           <dd className="mt-1">
             <span className={`ds-badge ${TOM_DA_ETAPA[resumo.etapa]}`}>{resumo.situacao}</span>
           </dd>
+        </div>
+        <div>
+          <dt className="text-[11px] font-semibold tracking-wide text-muted uppercase">{resumo.vencimento.rotulo}</dt>
+          <dd className="mt-0.5 text-base font-semibold text-ink">{resumo.vencimento.valor}</dd>
         </div>
       </dl>
       {resumo.detalhe && <p className={`${dica} mt-3`}>{resumo.detalhe}</p>}
