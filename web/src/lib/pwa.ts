@@ -7,6 +7,11 @@ export function modoApp(): boolean {
   return window.matchMedia?.('(display-mode: standalone)').matches === true || nav.standalone === true
 }
 
+/** vídeo de abertura: só no app instalado, uma vez por abertura, sem redução de movimento */
+export function deveMostrarSplash(sinais: { instalado: boolean; jaViu: boolean; reduzMovimento: boolean }): boolean {
+  return sinais.instalado && !sinais.jaViu && !sinais.reduzMovimento
+}
+
 /** como o botão "Instalar o app" deve se comportar neste aparelho:
  *  nativo  - o navegador entregou o aviso de instalação (Chrome/Edge/Samsung)
  *  ios     - iPhone/iPad: só dá para instalar pelo Compartilhar > Tela de Início

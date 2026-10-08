@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { eIos, modoInstalacao } from './pwa'
+import { deveMostrarSplash, eIos, modoInstalacao } from './pwa'
 
 const IPHONE =
   'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1'
@@ -17,6 +17,15 @@ describe('eIos', () => {
   it('não confunde Mac de mesa nem Windows', () => {
     expect(eIos(IPAD_DESKTOP, 0)).toBe(false)
     expect(eIos(WINDOWS, 0)).toBe(false)
+  })
+})
+
+describe('deveMostrarSplash', () => {
+  it('só no app instalado, uma vez por abertura, sem redução de movimento', () => {
+    expect(deveMostrarSplash({ instalado: true, jaViu: false, reduzMovimento: false })).toBe(true)
+    expect(deveMostrarSplash({ instalado: false, jaViu: false, reduzMovimento: false })).toBe(false)
+    expect(deveMostrarSplash({ instalado: true, jaViu: true, reduzMovimento: false })).toBe(false)
+    expect(deveMostrarSplash({ instalado: true, jaViu: false, reduzMovimento: true })).toBe(false)
   })
 })
 

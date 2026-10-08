@@ -4,7 +4,7 @@
  * instantâneo e funcionar sem rede. Dados (Supabase, n8n) nunca passam pelo cache:
  * qualquer requisição de outra origem que não seja fonte segue direto para a rede.
  */
-const VERSAO = 'despert-v1'
+const VERSAO = 'despert-v2'
 const CASCO = `${VERSAO}-casco`
 const RUNTIME = `${VERSAO}-runtime`
 const PRECACHE = [
@@ -89,6 +89,8 @@ self.addEventListener('fetch', (evento) => {
     return
   }
   if (url.pathname === '/sw.js') return
+  // vídeo vem em Range requests (Safari): resposta inteira do cache quebra o play
+  if (url.pathname.endsWith('.mp4')) return
   evento.respondWith(revalidarEmSegundoPlano(req))
 })
 

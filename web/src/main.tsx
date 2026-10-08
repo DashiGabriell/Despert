@@ -5,6 +5,7 @@ import { BrowserRouter } from 'react-router-dom'
 import './index.css'
 import App from './App.tsx'
 import AuthProvider from './components/AuthProvider.tsx'
+import SplashVideo from './components/SplashVideo.tsx'
 import ToastProvider from './components/ToastProvider.tsx'
 import { iniciarInstalacao, registrarServiceWorker } from './lib/pwa.ts'
 
@@ -25,6 +26,7 @@ createRoot(document.getElementById('root')!).render(
         </AuthProvider>
       </ToastProvider>
     </QueryClientProvider>
+    <SplashVideo />
   </StrictMode>,
 )
 
