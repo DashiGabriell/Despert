@@ -4,13 +4,13 @@ status: accepted
 
 # Preços dos planos no lançamento
 
-Os planos do ADR-0008 têm preço fixo mensal, sem cobrança por usuário e sem plano anual por enquanto. O preço posiciona o Despert acima dos serviços que só enviam alertas de publicação (Escavador, Voga, DOinet) e abaixo dos sistemas de gestão completos (Astrea, Projuris, ADVBOX): ele faz mais que avisar, porque calcula o vencimento em dias úteis e mostra prazos e agenda, mas não é um ERP jurídico.
+Os planos do ADR-0008 têm preço fixo mensal, sem cobrança por usuário e sem plano anual por enquanto. O preço posiciona o Despert bem acima dos serviços que só enviam alertas de publicação (Escavador, Voga, DOinet) e na faixa dos sistemas de gestão completos (Astrea, Projuris, ADVBOX): ele faz mais que avisar, porque calcula o vencimento em dias úteis e mostra prazos e agenda, e o valor se apoia em não deixar o advogado perder prazo, não na quantidade de funcionalidades.
 
 | Plano | Preço mensal | Usuários incluídos |
 |---|---|---|
-| Solo | R$ 49,90 | 1 |
-| Escritório | R$ 149,00 | 2 a 10 |
-| Corporativo | R$ 449,00 | 11 a 20 |
+| Solo | R$ 79,90 | 1 |
+| Escritório | R$ 397,90 | 2 a 10 |
+| Corporativo | R$ 849,90 | 11 a 20 |
 
 Acima de 20 usuários o preço é negociado caso a caso, junto com o limite ajustado pelo dev. O teste de 7 dias continua gratuito.
 
