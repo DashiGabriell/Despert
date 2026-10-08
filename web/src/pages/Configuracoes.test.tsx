@@ -2,7 +2,14 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { pode } from '../domain/permissoes'
-import type { Configuracao, ConfiguracaoOrganizacao, MembroDaEquipe, PapelMembro } from '../lib/database.types'
+import { CARENCIA_PADRAO } from '../domain/planos'
+import type {
+  Configuracao,
+  ConfiguracaoOrganizacao,
+  MembroDaEquipe,
+  Organizacao,
+  PapelMembro,
+} from '../lib/database.types'
 import Configuracoes from './Configuracoes'
 
 let papel: PapelMembro = 'administrador'
@@ -27,12 +34,23 @@ const CONFIG_ORG: ConfiguracaoOrganizacao = {
 }
 
 vi.mock('../lib/auth-context', () => ({ useUserId: () => 'ana-1', useEmailEfetivo: () => 'ana@exemplo.com' }))
+let organizacao: Partial<Organizacao> = {}
+const ORGANIZACAO: Partial<Organizacao> = {
+  id: 'org-1',
+  plano: 'escritorio',
+  situacao: 'ativa',
+  teste_iniciado_em: null,
+  pago_ate: null,
+  criado_em: '2026-01-01T12:00:00Z',
+}
+
 vi.mock('../lib/organizacao-context', () => ({
   useOrganizacaoId: () => 'org-1',
-  usePertenca: () => ({ organizacao_id: 'org-1', papel }),
+  usePertenca: () => ({ organizacao_id: 'org-1', papel, organizacao }),
   usePode: () => (acao: Parameters<typeof pode>[1]) => pode(papel, acao),
 }))
-vi.mock('../data/plano', () => ({ usePlano: () => ({ escrita: true }) }))
+vi.mock('../data/plano', () => ({ usePlano: () => ({ escrita: true, carencia: CARENCIA_PADRAO }) }))
+vi.mock('../data/relogio', () => ({ useHoje: () => '2026-10-06' }))
 vi.mock('../data/queries', () => ({
   useConfiguracao: () => ({ data: CONFIG, isPending: false, isError: false }),
   useConfiguracaoOrganizacao: () => ({ data: CONFIG_ORG, isPending: false, isError: false }),
@@ -58,6 +76,32 @@ describe('tela de Configurações', () => {
     vi.clearAllMocks()
     papel = 'administrador'
     membros = EQUIPE
+    organizacao = ORGANIZACAO
+  })
+
+  it('Administrador acompanha o plano e a situação', () => {
+    render(<Configuracoes />)
+    const plano = screen.getByRole('region', { name: 'Seu plano' })
+    expect(plano).toHaveTextContent('Escritório')
+    expect(plano).toHaveTextContent('Ativa')
+  })
+
+  it('no teste mostra quantos dias faltam; na carência, o prazo da etapa', () => {
+    organizacao = { ...ORGANIZACAO, plano: 'solo', situacao: 'teste', teste_iniciado_em: '2026-10-02T12:00:00Z' }
+    const { unmount } = render(<Configuracoes />)
+    expect(screen.getByRole('region', { name: 'Seu plano' })).toHaveTextContent(
+      /Solo.*Período de teste.*Faltam 3 dias de teste \(até 08\/10\/2026\)\./,
+    )
+    unmount()
+    organizacao = { ...ORGANIZACAO, pago_ate: '2026-09-26' }
+    render(<Configuracoes />)
+    expect(screen.getByRole('region', { name: 'Seu plano' })).toHaveTextContent(/Somente leitura.*por mais 6 dias/)
+  })
+
+  it.each(['advogado', 'assistente', 'leitura'] as const)('%s não vê o plano', (p) => {
+    papel = p
+    render(<Configuracoes />)
+    expect(screen.queryByRole('region', { name: 'Seu plano' })).not.toBeInTheDocument()
   })
 
   it('Administrador altera o robô da organização e os feriados', async () => {

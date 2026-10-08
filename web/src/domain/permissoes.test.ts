@@ -16,6 +16,7 @@ const TABELA: [Acao, PapelMembro[]][] = [
   ['ver_auditoria', ['administrador']],
   ['exportar_relatorios', ['administrador', 'advogado', 'leitura']],
   ['buscar_agora', ['administrador', 'advogado', 'assistente']],
+  ['ver_plano', ['administrador']],
 ]
 
 describe('permissões por papel', () => {

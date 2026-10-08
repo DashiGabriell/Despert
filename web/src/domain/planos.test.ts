@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  resumoDoPlano,
   buscasAgoraRestantes,
   CARENCIA_PADRAO,
   camposDosAjustes,
@@ -267,5 +268,58 @@ describe('Buscar agora da organização', () => {
     expect(buscasAgoraRestantes(LIMITES_PADRAO.escritorio, 0)).toBe(15)
     expect(buscasAgoraRestantes(LIMITES_PADRAO.solo, 1)).toBe(0)
     expect(buscasAgoraRestantes(LIMITES_PADRAO.solo, 3)).toBe(0)
+  })
+})
+
+describe('resumoDoPlano', () => {
+  const HOJE = '2026-10-06'
+  const org = (parcial: Partial<Parameters<typeof resumoDoPlano>[0]>) => ({
+    plano: 'escritorio' as const,
+    situacao: 'ativa' as const,
+    teste_iniciado_em: null,
+    criado_em: '2026-01-01T12:00:00Z',
+    pago_ate: null,
+    ...parcial,
+  })
+
+  it('teste: dias restantes e data final; no último dia avisa', () => {
+    const emTeste = resumoDoPlano(
+      org({ plano: 'solo', situacao: 'teste', teste_iniciado_em: '2026-10-02T12:00:00Z' }),
+      HOJE,
+      CARENCIA_PADRAO,
+    )
+    expect(emTeste).toEqual({
+      plano: 'Solo',
+      etapa: 'teste',
+      situacao: 'Período de teste',
+      detalhe: 'Faltam 3 dias de teste (até 08/10/2026).',
+    })
+    const ultimo = resumoDoPlano(
+      org({ situacao: 'teste', teste_iniciado_em: '2026-09-30T12:00:00Z' }),
+      HOJE,
+      CARENCIA_PADRAO,
+    )
+    expect(ultimo.detalhe).toBe('Hoje é o último dia do teste.')
+  })
+
+  it('ativa em dia não tem detalhe', () => {
+    expect(resumoDoPlano(org({}), HOJE, CARENCIA_PADRAO)).toEqual({
+      plano: 'Escritório',
+      etapa: 'ativa',
+      situacao: 'Ativa',
+      detalhe: null,
+    })
+    expect(resumoDoPlano(org({ pago_ate: '2026-12-31' }), HOJE, CARENCIA_PADRAO).detalhe).toBeNull()
+  })
+
+  it('carência: aviso, somente leitura e suspensa com o prazo de cada etapa', () => {
+    const aviso = resumoDoPlano(org({ pago_ate: '2026-10-03' }), HOJE, CARENCIA_PADRAO)
+    expect(aviso.situacao).toBe('Acesso vencido (em aviso)')
+    expect(aviso.detalhe).toMatch(/^Tudo continua funcionando por mais 3 dias;/)
+    const leitura = resumoDoPlano(org({ pago_ate: '2026-09-26' }), HOJE, CARENCIA_PADRAO)
+    expect(leitura.situacao).toBe('Somente leitura')
+    expect(leitura.detalhe).toMatch(/por mais 6 dias; depois, o acesso é suspenso/)
+    const suspensa = resumoDoPlano(org({ plano: 'corporativo', pago_ate: '2026-09-01' }), HOJE, CARENCIA_PADRAO)
+    expect(suspensa).toMatchObject({ plano: 'Corporativo', etapa: 'suspensa', situacao: 'Suspensa' })
   })
 })

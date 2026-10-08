@@ -1,5 +1,5 @@
 import type { Json, Plano, SituacaoOrganizacao } from '../lib/database.types'
-import { hojeISO } from './datas'
+import { formatarData, hojeISO } from './datas'
 import type { DataISO } from './dias'
 import type { Resultado } from './validacao'
 
@@ -308,6 +308,62 @@ export function diasAteMudar(org: DadosDeAcesso, hoje: DataISO, carencia: Carenc
   if (dia <= carencia.carencia_aviso_dias) return carencia.carencia_aviso_dias - dia + 1
   if (dia <= carencia.carencia_total_dias) return carencia.carencia_total_dias - dia + 1
   return null
+}
+
+export interface ResumoDoPlano {
+  plano: string
+  etapa: Etapa
+  situacao: string
+  /** Prazo da etapa atual e o que vem depois; `null` quando a organização está em dia. */
+  detalhe: string | null
+}
+
+function emDias(dias: number): string {
+  return dias === 1 ? '1 dia' : `${dias} dias`
+}
+
+/** O que o Administrador vê do plano em Configurações: plano, situação e prazo da etapa. */
+export function resumoDoPlano(
+  org: DadosDeAcesso & { plano: Plano },
+  hoje: DataISO,
+  carencia: Carencia,
+): ResumoDoPlano {
+  const etapa = etapaDaOrganizacao(org, hoje, carencia)
+  const dias = diasAteMudar(org, hoje, carencia) ?? 0
+  const base = { plano: ROTULO_PLANO[org.plano], etapa }
+  switch (etapa) {
+    case 'teste': {
+      const fim = ultimoDiaDeAcesso(org, carencia)
+      return {
+        ...base,
+        situacao: 'Período de teste',
+        detalhe:
+          dias <= 1
+            ? 'Hoje é o último dia do teste.'
+            : `Faltam ${emDias(dias)} de teste (até ${fim ? formatarData(fim) : '—'}).`,
+      }
+    }
+    case 'ativa':
+      return { ...base, situacao: 'Ativa', detalhe: null }
+    case 'aviso':
+      return {
+        ...base,
+        situacao: 'Acesso vencido (em aviso)',
+        detalhe: `Tudo continua funcionando por mais ${emDias(dias)}; depois, a organização fica somente leitura. Fale com o suporte para regularizar.`,
+      }
+    case 'leitura':
+      return {
+        ...base,
+        situacao: 'Somente leitura',
+        detalhe: `O robô continua capturando e avisando por mais ${emDias(dias)}; depois, o acesso é suspenso. Fale com o suporte para reativar.`,
+      }
+    case 'suspensa':
+      return {
+        ...base,
+        situacao: 'Suspensa',
+        detalhe: 'O robô parou de buscar. Os dados continuam guardados para consulta. Fale com o suporte para reativar.',
+      }
+  }
 }
 
 // ------------------------------------------------------------------ Buscar agora

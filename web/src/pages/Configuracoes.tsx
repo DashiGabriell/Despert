@@ -24,8 +24,10 @@ import {
   useSalvarConfiguracao,
   useSalvarConfiguracaoOrganizacao,
 } from '../data/queries'
+import { useHoje } from '../data/relogio'
 import { formatarData } from '../domain/datas'
 import { escopoDoResumo } from '../domain/equipe'
+import { resumoDoPlano, type Etapa } from '../domain/planos'
 import { novoToken } from '../domain/token'
 import {
   validarConfiguracaoOrganizacao,
@@ -64,6 +66,7 @@ export default function Configuracoes() {
   return (
     <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-2">
       <div className="space-y-5">
+        {permite('ver_plano') && <SeuPlano />}
         <section className={`${cartao} p-5`}>
           <h2 className="mb-4 text-2xl font-bold text-navy">Seus alertas</h2>
           {config.isPending && <Carregando />}
@@ -102,6 +105,42 @@ export default function Configuracoes() {
       </div>
       <Feriados orgId={orgId} podeAlterar={permite('configurar_organizacao')} />
     </div>
+  )
+}
+
+const TOM_DA_ETAPA: Record<Etapa, string> = {
+  teste: 'ds-badge-coin',
+  ativa: 'ds-badge-success',
+  aviso: 'ds-badge-warning',
+  leitura: 'ds-badge-destructive',
+  suspensa: 'ds-badge-destructive',
+}
+
+/** Só leitura: plano e cobrança são do dev; o Administrador acompanha. */
+function SeuPlano() {
+  const { organizacao } = usePertenca()
+  const { carencia } = usePlano()
+  const hoje = useHoje()
+  const resumo = resumoDoPlano(organizacao, hoje, carencia)
+  return (
+    <section className={`${cartao} p-5`} aria-labelledby="titulo-plano">
+      <h2 id="titulo-plano" className="mb-4 text-2xl font-bold text-navy">
+        Seu plano
+      </h2>
+      <dl className="grid grid-cols-1 gap-x-5 gap-y-3 text-sm sm:grid-cols-2">
+        <div>
+          <dt className="text-[11px] font-semibold tracking-wide text-muted uppercase">Plano</dt>
+          <dd className="mt-0.5 text-base font-semibold text-ink">{resumo.plano}</dd>
+        </div>
+        <div>
+          <dt className="text-[11px] font-semibold tracking-wide text-muted uppercase">Situação</dt>
+          <dd className="mt-1">
+            <span className={`ds-badge ${TOM_DA_ETAPA[resumo.etapa]}`}>{resumo.situacao}</span>
+          </dd>
+        </div>
+      </dl>
+      {resumo.detalhe && <p className={`${dica} mt-3`}>{resumo.detalhe}</p>}
+    </section>
   )
 }
 

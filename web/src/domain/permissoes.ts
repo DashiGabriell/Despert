@@ -14,8 +14,9 @@ export type Acao =
   | 'ver_auditoria'
   | 'exportar_relatorios'
   | 'buscar_agora'
+  | 'ver_plano'
 
-/** Espelho do RLS em supabase/schema.sql: mudar um exige mudar o outro. */
+/** Espelho do RLS em supabase/schema.sql (menos `ver_plano`, só de tela): mudar um exige mudar o outro. */
 const PERMISSOES: Record<Acao, readonly PapelMembro[]> = {
   ver_prazos: PAPEIS,
   editar_prazo: ['administrador', 'advogado', 'assistente'],
@@ -28,6 +29,7 @@ const PERMISSOES: Record<Acao, readonly PapelMembro[]> = {
   ver_auditoria: ['administrador'],
   exportar_relatorios: ['administrador', 'advogado', 'leitura'],
   buscar_agora: ['administrador', 'advogado', 'assistente'],
+  ver_plano: ['administrador'],
 }
 
 export function pode(papel: PapelMembro, acao: Acao): boolean {
